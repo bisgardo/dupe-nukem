@@ -63,8 +63,9 @@ func Run(root string, shouldSkip ShouldSkipPath) (*Dir, error) {
 				curDir:  dir,
 				pathLen: len(path),
 			}
+		} else if size := info.Size(); size == 0 {
+			head.curDir.appendEmptyFile(name) // Walk visits in lexical order
 		} else {
-			size := info.Size()
 			head.curDir.appendFile(NewFile(name, size)) // Walk visits in lexical order
 		}
 		return nil

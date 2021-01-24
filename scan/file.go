@@ -8,8 +8,10 @@ type Dir struct {
 	Name string `json:"name"`
 	// Sorted list of the subdirectories of the directory.
 	Dirs []*Dir `json:"dirs,omitempty"`
-	// Sorted list of files in the directory.
+	// Sorted list of non-empty files in the directory.
 	Files []*File `json:"files,omitempty"`
+	// Sorted list of empty files in the directory.
+	EmptyFiles []string `json:"empty_files,omitempty"`
 	// Sorted list of files in the directory that were skipped when scanning.
 	SkippedFiles []string `json:"skipped_files,omitempty"`
 	// Sorted list of subdirectories of the directory that were skipped when scanning.
@@ -37,6 +39,13 @@ func (d *Dir) appendDir(s *Dir) {
 // as the function doesn't ensure nor check this.
 func (d *Dir) appendFile(f *File) {
 	d.Files = append(d.Files, f)
+}
+
+// appendEmptyFile appends a file name to the list of empty files.
+// The usage pattern must ensure that this doesn't break the ordering constraint
+// as the function doesn't ensure nor check this.
+func (d *Dir) appendEmptyFile(fileName string) {
+	d.EmptyFiles = append(d.EmptyFiles, fileName)
 }
 
 // appendSkippedFile appends the file name to the list of files that were skipped by scan.

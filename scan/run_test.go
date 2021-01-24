@@ -54,7 +54,6 @@ func Test__testdata_no_skip(t *testing.T) {
 		Dirs: []*Dir{
 			{
 				Name: "b",
-				Dirs: nil,
 				Files: []*File{
 					{Name: "d", Size: 2},
 				},
@@ -64,14 +63,12 @@ func Test__testdata_no_skip(t *testing.T) {
 				Dirs: []*Dir{
 					{
 						Name: "f",
-						Dirs: nil,
 						Files: []*File{
 							{Name: "a", Size: 2},
-							{Name: "g", Size: 0},
 						},
+						EmptyFiles: []string{"g"},
 					},
 				},
-				Files: nil,
 			},
 		},
 		Files: []*File{
@@ -92,7 +89,6 @@ func Test__testdata_skip_root(t *testing.T) {
 		Dirs: []*Dir{
 			{
 				Name: "b",
-				Dirs: nil,
 				Files: []*File{
 					{Name: "d", Size: 2},
 				},
@@ -102,14 +98,12 @@ func Test__testdata_skip_root(t *testing.T) {
 				Dirs: []*Dir{
 					{
 						Name: "f",
-						Dirs: nil,
 						Files: []*File{
 							{Name: "a", Size: 2},
-							{Name: "g", Size: 0},
 						},
+						EmptyFiles: []string{"g"},
 					},
 				},
-				Files: nil,
 			},
 		},
 		Files: []*File{
@@ -135,8 +129,8 @@ func Test__testdata_skip_dir_without_subdirs(t *testing.T) {
 						Name: "f",
 						Files: []*File{
 							{Name: "a", Size: 2},
-							{Name: "g", Size: 0},
 						},
+						EmptyFiles: []string{"g"},
 					},
 				},
 			},
@@ -177,7 +171,7 @@ func Test__testdata_skip_dir_with_subdirs(t *testing.T) {
 	assert.Equal(t, want, res)
 }
 
-func Test__testdata_skip_file(t *testing.T) {
+func Test__testdata_skip_nonempty_file(t *testing.T) {
 	root := "testdata"
 	want := &Dir{
 		Name: "testdata",
@@ -192,10 +186,8 @@ func Test__testdata_skip_file(t *testing.T) {
 				Name: "e",
 				Dirs: []*Dir{
 					{
-						Name: "f",
-						Files: []*File{
-							{Name: "g", Size: 0},
-						},
+						Name:         "f",
+						EmptyFiles:   []string{"g"},
 						SkippedFiles: []string{"a"},
 					},
 				},
@@ -208,6 +200,21 @@ func Test__testdata_skip_file(t *testing.T) {
 	}
 	// Working dir for tests is the containing folder.
 	res, err := Run(root, skip("a"))
+	require.NoError(t, err)
+	assert.Equal(t, want, res)
+}
+
+func Test__testdata_skip_empty_file(t *testing.T) {
+	root := "testdata/e/f"
+	want := &Dir{
+		Name: "f",
+		Files: []*File{
+			{Name: "a", Size: 2},
+		},
+		SkippedFiles: []string{"g"},
+	}
+	// Working dir for tests is the containing folder.
+	res, err := Run(root, skip("g"))
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
 }
