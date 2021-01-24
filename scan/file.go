@@ -10,6 +10,10 @@ type Dir struct {
 	Dirs []*Dir `json:"dirs,omitempty"`
 	// Sorted list of files in the directory.
 	Files []*File `json:"files,omitempty"`
+	// Sorted list of files in the directory that were skipped when scanning.
+	SkippedFiles []string `json:"skipped_files,omitempty"`
+	// Sorted list of subdirectories of the directory that were skipped when scanning.
+	SkippedDirs []string `json:"skipped_dirs,omitempty"`
 }
 
 // NewDir constructs a Dir.
@@ -33,6 +37,20 @@ func (d *Dir) appendDir(s *Dir) {
 // as the function doesn't ensure nor check this.
 func (d *Dir) appendFile(f *File) {
 	d.Files = append(d.Files, f)
+}
+
+// appendSkippedFile appends the file name to the list of files that were skipped by scan.
+// The usage pattern must ensure that this doesn't break the ordering constraint
+// as the function doesn't ensure nor check this.
+func (d *Dir) appendSkippedFile(name string) {
+	d.SkippedFiles = append(d.SkippedFiles, name)
+}
+
+// appendSkippedDir appends the dir name to the list of subdirectories that were skipped by scan.
+// The usage pattern must ensure that this doesn't break the ordering constraint
+// as the function doesn't ensure nor check this.
+func (d *Dir) appendSkippedDir(dirName string) {
+	d.SkippedDirs = append(d.SkippedDirs, dirName)
 }
 
 // TODO Add function for validating (or ensuring?) that the lists are indeed ordered correctly.

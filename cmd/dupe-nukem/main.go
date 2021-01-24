@@ -4,9 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 
-	"github.com/bisgardo/dupe-nukem/scan"
 	"github.com/spf13/cobra"
 )
 
@@ -21,8 +19,12 @@ func main() {
 			if err != nil {
 				return err
 			}
-			// TODO Replace '.' with working dir.
-			res, err := scan.Run(filepath.Clean(dir))
+			skipDirs, err := flags.GetString("skip")
+			if err != nil {
+				return err
+			}
+
+			res, err := Scan(dir, skipDirs)
 			if err != nil {
 				return err
 			}
@@ -37,6 +39,7 @@ func main() {
 	}
 	flags := scanCmd.Flags()
 	flags.String("dir", "", "Directory to scan.")
+	flags.String("skip", "", "Comma-separated list of files and dirs to skip.")
 
 	rootCmd.AddCommand(scanCmd)
 	if err := rootCmd.Execute(); err != nil {

@@ -1,15 +1,24 @@
 package scan
 
 import (
+	"log"
 	"os"
 	"path/filepath"
 
 	"github.com/pkg/errors"
 )
 
+// ShouldSkipPath is a function for determining if a given path should be skipped when walking a file tree.
+type ShouldSkipPath func(dir, name string) bool
+
+// NoSkip always returns false.
+func NoSkip(string, string) bool {
+	return false
+}
+
 // Run runs the "scan" command to walk the provided root directory.
 // The directory is assumed to be "clean" in the sense that filepath.Clean is a no-op.
-func Run(root string) (*Dir, error) {
+func Run(root string, shouldSkip ShouldSkipPath) (*Dir, error) {
 	type walkContext struct {
 		prev    *walkContext
 		curDir  *Dir
@@ -29,6 +38,17 @@ func Run(root string) (*Dir, error) {
 		}
 		parentPath := filepath.Dir(path)
 		name := filepath.Base(path)
+		if shouldSkip(parentPath, name) {
+			if info.IsDir() {
+				log.Printf("skipping dir %q\n", path)
+				head.curDir.appendSkippedDir(name)
+				return filepath.SkipDir
+			} else {
+				log.Printf("skipping file %q\n", path)
+				head.curDir.appendSkippedFile(name)
+				return nil
+			}
+		}
 
 		// We don't get any signal that the walk has returned up the stack so have to detect it ourselves.
 		for head.pathLen != len(parentPath) {
