@@ -1,12 +1,16 @@
 package scan
 
 import (
+	"hash/fnv"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
 
 	"github.com/pkg/errors"
 )
+
+const computeHash = true // to become a parameter
 
 // ShouldSkipPath is a function for determining if a given path should be skipped when walking a file tree.
 type ShouldSkipPath func(dir, name string) bool
@@ -66,7 +70,19 @@ func Run(root string, shouldSkip ShouldSkipPath) (*Dir, error) {
 		} else if size := info.Size(); size == 0 {
 			head.curDir.appendEmptyFile(name) // Walk visits in lexical order
 		} else {
-			head.curDir.appendFile(NewFile(name, size)) // Walk visits in lexical order
+			// IDEA Parallelize hash computation (via work queue for example).
+			// IDEA Consider adding option to hash a limited number of bytes only
+			//      (the reason being that if two files differ, the first 1MB or so probably differ too).
+			var hash uint64
+			if computeHash {
+				var err error
+				hash, err = hashFile(path)
+				if err != nil {
+					// Currently report error but keep going.
+					log.Printf("error: cannot hash file %q: %v", path, err)
+				}
+			}
+			head.curDir.appendFile(NewFile(name, size, hash)) // Walk visits in lexical order
 		}
 		return nil
 	})
@@ -74,4 +90,15 @@ func Run(root string, shouldSkip ShouldSkipPath) (*Dir, error) {
 		head = head.prev
 	}
 	return head.curDir, errors.Wrapf(cleanError(err), "cannot scan root directory %q", root)
+}
+
+func hashFile(path string) (uint64, error) {
+	// Hasher is just a *uint64 so there's no point in thinking of reusing it.
+	h := fnv.New64a()
+	f, err := os.Open(path)
+	if err != nil {
+		return 0, errors.Wrap(err, "cannot open file")
+	}
+	n, err := io.Copy(h, f)
+	return h.Sum64(), errors.Wrapf(err, "error reading file after around %d bytes", n)
 }

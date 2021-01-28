@@ -68,12 +68,14 @@ func (d *Dir) appendSkippedDir(dirName string) {
 type File struct {
 	Name string `json:"name"`
 	Size int64  `json:"size"`
+	Hash uint64 `json:"hash,omitempty"`
 }
 
 // NewFile constructs a File.
-func NewFile(name string, size int64) *File {
+func NewFile(name string, size int64, hash uint64) *File {
 	return &File{
 		Name: name,
 		Size: size,
+		Hash: hash,
 	}
 }

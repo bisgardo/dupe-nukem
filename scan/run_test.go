@@ -47,34 +47,35 @@ func Test__nonexistent_dir(t *testing.T) {
 	})
 }
 
+//goland:noinspection GoSnakeCaseUsage
+var (
+	testdata_b_d   = &File{Name: "d", Size: 2, Hash: 644258871406045975} // contents: "x"
+	testdata_e_f_a = &File{Name: "a", Size: 2, Hash: 646158827499216133} // contents: "z"
+	testdata_a     = &File{Name: "a", Size: 2, Hash: 644258871406045975} // contents: "x"
+	testdata_c     = &File{Name: "c", Size: 2, Hash: 643306694336204474} // contents: "y"
+)
+
 func Test__testdata_no_skip(t *testing.T) {
 	root := "testdata"
 	want := &Dir{
 		Name: "testdata",
 		Dirs: []*Dir{
 			{
-				Name: "b",
-				Files: []*File{
-					{Name: "d", Size: 2},
-				},
+				Name:  "b",
+				Files: []*File{testdata_b_d},
 			},
 			{
 				Name: "e",
 				Dirs: []*Dir{
 					{
-						Name: "f",
-						Files: []*File{
-							{Name: "a", Size: 2},
-						},
+						Name:       "f",
+						Files:      []*File{testdata_e_f_a},
 						EmptyFiles: []string{"g"},
 					},
 				},
 			},
 		},
-		Files: []*File{
-			{Name: "a", Size: 2},
-			{Name: "c", Size: 2},
-		},
+		Files: []*File{testdata_a, testdata_c},
 	}
 	// Working dir for tests is the containing folder.
 	res, err := Run(root, NoSkip)
@@ -88,28 +89,21 @@ func Test__testdata_skip_root(t *testing.T) {
 		Name: "testdata",
 		Dirs: []*Dir{
 			{
-				Name: "b",
-				Files: []*File{
-					{Name: "d", Size: 2},
-				},
+				Name:  "b",
+				Files: []*File{testdata_b_d},
 			},
 			{
 				Name: "e",
 				Dirs: []*Dir{
 					{
-						Name: "f",
-						Files: []*File{
-							{Name: "a", Size: 2},
-						},
+						Name:       "f",
+						Files:      []*File{testdata_e_f_a},
 						EmptyFiles: []string{"g"},
 					},
 				},
 			},
 		},
-		Files: []*File{
-			{Name: "a", Size: 2},
-			{Name: "c", Size: 2},
-		},
+		Files: []*File{testdata_a, testdata_c},
 	}
 	// Working dir for tests is the containing folder.
 	res, err := Run(root, NoSkip)
@@ -126,19 +120,14 @@ func Test__testdata_skip_dir_without_subdirs(t *testing.T) {
 				Name: "e",
 				Dirs: []*Dir{
 					{
-						Name: "f",
-						Files: []*File{
-							{Name: "a", Size: 2},
-						},
+						Name:       "f",
+						Files:      []*File{testdata_e_f_a},
 						EmptyFiles: []string{"g"},
 					},
 				},
 			},
 		},
-		Files: []*File{
-			{Name: "a", Size: 2},
-			{Name: "c", Size: 2},
-		},
+		Files:       []*File{testdata_a, testdata_c},
 		SkippedDirs: []string{"b"},
 	}
 	// Working dir for tests is the containing folder.
@@ -153,16 +142,11 @@ func Test__testdata_skip_dir_with_subdirs(t *testing.T) {
 		Name: "testdata",
 		Dirs: []*Dir{
 			{
-				Name: "b",
-				Files: []*File{
-					{Name: "d", Size: 2},
-				},
+				Name:  "b",
+				Files: []*File{testdata_b_d},
 			},
 		},
-		Files: []*File{
-			{Name: "a", Size: 2},
-			{Name: "c", Size: 2},
-		},
+		Files:       []*File{testdata_a, testdata_c},
 		SkippedDirs: []string{"e"},
 	}
 	// Working dir for tests is the containing folder.
@@ -177,10 +161,8 @@ func Test__testdata_skip_nonempty_file(t *testing.T) {
 		Name: "testdata",
 		Dirs: []*Dir{
 			{
-				Name: "b",
-				Files: []*File{
-					{Name: "d", Size: 2},
-				},
+				Name:  "b",
+				Files: []*File{testdata_b_d},
 			},
 			{
 				Name: "e",
@@ -193,9 +175,7 @@ func Test__testdata_skip_nonempty_file(t *testing.T) {
 				},
 			},
 		},
-		Files: []*File{
-			{Name: "c", Size: 2},
-		},
+		Files:        []*File{testdata_c},
 		SkippedFiles: []string{"a"},
 	}
 	// Working dir for tests is the containing folder.
@@ -207,10 +187,8 @@ func Test__testdata_skip_nonempty_file(t *testing.T) {
 func Test__testdata_skip_empty_file(t *testing.T) {
 	root := "testdata/e/f"
 	want := &Dir{
-		Name: "f",
-		Files: []*File{
-			{Name: "a", Size: 2},
-		},
+		Name:         "f",
+		Files:        []*File{testdata_e_f_a},
 		SkippedFiles: []string{"g"},
 	}
 	// Working dir for tests is the containing folder.
