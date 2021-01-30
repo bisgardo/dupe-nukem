@@ -23,8 +23,12 @@ func main() {
 			if err != nil {
 				return err
 			}
+			cacheFile, err := flags.GetString("cache")
+			if err != nil {
+				return err
+			}
 
-			res, err := Scan(dir, skipDirs)
+			res, err := Scan(dir, skipDirs, cacheFile)
 			if err != nil {
 				return err
 			}
@@ -39,7 +43,8 @@ func main() {
 	}
 	flags := scanCmd.Flags()
 	flags.String("dir", "", "Directory to scan.")
-	flags.String("skip", "", "Comma-separated list of files and dirs to skip.")
+	flags.String("skip", "", "Comma-separated list of dirs to skip.")
+	flags.String("cache", "", "File from a previous call to 'scan' to use as hash cache.")
 
 	rootCmd.AddCommand(scanCmd)
 	if err := rootCmd.Execute(); err != nil {

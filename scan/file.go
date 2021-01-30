@@ -79,3 +79,33 @@ func NewFile(name string, size int64, hash uint64) *File {
 		Hash: hash,
 	}
 }
+
+// safeFindDir looks for a Dir with the given name in the subdirectory list of the given Dir.
+// Returns nil if the Dir is nil.
+func safeFindDir(d *Dir, name string) *Dir {
+	if d == nil {
+		return nil
+	}
+	// TODO Use binary search.
+	for _, s := range d.Dirs {
+		if s.Name == name {
+			return s
+		}
+	}
+	return nil
+}
+
+// safeFindFile looks for a File with the given name in the file list of the given Dir.
+// Returns nil if the Dir is nil.
+func safeFindFile(d *Dir, name string) *File {
+	if d == nil {
+		return nil
+	}
+	// TODO Use binary search.
+	for _, f := range d.Files {
+		if f.Name == name {
+			return f
+		}
+	}
+	return nil
+}

@@ -1,8 +1,12 @@
 package main
 
 import (
+	"fmt"
+	"io/ioutil"
+	"os"
 	"testing"
 
+	"github.com/bisgardo/dupe-nukem/scan"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -81,6 +85,53 @@ func Test__cannot_parse_invalid_skip_names(t *testing.T) {
 }
 
 func Test__Scan_wraps_parse_error_of_skip_names(t *testing.T) {
-	_, err := Scan("x", "valid, it's not")
+	_, err := Scan("x", "valid, it's not", "")
 	assert.EqualError(t, err, "cannot parse skip dirs expression \"valid, it's not\": invalid skip name \" it's not\": has surrounding space")
+}
+
+func Test__loadCacheDir_empty_loads_nil(t *testing.T) {
+	res, err := loadCacheDir("")
+	require.NoError(t, err)
+	assert.Nil(t, res)
+}
+
+func Test__loadCacheDir_loads_scan_format(t *testing.T) {
+	f := "testdata/cache.json"
+	want := &scan.Dir{
+		Name: "x",
+		Dirs: []*scan.Dir{
+			{
+				Name: "y",
+				Files: []*scan.File{
+					{Name: "a", Size: 21, Hash: 42},
+					{Name: "b", Size: 53, Hash: 0},
+				},
+			},
+		},
+		Files: []*scan.File{
+			{Name: "c", Size: 11, Hash: 11},
+		},
+	}
+	res, err := loadCacheDir(f)
+	require.NoError(t, err)
+	assert.Equal(t, want, res)
+}
+
+func Test__Scan_wraps_cache_file_not_found_error(t *testing.T) {
+	_, err := Scan("x", "", "missing")
+	assert.EqualError(t, err, "cannot load cache file \"missing\": file not found")
+}
+
+func Test__Scan_wraps_cache_load_error(t *testing.T) {
+	f, err := ioutil.TempFile("", "malformed")
+	require.NoError(t, err)
+	defer func() {
+		err := os.Remove(f.Name())
+		require.NoError(t, err)
+	}()
+	_, err = f.WriteString("{")
+	require.NoError(t, err)
+
+	_, err = Scan("x", "", f.Name())
+	assert.EqualError(t, err, fmt.Sprintf("cannot load cache file %q: cannot decode cache file as JSON: unexpected EOF", f.Name()))
 }

@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -9,13 +11,17 @@ import (
 	"github.com/pkg/errors"
 )
 
-func Scan(dir string, skip string) (*scan.Dir, error) {
+func Scan(dir, skip, cache string) (*scan.Dir, error) {
 	skipDirs, err := parseSkipNames(skip)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot parse skip dirs expression %q", skip)
 	}
-	// TODO Replace '.' with working dir.
-	return scan.Run(filepath.Clean(dir), skipDirs)
+	cacheDir, err := loadCacheDir(cache)
+	if err != nil {
+		return nil, errors.Wrapf(err, "cannot load cache file %q", cache)
+	}
+	// TODO Replace '.' with working dir?
+	return scan.Run(filepath.Clean(dir), skipDirs, cacheDir)
 }
 
 func parseSkipNames(input string) (scan.ShouldSkipPath, error) {
@@ -52,4 +58,17 @@ func validateSkipName(name string) error {
 		return fmt.Errorf("has invalid character '%c'", name[i])
 	}
 	return nil
+}
+
+func loadCacheDir(cache string) (*scan.Dir, error) {
+	if cache == "" {
+		return nil, nil
+	}
+	f, err := os.Open(cache)
+	if err != nil {
+		return nil, cleanFileNotFoundError(err)
+	}
+	var cacheDir scan.Dir
+	err = json.NewDecoder(f).Decode(&cacheDir)
+	return &cacheDir, errors.Wrap(err, "cannot decode cache file as JSON")
 }

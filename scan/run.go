@@ -1,6 +1,7 @@
 package scan
 
 import (
+	"fmt"
 	"hash/fnv"
 	"io"
 	"log"
@@ -10,8 +11,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-const computeHash = true // to become a parameter
-
 // ShouldSkipPath is a function for determining if a given path should be skipped when walking a file tree.
 type ShouldSkipPath func(dir, name string) bool
 
@@ -20,19 +19,28 @@ func NoSkip(string, string) bool {
 	return false
 }
 
-// Run runs the "scan" command to walk the provided root directory.
+// Run runs the "scan" command with all arguments provided.
 // The directory is assumed to be "clean" in the sense that filepath.Clean is a no-op.
-func Run(root string, shouldSkip ShouldSkipPath) (*Dir, error) {
+func Run(root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, error) {
+	rootName := filepath.Base(root)
+	if cache != nil && cache.Name != rootName {
+		// While there's no technical reason for this requirement,
+		// it seems reasonable that differing root names would signal a mistake in most cases.
+		return nil, fmt.Errorf("cache of dir %q cannot be used with root dir %q", cache.Name, rootName)
+	}
+
 	type walkContext struct {
-		prev    *walkContext
-		curDir  *Dir
-		pathLen int
+		prev     *walkContext
+		curDir   *Dir
+		pathLen  int
+		cacheDir *Dir
 	}
 
 	head := &walkContext{
-		prev:    nil,
-		curDir:  NewDir(filepath.Base(root)),
-		pathLen: len(root),
+		prev:     nil,
+		curDir:   NewDir(rootName),
+		pathLen:  len(root),
+		cacheDir: cache,
 	}
 
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
@@ -63,9 +71,10 @@ func Run(root string, shouldSkip ShouldSkipPath) (*Dir, error) {
 			dir := NewDir(name)
 			head.curDir.appendDir(dir) // Walk visits in lexical order
 			head = &walkContext{
-				prev:    head,
-				curDir:  dir,
-				pathLen: len(path),
+				prev:     head,
+				curDir:   dir,
+				pathLen:  len(path),
+				cacheDir: safeFindDir(head.cacheDir, name),
 			}
 		} else if size := info.Size(); size == 0 {
 			head.curDir.appendEmptyFile(name) // Walk visits in lexical order
@@ -73,9 +82,8 @@ func Run(root string, shouldSkip ShouldSkipPath) (*Dir, error) {
 			// IDEA Parallelize hash computation (via work queue for example).
 			// IDEA Consider adding option to hash a limited number of bytes only
 			//      (the reason being that if two files differ, the first 1MB or so probably differ too).
-			var hash uint64
-			if computeHash {
-				var err error
+			hash := hashFromCache(head.cacheDir, name, size)
+			if hash == 0 {
 				hash, err = hashFile(path)
 				if err != nil {
 					// Currently report error but keep going.
@@ -89,12 +97,24 @@ func Run(root string, shouldSkip ShouldSkipPath) (*Dir, error) {
 	for head.prev != nil {
 		head = head.prev
 	}
-	return head.curDir, errors.Wrapf(cleanError(err), "cannot scan root directory %q", root)
+	return head.curDir, errors.Wrapf(cleanFilepathWalkError(err), "cannot scan root directory %q", root)
 }
 
+// hashFromCache looks up the content hash of the given file in the given cache dir.
+// A cache miss is represented by the value 0.
+// If the hash is cached with value 0, this is assumed to be a mistake and considered a cache miss:
+// There's no way to represent the cached value if it happens to be actually 0.
+func hashFromCache(cacheDir *Dir, fileName string, fileSize int64) uint64 {
+	f := safeFindFile(cacheDir, fileName)
+	if f != nil && f.Size == fileSize {
+		return f.Hash
+	}
+	return 0
+}
+
+// hashFile computes the FNV-1a hash of the file at the provided path.
 func hashFile(path string) (uint64, error) {
-	// Hasher is just a *uint64 so there's no point in thinking of reusing it.
-	h := fnv.New64a()
+	h := fnv.New64a() // is just a *uint64 internally
 	f, err := os.Open(path)
 	if err != nil {
 		return 0, errors.Wrap(err, "cannot open file")
