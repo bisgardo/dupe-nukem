@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -60,14 +61,19 @@ func validateSkipName(name string) error {
 	return nil
 }
 
-func loadCacheDir(cache string) (*scan.Dir, error) {
-	if cache == "" {
+func loadCacheDir(path string) (*scan.Dir, error) {
+	if path == "" {
 		return nil, nil
 	}
-	f, err := os.Open(cache)
+	f, err := os.Open(path)
 	if err != nil {
 		return nil, cleanFileNotFoundError(err)
 	}
+	defer func() {
+		if err := f.Close(); err != nil {
+			log.Printf("error: cannot close cache file '%v': %v\n", path, err)
+		}
+	}()
 	var cacheDir scan.Dir
 	err = json.NewDecoder(f).Decode(&cacheDir)
 	return &cacheDir, errors.Wrap(err, "cannot decode cache file as JSON")

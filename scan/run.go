@@ -119,6 +119,11 @@ func hashFile(path string) (uint64, error) {
 	if err != nil {
 		return 0, errors.Wrap(err, "cannot open file")
 	}
+	defer func() {
+		if err := f.Close(); err != nil {
+			log.Printf("error: cannot close file '%v': %v\n", path, err)
+		}
+	}()
 	n, err := io.Copy(h, f)
-	return h.Sum64(), errors.Wrapf(err, "error reading file after around %d bytes", n)
+	return h.Sum64(), errors.Wrapf(err, "error reading file after approx. %d bytes", n)
 }
