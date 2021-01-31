@@ -52,11 +52,11 @@ func Run(root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, error) {
 		name := filepath.Base(path)
 		if shouldSkip(parentPath, name) {
 			if info.IsDir() {
-				log.Printf("skipping dir %q\n", path)
+				log.Printf("skipping dir %q based on skip list\n", path)
 				head.curDir.appendSkippedDir(name)
 				return filepath.SkipDir
 			} else {
-				log.Printf("skipping file %q\n", path)
+				log.Printf("skipping file %q based on skip list\n", path)
 				head.curDir.appendSkippedFile(name)
 				return nil
 			}
@@ -87,7 +87,7 @@ func Run(root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, error) {
 				hash, err = hashFile(path)
 				if err != nil {
 					// Currently report error but keep going.
-					log.Printf("error: cannot hash file %q: %v", path, err)
+					log.Printf("error: cannot hash file %q: %v\n", path, err)
 				}
 			}
 			head.curDir.appendFile(NewFile(name, size, hash)) // Walk visits in lexical order
