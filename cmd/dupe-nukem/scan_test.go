@@ -122,6 +122,19 @@ func Test__Scan_wraps_cache_file_not_found_error(t *testing.T) {
 	assert.EqualError(t, err, `cannot load cache file "missing": cannot open file: file not found`)
 }
 
+func Test__Scan_wraps_cache_file_not_accessible_error(t *testing.T) {
+	f, err := ioutil.TempFile("", "inaccessible")
+	require.NoError(t, err)
+	defer func() {
+		err := os.Remove(f.Name())
+		require.NoError(t, err)
+	}()
+	err = f.Chmod(0) // remove permissions
+	require.NoError(t, err)
+	_, err = Scan("x", "", f.Name())
+	assert.EqualError(t, err, fmt.Sprintf("cannot load cache file %q: cannot open file: access denied", f.Name()))
+}
+
 func Test__Scan_wraps_cache_load_error(t *testing.T) {
 	f, err := ioutil.TempFile("", "malformed")
 	require.NoError(t, err)

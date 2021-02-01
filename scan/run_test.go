@@ -1,6 +1,7 @@
 package scan
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -49,6 +50,19 @@ func Test__nonexistent_dir_fails(t *testing.T) {
 		_, err := Run("nonexistent/", NoSkip, nil)
 		require.EqualError(t, err, `cannot scan root directory "nonexistent/": file or directory "nonexistent/" does not exist`)
 	})
+}
+
+func Test__non_accessible_dir_fails(t *testing.T) {
+	d, err := ioutil.TempDir("", "inaccessible")
+	require.NoError(t, err)
+	defer func() {
+		err := os.Remove(d)
+		require.NoError(t, err)
+	}()
+	err = os.Chmod(d, 0) // remove permissions
+	require.NoError(t, err)
+	_, err = Run(d, NoSkip, nil)
+	assert.EqualError(t, err, fmt.Sprintf("cannot scan root directory %q: access denied to directory %q", d, d))
 }
 
 //goland:noinspection GoSnakeCaseUsage
