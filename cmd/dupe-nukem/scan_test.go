@@ -96,7 +96,7 @@ func Test__loadCacheDir_empty_loads_nil(t *testing.T) {
 }
 
 func Test__loadCacheDir_loads_scan_format(t *testing.T) {
-	f := "testdata/cache.json"
+	f := "testdata/cache1.json"
 	want := &scan.Dir{
 		Name: "x",
 		Dirs: []*scan.Dir{
@@ -115,6 +115,15 @@ func Test__loadCacheDir_loads_scan_format(t *testing.T) {
 	res, err := loadCacheDir(f)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
+}
+
+func Test__loadCacheDir_loads_compressed_scan_format(t *testing.T) {
+	f := "testdata/cache2.json.gz"
+	want := &scan.Dir{Name: "y"}
+	res, err := loadCacheDir(f)
+	require.NoError(t, err)
+	assert.Equal(t, want, res)
+
 }
 
 func Test__Scan_wraps_cache_file_not_found_error(t *testing.T) {

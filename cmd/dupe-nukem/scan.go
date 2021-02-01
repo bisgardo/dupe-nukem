@@ -1,8 +1,10 @@
 package main
 
 import (
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -78,8 +80,11 @@ func loadCacheDir(path string) (*scan.Dir, error) {
 		}
 	}()
 	var cacheDir scan.Dir
-	// TODO Decompress file if gzipped.
-	if err := json.NewDecoder(f).Decode(&cacheDir); err != nil {
+	r, err := resolveReader(path, f)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot resolver reader")
+	}
+	if err := json.NewDecoder(r).Decode(&cacheDir); err != nil {
 		return nil, errors.Wrap(err, "cannot decode file as JSON")
 	}
 
@@ -122,4 +127,12 @@ func checkCache(dir *scan.Dir) error {
 		lef = ef
 	}
 	return nil
+}
+
+func resolveReader(path string, f *os.File) (io.Reader, error) {
+	// TODO Read magic number instead of extension.
+	if strings.HasSuffix(path, ".gz") {
+		return gzip.NewReader(f)
+	}
+	return f, nil
 }
