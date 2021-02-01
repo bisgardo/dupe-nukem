@@ -43,11 +43,11 @@ func Test__empty_dir(t *testing.T) {
 func Test__nonexistent_dir_fails(t *testing.T) {
 	t.Run("without trailing slash", func(t *testing.T) {
 		_, err := Run("nonexistent", NoSkip, nil)
-		require.EqualError(t, err, "cannot scan root directory \"nonexistent\": file or directory \"nonexistent\" does not exist")
+		require.EqualError(t, err, `cannot scan root directory "nonexistent": file or directory "nonexistent" does not exist`)
 	})
 	t.Run("with trailing slash", func(t *testing.T) {
 		_, err := Run("nonexistent/", NoSkip, nil)
-		require.EqualError(t, err, "cannot scan root directory \"nonexistent/\": file or directory \"nonexistent/\" does not exist")
+		require.EqualError(t, err, `cannot scan root directory "nonexistent/": file or directory "nonexistent/" does not exist`)
 	})
 }
 
@@ -214,7 +214,7 @@ func Test__testdata_cache_with_mismatching_root_fails(t *testing.T) {
 		Name: "not-testdata",
 	}
 	_, err := Run(root, skip("a"), cache)
-	assert.EqualError(t, err, "cache of dir \"not-testdata\" cannot be used with root dir \"testdata\"")
+	assert.EqualError(t, err, `cache of dir "not-testdata" cannot be used with root dir "testdata"`)
 }
 
 func Test__testdata_with_hashes_from_cache(t *testing.T) {

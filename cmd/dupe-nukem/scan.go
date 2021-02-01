@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/bisgardo/dupe-nukem/scan"
+	"github.com/bisgardo/dupe-nukem/util"
 	"github.com/pkg/errors"
 )
 
@@ -69,7 +70,7 @@ func loadCacheDir(path string) (*scan.Dir, error) {
 	start := time.Now()
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, cleanFileNotFoundError(err)
+		return nil, errors.Wrap(util.SimplifyIOError(err), "cannot open file")
 	}
 	defer func() {
 		if err := f.Close(); err != nil {
@@ -79,12 +80,12 @@ func loadCacheDir(path string) (*scan.Dir, error) {
 	var cacheDir scan.Dir
 	// TODO Decompress file if gzipped.
 	if err := json.NewDecoder(f).Decode(&cacheDir); err != nil {
-		return nil, errors.Wrap(err, "cannot decode cache file as JSON")
+		return nil, errors.Wrap(err, "cannot decode file as JSON")
 	}
 
 	// TODO Unless it's too expensive, just sorts lists instead of validating.
 	if err := checkCache(&cacheDir); err != nil {
-		return nil, errors.Wrap(err, "invalid cache file")
+		return nil, errors.Wrap(err, "invalid cache contents")
 	}
 	log.Printf("cache loaded from %q in %v\n", path, timeSince(start))
 	return &cacheDir, nil

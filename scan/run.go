@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/bisgardo/dupe-nukem/util"
 	"github.com/pkg/errors"
 )
 
@@ -97,7 +98,10 @@ func Run(root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, error) {
 	for head.prev != nil {
 		head = head.prev
 	}
-	return head.curDir, errors.Wrapf(cleanFilepathWalkError(err), "cannot scan root directory %q", root)
+	// TODO Can the error happen in other cases than the root dir not existing?
+	//      If so, simplify the wrapped one such that the path is printed only once.
+	// TODO At least test case where subdir on the walk path is inaccessible.
+	return head.curDir, errors.Wrapf(simplifyFilepathWalkError(err), "cannot scan root directory %q", root)
 }
 
 // hashFromCache looks up the content hash of the given file in the given cache dir.
@@ -117,7 +121,7 @@ func hashFile(path string) (uint64, error) {
 	h := fnv.New64a() // is just a *uint64 internally
 	f, err := os.Open(path)
 	if err != nil {
-		return 0, errors.Wrap(err, "cannot open file")
+		return 0, errors.Wrap(util.SimplifyIOError(err), "cannot open file")
 	}
 	defer func() {
 		if err := f.Close(); err != nil {
