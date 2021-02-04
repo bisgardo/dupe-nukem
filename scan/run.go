@@ -24,6 +24,9 @@ func NoSkip(string, string) bool {
 // The directory is assumed to be "clean" in the sense that filepath.Clean is a no-op.
 func Run(root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, error) {
 	rootName := filepath.Base(root)
+	if shouldSkip(filepath.Dir(root), rootName) {
+		return nil, fmt.Errorf("skipping root directory %q", root)
+	}
 	if cache != nil && cache.Name != rootName {
 		// While there's no technical reason for this requirement,
 		// it seems reasonable that differing root names would signal a mistake in most cases.

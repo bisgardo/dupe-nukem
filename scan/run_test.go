@@ -100,31 +100,10 @@ func Test__testdata_no_skip(t *testing.T) {
 	assert.Equal(t, want, res)
 }
 
-func Test__testdata_skip_root_has_no_effect(t *testing.T) {
+func Test__testdata_skip_root_fails(t *testing.T) {
 	root := "testdata"
-	want := &Dir{
-		Name: "testdata",
-		Dirs: []*Dir{
-			{
-				Name:  "b",
-				Files: []*File{testdata_b_d},
-			},
-			{
-				Name: "e",
-				Dirs: []*Dir{
-					{
-						Name:       "f",
-						Files:      []*File{testdata_e_f_a},
-						EmptyFiles: []string{"g"},
-					},
-				},
-			},
-		},
-		Files: []*File{testdata_a, testdata_c},
-	}
-	res, err := Run(root, skip(root), nil)
-	require.NoError(t, err)
-	assert.Equal(t, want, res)
+	_, err := Run(root, skip(root), nil)
+	assert.EqualError(t, err, `skipping root directory "testdata"`)
 }
 
 func Test__testdata_skip_dir_without_subdirs(t *testing.T) {
