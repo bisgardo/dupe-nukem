@@ -128,7 +128,7 @@ func Test__loadCacheDir_loads_compressed_scan_format(t *testing.T) {
 
 func Test__Scan_wraps_cache_file_not_found_error(t *testing.T) {
 	_, err := Scan("x", "", "missing")
-	assert.EqualError(t, err, `cannot load cache file "missing": cannot open file: file not found`)
+	assert.EqualError(t, err, `cannot load cache file "missing": cannot open file: not found`)
 }
 
 func Test__Scan_wraps_cache_file_not_accessible_error(t *testing.T) {

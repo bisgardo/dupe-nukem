@@ -44,11 +44,11 @@ func Test__empty_dir(t *testing.T) {
 func Test__nonexistent_dir_fails(t *testing.T) {
 	t.Run("without trailing slash", func(t *testing.T) {
 		_, err := Run("nonexistent", NoSkip, nil)
-		require.EqualError(t, err, `cannot scan root directory "nonexistent": file or directory "nonexistent" does not exist`)
+		require.EqualError(t, err, `cannot scan root directory "nonexistent": file or directory "nonexistent" not found`)
 	})
 	t.Run("with trailing slash", func(t *testing.T) {
 		_, err := Run("nonexistent/", NoSkip, nil)
-		require.EqualError(t, err, `cannot scan root directory "nonexistent/": file or directory "nonexistent/" does not exist`)
+		require.EqualError(t, err, `cannot scan root directory "nonexistent/": file or directory "nonexistent/" not found`)
 	})
 }
 

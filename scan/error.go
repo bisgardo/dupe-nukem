@@ -14,7 +14,7 @@ func simplifyFilepathWalkError(err error) error {
 	}
 	switch {
 	case errors.Is(pathErr.Err, os.ErrNotExist):
-		return util.ErrFileOrDirectoryDoesNotExist(pathErr.Path)
+		return util.ErrFileOrDirectoryNotFound(pathErr.Path)
 	case errors.Is(pathErr.Err, os.ErrPermission):
 		return util.ErrFileOrDirectoryAccessDenied(pathErr.Path)
 	}

@@ -6,24 +6,24 @@ import (
 )
 
 var (
-	errFileNotFound = fmt.Errorf("file not found")
+	errNotFound     = fmt.Errorf("not found")
 	errAccessDenied = fmt.Errorf("access denied")
 )
 
-// SimplifyIOError replaces "file does not exist" and "permission denied" errors with constant ones.
+// SimplifyIOError replaces "file does not exist" and "permission denied" errors with simpler, constant ones.
 func SimplifyIOError(err error) error {
 	switch {
 	case os.IsNotExist(err):
-		return errFileNotFound
+		return errNotFound
 	case os.IsPermission(err):
 		return errAccessDenied
 	}
 	return err
 }
 
-// ErrFileOrDirectoryDoesNotExist constructs a "file or directory does not exist" error which includes the path name.
-func ErrFileOrDirectoryDoesNotExist(path string) error {
-	return fmt.Errorf("file or directory %q does not exist", path)
+// ErrFileOrDirectoryNotFound constructs a "file or directory not found" error which includes the path name.
+func ErrFileOrDirectoryNotFound(path string) error {
+	return fmt.Errorf("file or directory %q not found", path)
 }
 
 // ErrFileOrDirectoryAccessDenied constructs a "file or directory access denied" error which includes the path name.
