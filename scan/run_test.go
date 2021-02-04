@@ -52,7 +52,7 @@ func Test__nonexistent_dir_fails(t *testing.T) {
 	})
 }
 
-func Test__non_accessible_dir_fails(t *testing.T) {
+func Test__inaccessible_root_fails(t *testing.T) {
 	d, err := ioutil.TempDir("", "inaccessible")
 	require.NoError(t, err)
 	defer func() {
@@ -193,6 +193,52 @@ func Test__testdata_dir_with_trailing_slash_panics(t *testing.T) {
 	require.Panics(t, func() {
 		_, _ = Run("testdata/", NoSkip, nil)
 	})
+}
+
+func Test__inaccessible_internal_file_is_not_hashed(t *testing.T) {
+	f, err := ioutil.TempFile("testdata/e/f", "inaccessible")
+	require.NoError(t, err)
+	_, err = f.WriteString("53cR31_")
+	require.NoError(t, err)
+	defer func() {
+		err := os.Remove(f.Name())
+		assert.NoError(t, err)
+	}()
+	err = f.Chmod(0) // remove permissions
+	require.NoError(t, err)
+
+	root := "testdata/e/f"
+	want := &Dir{
+		Name: "f",
+		Files: []*File{
+			testdata_e_f_a,
+			{
+				Name: filepath.Base(f.Name()),
+				Size: 7,
+				Hash: 0,
+			},
+		},
+		EmptyFiles: []string{"g"},
+	}
+	res, err := Run(root, NoSkip, nil)
+	require.NoError(t, err)
+	assert.Equal(t, want, res)
+}
+
+// TODO Causing everything to error out surely is not the desired behavior.
+func Test__inaccessible_internal_dir_fails(t *testing.T) {
+	root := "testdata"
+	d, err := ioutil.TempDir("testdata/e/f", "inaccessible")
+	require.NoError(t, err)
+	defer func() {
+		err := os.Remove(d)
+		assert.NoError(t, err)
+	}()
+
+	err = os.Chmod(d, 0) // remove permissions
+	require.NoError(t, err)
+	_, err = Run(root, NoSkip, nil)
+	assert.EqualError(t, err, fmt.Sprintf(`cannot scan root directory "testdata": access denied to directory %q`, d))
 }
 
 func Test__testdata_cache_with_mismatching_root_fails(t *testing.T) {

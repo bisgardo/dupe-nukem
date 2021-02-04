@@ -101,9 +101,6 @@ func Run(root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, error) {
 	for head.prev != nil {
 		head = head.prev
 	}
-	// TODO Can the error happen in other cases than the root dir not existing?
-	//      If so, simplify the wrapped one such that the path is printed only once.
-	// TODO At least test case where subdir on the walk path is inaccessible.
 	return head.curDir, errors.Wrapf(simplifyFilepathWalkError(err), "cannot scan root directory %q", root)
 }
 
