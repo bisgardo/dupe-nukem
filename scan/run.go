@@ -22,6 +22,7 @@ func NoSkip(string, string) bool {
 
 // Run runs the "scan" command with all arguments provided.
 // The directory is assumed to be "clean" in the sense that filepath.Clean is a no-op.
+// TODO List performed sanity checks.
 func Run(root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, error) {
 	rootName := filepath.Base(root)
 	if shouldSkip(filepath.Dir(root), rootName) {
@@ -32,7 +33,25 @@ func Run(root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, error) {
 		// it seems reasonable that differing root names would signal a mistake in most cases.
 		return nil, fmt.Errorf("cache of directory %q cannot be used with root directory %q", cache.Name, rootName)
 	}
+	if err := validateRoot(root); err != nil {
+		return nil, errors.Wrapf(util.SimplifyIOError(err), "invalid root directory %q", root)
+	}
+	return run(rootName, root, shouldSkip, cache)
+}
+func validateRoot(path string) error {
+	s, err := os.Lstat(path)
+	if err != nil {
+		return err
+	}
+	if !s.IsDir() {
+		return fmt.Errorf("not a directory")
+	}
+	return nil
+}
 
+// run runs the "scan" command without any sanity checks.
+// In particular, the directory must not have a trailing slash as that will cause the file walk to panic.
+func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, error) {
 	type walkContext struct {
 		prev     *walkContext
 		curDir   *Dir

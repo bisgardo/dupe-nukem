@@ -123,7 +123,6 @@ func Test__loadCacheDir_loads_compressed_scan_format(t *testing.T) {
 	res, err := loadCacheDir(f)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
-
 }
 
 func Test__Scan_wraps_cache_file_not_found_error(t *testing.T) {
@@ -221,4 +220,32 @@ func Test__checkCache(t *testing.T) {
 		err := checkCache(d)
 		assert.EqualError(t, err, `in subdirectory "z" on index 1: list of subdirectories of "z" is not sorted: "s" on index 2 should come before "t" on index 1`)
 	})
+}
+
+func Test__scan_testdata(t *testing.T) {
+	root := "testdata"
+	want := &scan.Dir{
+		Name: "testdata",
+		Files: []*scan.File{
+			{Name: "cache1.json", Size: 232, Hash: 17698409774061682325},
+			{Name: "cache2.json.gz", Size: 34, Hash: 11617732806245318878},
+		},
+	}
+	res, err := Scan(root, "", "")
+	require.NoError(t, err)
+	assert.Equal(t, want, res)
+}
+
+func Test__scan_testdata_with_trailing_slash(t *testing.T) {
+	root := "testdata/"
+	want := &scan.Dir{
+		Name: "testdata",
+		Files: []*scan.File{
+			{Name: "cache1.json", Size: 232, Hash: 17698409774061682325},
+			{Name: "cache2.json.gz", Size: 34, Hash: 11617732806245318878},
+		},
+	}
+	res, err := Scan(root, "", "")
+	require.NoError(t, err)
+	assert.Equal(t, want, res)
 }

@@ -44,12 +44,23 @@ func Test__empty_dir(t *testing.T) {
 func Test__nonexistent_dir_fails(t *testing.T) {
 	t.Run("without trailing slash", func(t *testing.T) {
 		_, err := Run("nonexistent", NoSkip, nil)
-		require.EqualError(t, err, `cannot scan root directory "nonexistent": file or directory "nonexistent" not found`)
+		require.EqualError(t, err, `invalid root directory "nonexistent": not found`)
 	})
 	t.Run("with trailing slash", func(t *testing.T) {
 		_, err := Run("nonexistent/", NoSkip, nil)
-		require.EqualError(t, err, `cannot scan root directory "nonexistent/": file or directory "nonexistent/" not found`)
+		require.EqualError(t, err, `invalid root directory "nonexistent/": not found`)
 	})
+}
+
+func Test__file_root_fails(t *testing.T) {
+	f, err := ioutil.TempFile("", "root")
+	require.NoError(t, err)
+	defer func() {
+		err := os.Remove(f.Name())
+		assert.NoError(t, err)
+	}()
+	_, err = Run(f.Name(), NoSkip, nil)
+	assert.EqualError(t, err, fmt.Sprintf("invalid root directory %q: not a directory", f.Name()))
 }
 
 func Test__inaccessible_root_fails(t *testing.T) {
