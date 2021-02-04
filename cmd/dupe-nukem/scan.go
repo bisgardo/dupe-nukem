@@ -7,7 +7,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -26,7 +25,7 @@ func Scan(dir, skip, cache string) (*scan.Dir, error) {
 		return nil, errors.Wrapf(err, "cannot load cache file %q", cache)
 	}
 	// TODO Replace '.' with working dir?
-	return scan.Run(filepath.Clean(dir), skipDirs, cacheDir)
+	return scan.Run(dir, skipDirs, cacheDir)
 }
 
 func parseSkipNames(input string) (scan.ShouldSkipPath, error) {

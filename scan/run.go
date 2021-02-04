@@ -21,8 +21,12 @@ func NoSkip(string, string) bool {
 }
 
 // Run runs the "scan" command with all arguments provided.
-// The directory is assumed to be "clean" in the sense that filepath.Clean is a no-op.
-// TODO List performed sanity checks.
+// If the root is a symlink, this link is traversed recursively.
+// The root name of the scan result keeps the name of the original symlink.
+// The following sanity checks are performed:
+// - The root directory must not be skipped.
+// - If a cache is provided, it's root must have the same name as the provided root.
+// - The root is an existing directory.
 func Run(root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, error) {
 	rootName := filepath.Base(root)
 	if shouldSkip(filepath.Dir(root), rootName) {
@@ -33,11 +37,25 @@ func Run(root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, error) {
 		// it seems reasonable that differing root names would signal a mistake in most cases.
 		return nil, fmt.Errorf("cache of directory %q cannot be used with root directory %q", cache.Name, rootName)
 	}
-	if err := validateRoot(root); err != nil {
+	r, err := resolveRoot(root)
+	if err != nil {
 		return nil, errors.Wrapf(util.SimplifyIOError(err), "invalid root directory %q", root)
 	}
-	return run(rootName, root, shouldSkip, cache)
+	return run(rootName, r, shouldSkip, cache)
 }
+
+func resolveRoot(path string) (string, error) {
+	// Follow symlink.
+	p, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return "", err
+	}
+	if p != path {
+		log.Printf("following root symlink %q to %q", path, p)
+	}
+	return p, validateRoot(p)
+}
+
 func validateRoot(path string) error {
 	s, err := os.Lstat(path)
 	if err != nil {
@@ -90,7 +108,7 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 			head = head.prev
 		}
 
-		if info.IsDir() {
+		if mode := info.Mode(); mode.IsDir() {
 			dir := NewDir(name)
 			head.curDir.appendDir(dir) // Walk visits in lexical order
 			head = &walkContext{
@@ -99,6 +117,11 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 				pathLen:  len(path),
 				cacheDir: safeFindDir(head.cacheDir, name),
 			}
+		} else if !mode.IsRegular() {
+			// File is a symlink, named pipe, socket, device, etc.
+			// We start by not supporting any of that.
+			// IDEA If symlink, print target (and if it exists).
+			log.Printf("skipping %v %q during scan\n", util.FileModeName(mode), path)
 		} else if size := info.Size(); size == 0 {
 			head.curDir.appendEmptyFile(name) // Walk visits in lexical order
 		} else {

@@ -117,6 +117,18 @@ func Test__testdata_skip_root_fails(t *testing.T) {
 	assert.EqualError(t, err, `skipping root directory "testdata"`)
 }
 
+func Test__testdata_skip_symlinked_root_fails(t *testing.T) {
+	symlinkName := "test_root-symlink"
+	err := os.Symlink("testdata", symlinkName)
+	require.NoError(t, err)
+	defer func() {
+		err := os.Remove(symlinkName)
+		assert.NoError(t, err)
+	}()
+	_, err = Run(symlinkName, skip(symlinkName), nil)
+	assert.EqualError(t, err, `skipping root directory "test_root-symlink"`)
+}
+
 func Test__testdata_skip_dir_without_subdirs(t *testing.T) {
 	root := "testdata"
 	want := &Dir{
@@ -199,11 +211,16 @@ func Test__testdata_subdir_skip_empty_file(t *testing.T) {
 	assert.Equal(t, want, res)
 }
 
-func Test__testdata_dir_with_trailing_slash_panics(t *testing.T) {
-	// Doesn't happen in practice because cmd passes dir through filepath.Clean.
-	require.Panics(t, func() {
-		_, _ = Run("testdata/", NoSkip, nil)
-	})
+func Test__testdata_trailing_slash_gets_removed(t *testing.T) {
+	root := "testdata/e/f/"
+	want := &Dir{
+		Name:       "f",
+		Files:      []*File{testdata_e_f_a},
+		EmptyFiles: []string{"g"},
+	}
+	res, err := Run(root, NoSkip, nil)
+	require.NoError(t, err)
+	assert.Equal(t, want, res)
 }
 
 func Test__inaccessible_internal_file_is_not_hashed(t *testing.T) {
@@ -333,6 +350,97 @@ func Test__testdata_subdir_cache_not_used_for_different_file_size(t *testing.T) 
 		Files: []*File{testdata_b_d},
 	}
 	res, err := Run(root, NoSkip, cache)
+	require.NoError(t, err)
+	assert.Equal(t, want, res)
+}
+
+func Test__root_symlink_is_followed(t *testing.T) {
+	symlinkName := "test_root-symlink"
+
+	err := os.Symlink("testdata/e/f", symlinkName)
+	require.NoError(t, err)
+	defer func() {
+		err := os.Remove(symlinkName)
+		assert.NoError(t, err)
+	}()
+	want := &Dir{
+		Name:       symlinkName,
+		Files:      []*File{testdata_e_f_a},
+		EmptyFiles: []string{"g"},
+	}
+	res, err := Run(symlinkName, NoSkip, nil)
+	require.NoError(t, err)
+	assert.Equal(t, want, res)
+}
+
+func Test__root_indirect_symlink_is_followed(t *testing.T) {
+	indirectSymlink := "test_indirect-root-symlink"
+	symlink := "test-symlink"
+
+	err := os.Symlink(symlink, indirectSymlink)
+	require.NoError(t, err)
+	err = os.Symlink("testdata/e/f", symlink)
+	require.NoError(t, err)
+	defer func() {
+		err := os.Remove(indirectSymlink)
+		assert.NoError(t, err)
+	}()
+	defer func() {
+		err := os.Remove(symlink)
+		assert.NoError(t, err)
+	}()
+	want := &Dir{
+		Name:       indirectSymlink,
+		Files:      []*File{testdata_e_f_a},
+		EmptyFiles: []string{"g"},
+	}
+	res, err := Run(indirectSymlink, NoSkip, nil)
+	require.NoError(t, err)
+	assert.Equal(t, want, res)
+}
+
+func Test__internal_symlink_is_skipped(t *testing.T) {
+	symlink := "testdata/e/f/test_internal-symlink"
+
+	err := os.Symlink("testdata", symlink)
+	require.NoError(t, err)
+	defer func() {
+		err := os.Remove(symlink)
+		assert.NoError(t, err)
+	}()
+
+	root := "testdata/e/f"
+	want := &Dir{
+		Name:       "f",
+		Files:      []*File{testdata_e_f_a}, // doesn't include the symlink as file nor the dir it points at
+		EmptyFiles: []string{"g"},
+	}
+	res, err := Run(root, NoSkip, nil)
+	require.NoError(t, err)
+	assert.Equal(t, want, res)
+}
+
+func Test__root_symlink_to_ancestor_is_followed_but_skipped_when_internal(t *testing.T) {
+	symlink := "testdata/e/f/test_ancestor-symlink" // points to "testdata/e"
+
+	err := os.Symlink("..", symlink)
+	require.NoError(t, err)
+	defer func() {
+		err := os.Remove(symlink)
+		assert.NoError(t, err)
+	}()
+
+	want := &Dir{
+		Name: "test_ancestor-symlink",
+		Dirs: []*Dir{
+			{
+				Name:       "f",
+				Files:      []*File{testdata_e_f_a}, // doesn't include the symlink as file nor the dir it points at
+				EmptyFiles: []string{"g"},
+			},
+		},
+	}
+	res, err := Run(symlink, NoSkip, nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
 }
