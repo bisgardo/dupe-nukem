@@ -27,7 +27,7 @@ func Run(root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, error) {
 	if cache != nil && cache.Name != rootName {
 		// While there's no technical reason for this requirement,
 		// it seems reasonable that differing root names would signal a mistake in most cases.
-		return nil, fmt.Errorf("cache of dir %q cannot be used with root dir %q", cache.Name, rootName)
+		return nil, fmt.Errorf("cache of directory %q cannot be used with root directory %q", cache.Name, rootName)
 	}
 
 	type walkContext struct {
@@ -53,7 +53,7 @@ func Run(root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, error) {
 		name := filepath.Base(path)
 		if shouldSkip(parentPath, name) {
 			if info.IsDir() {
-				log.Printf("skipping dir %q based on skip list\n", path)
+				log.Printf("skipping directory %q based on skip list\n", path)
 				head.curDir.appendSkippedDir(name)
 				return filepath.SkipDir
 			} else {

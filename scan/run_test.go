@@ -11,14 +11,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Working dir for tests is the containing folder.
+// INFO Working dir for tests is the directory containing the file.
 
 func Test__empty_dir(t *testing.T) {
 	dir, err := ioutil.TempDir("", "empty")
 	require.NoError(t, err)
 	defer func() {
 		err := os.RemoveAll(dir)
-		require.NoError(t, err)
+		assert.NoError(t, err)
 	}()
 
 	want := &Dir{Name: filepath.Base(dir)}
@@ -57,7 +57,7 @@ func Test__non_accessible_dir_fails(t *testing.T) {
 	require.NoError(t, err)
 	defer func() {
 		err := os.Remove(d)
-		require.NoError(t, err)
+		assert.NoError(t, err)
 	}()
 	err = os.Chmod(d, 0) // remove permissions
 	require.NoError(t, err)
@@ -95,13 +95,12 @@ func Test__testdata_no_skip(t *testing.T) {
 		},
 		Files: []*File{testdata_a, testdata_c},
 	}
-	// Working dir for tests is the containing folder.
 	res, err := Run(root, NoSkip, nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
 }
 
-func Test__testdata_skip_root(t *testing.T) {
+func Test__testdata_skip_root_has_no_effect(t *testing.T) {
 	root := "testdata"
 	want := &Dir{
 		Name: "testdata",
@@ -123,8 +122,7 @@ func Test__testdata_skip_root(t *testing.T) {
 		},
 		Files: []*File{testdata_a, testdata_c},
 	}
-	// Working dir for tests is the containing folder.
-	res, err := Run(root, NoSkip, nil)
+	res, err := Run(root, skip(root), nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
 }
@@ -148,7 +146,6 @@ func Test__testdata_skip_dir_without_subdirs(t *testing.T) {
 		Files:       []*File{testdata_a, testdata_c},
 		SkippedDirs: []string{"b"},
 	}
-	// Working dir for tests is the containing folder.
 	res, err := Run(root, skip("b"), nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
@@ -167,7 +164,6 @@ func Test__testdata_skip_dir_with_subdirs(t *testing.T) {
 		Files:       []*File{testdata_a, testdata_c},
 		SkippedDirs: []string{"e"},
 	}
-	// Working dir for tests is the containing folder.
 	res, err := Run(root, skip("e"), nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
@@ -196,7 +192,6 @@ func Test__testdata_skip_nonempty_file(t *testing.T) {
 		Files:        []*File{testdata_c},
 		SkippedFiles: []string{"a"},
 	}
-	// Working dir for tests is the containing folder.
 	res, err := Run(root, skip("a"), nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
@@ -209,7 +204,6 @@ func Test__testdata_subdir_skip_empty_file(t *testing.T) {
 		Files:        []*File{testdata_e_f_a},
 		SkippedFiles: []string{"g"},
 	}
-	// Working dir for tests is the containing folder.
 	res, err := Run(root, skip("g"), nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
@@ -228,7 +222,7 @@ func Test__testdata_cache_with_mismatching_root_fails(t *testing.T) {
 		Name: "not-testdata",
 	}
 	_, err := Run(root, skip("a"), cache)
-	assert.EqualError(t, err, `cache of dir "not-testdata" cannot be used with root dir "testdata"`)
+	assert.EqualError(t, err, `cache of directory "not-testdata" cannot be used with root directory "testdata"`)
 }
 
 func Test__testdata_with_hashes_from_cache(t *testing.T) {

@@ -47,7 +47,7 @@ func main() {
 	}
 	flags := scanCmd.Flags()
 	flags.String("dir", "", "directory to scan")
-	flags.String("skip", "", "comma-separated list of dirs to skip")
+	flags.String("skip", "", "comma-separated list of directories to skip")
 	flags.String("cache", "", "file from a previous call to 'scan' to use as hash cache")
 
 	rootCmd.AddCommand(scanCmd)

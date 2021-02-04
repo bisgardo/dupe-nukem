@@ -136,7 +136,7 @@ func Test__Scan_wraps_cache_file_not_accessible_error(t *testing.T) {
 	require.NoError(t, err)
 	defer func() {
 		err := os.Remove(f.Name())
-		require.NoError(t, err)
+		assert.NoError(t, err)
 	}()
 	err = f.Chmod(0) // remove permissions
 	require.NoError(t, err)
@@ -149,7 +149,7 @@ func Test__Scan_wraps_cache_load_error(t *testing.T) {
 	require.NoError(t, err)
 	defer func() {
 		err := os.Remove(f.Name())
-		require.NoError(t, err)
+		assert.NoError(t, err)
 	}()
 	_, err = f.WriteString("{")
 	require.NoError(t, err)
