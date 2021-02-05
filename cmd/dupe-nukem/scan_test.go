@@ -54,20 +54,36 @@ func Test__parseSkipNames_file_with_length_255_is_allowed(t *testing.T) {
 	assert.Equal(t, want, res)
 }
 
-func Test__parseSkipNames_file_with_length_256_is_rejected(t *testing.T) {
-	f, err := ioutil.TempFile("", "disallowed-skipnames")
+func Test__loadShouldSkip_file_with_length_256_fails(t *testing.T) {
+	f, err := ioutil.TempFile("", "long-skipnames")
 	require.NoError(t, err)
 	defer func() {
 		err := os.Remove(f.Name())
 		assert.NoError(t, err)
 	}()
-	n, err := f.WriteString(strings.Repeat("x", maxSkipNameFileLineLen-1) + "\n") // let the 256'th character be a newline
+	n, err := f.WriteString(strings.Repeat("x", maxSkipNameFileLineLen) + "\n") // let the 256'th character be a newline
 	require.NoError(t, err)
-	require.Equal(t, maxSkipNameFileLineLen, n)
+	require.Equal(t, maxSkipNameFileLineLen+1, n)
 
 	input := fmt.Sprintf("@%v", f.Name())
-	_, err = parseSkipNames(input)
+	_, err = loadShouldSkip(input)
+	assert.EqualError(t, err, "line 1 is longer than the max allowed length of 256 characters")
+}
+
+func Test__loadShouldSkip_file_with_invalid_line_fails(t *testing.T) {
+	f, err := ioutil.TempFile("", "invalid-skipnames")
 	require.NoError(t, err)
+	defer func() {
+		err := os.Remove(f.Name())
+		assert.NoError(t, err)
+	}()
+	n, err := f.WriteString("with/slash")
+	require.NoError(t, err)
+	require.Equal(t, 10, n)
+
+	input := fmt.Sprintf("@%v", f.Name())
+	_, err = loadShouldSkip(input)
+	assert.EqualError(t, err, `invalid skip name "with/slash": has invalid character '/'`)
 }
 
 func Test__cannot_parse_invalid_skip_names(t *testing.T) {

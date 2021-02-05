@@ -78,7 +78,7 @@ func parseSkipNameFile(filename string) ([]string, error) {
 			return nil, err
 		}
 		if isNotSuffix {
-			return nil, fmt.Errorf("line %d is longer than the %d allowed characters", i, maxSkipNameFileLineLen)
+			return nil, fmt.Errorf("line %d is longer than the max allowed length of %d characters", i, maxSkipNameFileLineLen)
 		}
 		if n := strings.TrimSpace(string(l)); n != "" {
 			names = append(names, n)

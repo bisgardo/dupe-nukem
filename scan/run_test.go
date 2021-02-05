@@ -153,7 +153,7 @@ func Test__testdata_skip_dir_without_subdirs(t *testing.T) {
 	assert.Equal(t, want, res)
 }
 
-func Test__parsed_ShouldSkipPath_empty_always_returns_false(t *testing.T) {
+func Test__SkipNameSet_empty_always_returns_false(t *testing.T) {
 	shouldSkip := SkipNameSet(nil)
 
 	tests := []struct {
@@ -174,7 +174,7 @@ func Test__parsed_ShouldSkipPath_empty_always_returns_false(t *testing.T) {
 	}
 }
 
-func Test__parsed_ShouldSkipPath_nonempty_returns_true_on_basename_match(t *testing.T) {
+func Test__SkipNameSet_nonempty_returns_true_on_basename_match(t *testing.T) {
 	shouldSkip := SkipNameSet(map[string]struct{}{"a": {}, "b": {}})
 
 	tests := []struct {
