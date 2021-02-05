@@ -24,17 +24,17 @@ func Test__empty_dir(t *testing.T) {
 	want := &Dir{Name: filepath.Base(dir)}
 
 	tests := []struct {
-		name     string
-		skipFunc ShouldSkipPath
+		name       string
+		shouldSkip ShouldSkipPath
 	}{
-		{name: "without skip", skipFunc: NoSkip},
-		{name: "skipping root", skipFunc: skip(dir)},
-		{name: "skipping non-existing", skipFunc: skip("non-existing")},
+		{name: "without skip", shouldSkip: NoSkip},
+		{name: "skipping root", shouldSkip: skip(dir)},
+		{name: "skipping non-existing", shouldSkip: skip("non-existing")},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			res, err := Run(dir, test.skipFunc, nil)
+			res, err := Run(dir, test.shouldSkip, nil)
 			require.NoError(t, err)
 			assert.Equal(t, want, res)
 		})
@@ -153,6 +153,55 @@ func Test__testdata_skip_dir_without_subdirs(t *testing.T) {
 	assert.Equal(t, want, res)
 }
 
+func Test__parsed_ShouldSkipPath_empty_always_returns_false(t *testing.T) {
+	shouldSkip := SkipNameSet(nil)
+
+	tests := []struct {
+		name     string
+		dirName  string
+		baseName string
+	}{
+		{name: "empty dir- and basename", dirName: "", baseName: ""},
+		{name: "empty dirname and nonempty basename", dirName: "", baseName: "x"},
+		{name: "nonempty dirname and empty basename", dirName: "x", baseName: ""},
+		{name: "nonempty dir- and basename", dirName: "x", baseName: "y"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			skip := shouldSkip(test.dirName, test.baseName)
+			assert.False(t, skip)
+		})
+	}
+}
+
+func Test__parsed_ShouldSkipPath_nonempty_returns_true_on_basename_match(t *testing.T) {
+	shouldSkip := SkipNameSet(map[string]struct{}{"a": {}, "b": {}})
+
+	tests := []struct {
+		name     string
+		dirName  string
+		baseName string
+		want     bool
+	}{
+		{name: "empty dir- and basename", dirName: "", baseName: "", want: false},
+		{name: "empty dirname and matching basename", dirName: "", baseName: "a", want: true},
+		{name: "empty dirname and nonmatching basename", dirName: "", baseName: "x", want: false},
+		{name: "matching dirname and empty basename", dirName: "a", baseName: "", want: false},
+		{name: "nonmatching dirname and empty basename", dirName: "x", baseName: "", want: false},
+
+		{name: "nonmatching dirname and nonmatching basename", dirName: "x", baseName: "y", want: false},
+		{name: "nonmatching dirname and matching basename", dirName: "x", baseName: "b", want: true},
+		{name: "matching dirname and nonmatching basename", dirName: "a", baseName: "x", want: false},
+		{name: "matching dir- and basename", dirName: "a", baseName: "b", want: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			skip := shouldSkip(test.dirName, test.baseName)
+			assert.Equal(t, test.want, skip)
+		})
+	}
+}
+
 func Test__testdata_skip_dir_with_subdirs(t *testing.T) {
 	root := "testdata"
 	want := &Dir{
@@ -226,12 +275,14 @@ func Test__testdata_trailing_slash_gets_removed(t *testing.T) {
 func Test__inaccessible_internal_file_is_not_hashed(t *testing.T) {
 	f, err := ioutil.TempFile("testdata/e/f", "inaccessible")
 	require.NoError(t, err)
-	_, err = f.WriteString("53cR31_")
-	require.NoError(t, err)
 	defer func() {
 		err := os.Remove(f.Name())
 		assert.NoError(t, err)
 	}()
+	n, err := f.WriteString("53cR31_")
+	require.NoError(t, err)
+	require.Equal(t, 7, n)
+
 	err = f.Chmod(0) // remove permissions
 	require.NoError(t, err)
 

@@ -16,8 +16,10 @@ import (
 	"github.com/pkg/errors"
 )
 
+const maxSkipNameFileLineLen = 256
+
 func Scan(dir, skip, cache string) (*scan.Dir, error) {
-	skipDirs, err := loadShouldSkipPath(skip)
+	shouldSkip, err := loadShouldSkip(skip)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot parse skip dirs expression %q", skip)
 	}
@@ -26,11 +28,10 @@ func Scan(dir, skip, cache string) (*scan.Dir, error) {
 		return nil, errors.Wrapf(err, "cannot load cache file %q", cache)
 	}
 	// TODO Replace '.' with working dir?
-	return scan.Run(dir, skipDirs, cacheDir)
+	return scan.Run(dir, shouldSkip, cacheDir)
 }
 
-func loadShouldSkipPath(input string) (scan.ShouldSkipPath, error) {
-	// TODO Test.
+func loadShouldSkip(input string) (scan.ShouldSkipPath, error) {
 	names, err := parseSkipNames(input)
 	if err != nil {
 		return nil, err
@@ -38,20 +39,15 @@ func loadShouldSkipPath(input string) (scan.ShouldSkipPath, error) {
 	if len(names) == 0 {
 		return scan.NoSkip, nil
 	}
-	res := make(map[string]struct{}, len(names))
+	set := make(map[string]struct{}, len(names))
 	for _, n := range names {
 		if err := validateSkipName(n); err != nil {
 			return nil, errors.Wrapf(err, "invalid skip name %q", n)
 		}
-		res[n] = struct{}{}
+		set[n] = struct{}{}
 	}
-	return func(dir, name string) bool {
-		_, ok := res[name]
-		return ok
-	}, nil
+	return scan.SkipNameSet(set), nil
 }
-
-const maxSkipNameLen = 256
 
 func parseSkipNames(input string) ([]string, error) {
 	if input == "" {
@@ -69,18 +65,20 @@ func parseSkipNameFile(filename string) ([]string, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot read skip names from file %q", filename)
 	}
-	r := bufio.NewReaderSize(f, maxSkipNameLen)
+	r := bufio.NewReaderSize(f, maxSkipNameFileLineLen)
 	var names []string
+	i := 0
 	for {
-		l, isPrefix, err := r.ReadLine()
+		i++
+		l, isNotSuffix, err := r.ReadLine()
 		if err == io.EOF {
 			return names, nil
 		}
 		if err != nil {
 			return nil, err
 		}
-		if isPrefix {
-			return nil, fmt.Errorf("line too long")
+		if isNotSuffix {
+			return nil, fmt.Errorf("line %d is longer than the %d allowed characters", i, maxSkipNameFileLineLen)
 		}
 		if n := strings.TrimSpace(string(l)); n != "" {
 			names = append(names, n)
