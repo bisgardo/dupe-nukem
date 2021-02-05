@@ -12,7 +12,7 @@ import (
 )
 
 func Test__parsed_ShouldSkipPath_empty_always_returns_false(t *testing.T) {
-	f, err := parseSkipNames("")
+	f, err := loadShouldSkipPath("")
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -34,7 +34,7 @@ func Test__parsed_ShouldSkipPath_empty_always_returns_false(t *testing.T) {
 }
 
 func Test__parsed_ShouldSkipPath_nonempty_returns_true_on_basename_match(t *testing.T) {
-	f, err := parseSkipNames("a,b")
+	f, err := loadShouldSkipPath("a,b")
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -78,7 +78,7 @@ func Test__cannot_parse_invalid_skip_names(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.names, func(t *testing.T) {
-			_, err := parseSkipNames(test.names)
+			_, err := loadShouldSkipPath(test.names)
 			assert.EqualError(t, err, test.wantErr)
 		})
 	}

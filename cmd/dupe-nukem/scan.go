@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
@@ -16,7 +17,7 @@ import (
 )
 
 func Scan(dir, skip, cache string) (*scan.Dir, error) {
-	skipDirs, err := parseSkipNames(skip)
+	skipDirs, err := loadShouldSkipPath(skip)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot parse skip dirs expression %q", skip)
 	}
@@ -28,11 +29,15 @@ func Scan(dir, skip, cache string) (*scan.Dir, error) {
 	return scan.Run(dir, skipDirs, cacheDir)
 }
 
-func parseSkipNames(input string) (scan.ShouldSkipPath, error) {
-	if input == "" {
+func loadShouldSkipPath(input string) (scan.ShouldSkipPath, error) {
+	// TODO Test.
+	names, err := parseSkipNames(input)
+	if err != nil {
+		return nil, err
+	}
+	if len(names) == 0 {
 		return scan.NoSkip, nil
 	}
-	names := strings.Split(input, ",")
 	res := make(map[string]struct{}, len(names))
 	for _, n := range names {
 		if err := validateSkipName(n); err != nil {
@@ -44,6 +49,43 @@ func parseSkipNames(input string) (scan.ShouldSkipPath, error) {
 		_, ok := res[name]
 		return ok
 	}, nil
+}
+
+const maxSkipNameLen = 256
+
+func parseSkipNames(input string) ([]string, error) {
+	if input == "" {
+		return nil, nil
+	}
+	if input[0] == '@' {
+		return parseSkipNameFile(input[1:])
+	}
+	return strings.Split(input, ","), nil
+
+}
+
+func parseSkipNameFile(filename string) ([]string, error) {
+	f, err := os.Open(filename)
+	if err != nil {
+		return nil, errors.Wrapf(err, "cannot read skip names from file %q", filename)
+	}
+	r := bufio.NewReaderSize(f, maxSkipNameLen)
+	var names []string
+	for {
+		l, isPrefix, err := r.ReadLine()
+		if err == io.EOF {
+			return names, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		if isPrefix {
+			return nil, fmt.Errorf("line too long")
+		}
+		if n := strings.TrimSpace(string(l)); n != "" {
+			names = append(names, n)
+		}
+	}
 }
 
 func validateSkipName(name string) error {
@@ -58,7 +100,7 @@ func validateSkipName(name string) error {
 	case "..":
 		return fmt.Errorf("parent directory")
 	}
-	if i := strings.IndexAny(name, "/"); i != -1 {
+	if i := strings.IndexAny(name, "/,"); i != -1 {
 		return fmt.Errorf("has invalid character '%c'", name[i])
 	}
 	return nil
