@@ -21,7 +21,7 @@ const maxSkipNameFileLineLen = 256
 func Scan(dir, skip, cache string) (*scan.Dir, error) {
 	shouldSkip, err := loadShouldSkip(skip)
 	if err != nil {
-		return nil, errors.Wrapf(err, "cannot parse skip dirs expression %q", skip)
+		return nil, errors.Wrapf(err, "cannot process skip dirs expression %q", skip)
 	}
 	cacheDir, err := loadCacheDir(cache)
 	if err != nil {
@@ -54,7 +54,9 @@ func parseSkipNames(input string) ([]string, error) {
 		return nil, nil
 	}
 	if input[0] == '@' {
-		return parseSkipNameFile(input[1:])
+		f := input[1:]
+		res, err := parseSkipNameFile(f)
+		return res, errors.Wrapf(err, "cannot read skip names from file %q", f)
 	}
 	return strings.Split(input, ","), nil
 
@@ -63,7 +65,7 @@ func parseSkipNames(input string) ([]string, error) {
 func parseSkipNameFile(filename string) ([]string, error) {
 	f, err := os.Open(filename)
 	if err != nil {
-		return nil, errors.Wrapf(err, "cannot read skip names from file %q", filename)
+		return nil, errors.Wrapf(util.SimplifyIOError(err), "cannot open file")
 	}
 	r := bufio.NewReaderSize(f, maxSkipNameFileLineLen)
 	var names []string
@@ -121,7 +123,7 @@ func loadCacheDir(path string) (*scan.Dir, error) {
 	var cacheDir scan.Dir
 	r, err := resolveReader(path, f)
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot resolver reader")
+		return nil, errors.Wrap(err, "cannot resolve reader")
 	}
 	if err := json.NewDecoder(r).Decode(&cacheDir); err != nil {
 		return nil, errors.Wrap(err, "cannot decode file as JSON")

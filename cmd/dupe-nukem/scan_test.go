@@ -71,7 +71,7 @@ func Test__loadShouldSkip_file_with_length_256_fails(t *testing.T) {
 
 	input := fmt.Sprintf("@%v", f.Name())
 	_, err = loadShouldSkip(input)
-	assert.EqualError(t, err, "line 1 is longer than the max allowed length of 256 characters")
+	assert.EqualError(t, err, fmt.Sprintf("cannot read skip names from file %q: line 1 is longer than the max allowed length of 256 characters", f.Name()))
 }
 
 func Test__loadShouldSkip_file_with_invalid_line_fails(t *testing.T) {
@@ -112,9 +112,14 @@ func Test__loadShouldSkip_invalid_names_fail(t *testing.T) {
 	}
 }
 
+func Test__Scan_wraps_skip_file_not_found_error(t *testing.T) {
+	_, err := Scan("x", "@missing", "")
+	assert.EqualError(t, err, `cannot process skip dirs expression "@missing": cannot read skip names from file "missing": cannot open file: not found`)
+}
+
 func Test__Scan_wraps_parse_error_of_skip_names(t *testing.T) {
 	_, err := Scan("x", "valid, it's not", "")
-	assert.EqualError(t, err, `cannot parse skip dirs expression "valid, it's not": invalid skip name " it's not": has surrounding space`)
+	assert.EqualError(t, err, `cannot process skip dirs expression "valid, it's not": invalid skip name " it's not": has surrounding space`)
 }
 
 func Test__loadCacheDir_empty_loads_nil(t *testing.T) {
