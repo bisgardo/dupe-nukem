@@ -24,17 +24,17 @@ func Test__empty_dir(t *testing.T) {
 	want := &Dir{Name: filepath.Base(dir)}
 
 	tests := []struct {
-		name     string
-		skipFunc ShouldSkipPath
+		name       string
+		shouldSkip ShouldSkipPath
 	}{
-		{name: "without skip", skipFunc: NoSkip},
-		{name: "skipping root", skipFunc: skip(dir)},
-		{name: "skipping non-existing", skipFunc: skip("non-existing")},
+		{name: "without skip", shouldSkip: NoSkip},
+		{name: "skipping root", shouldSkip: skip(dir)},
+		{name: "skipping non-existing", shouldSkip: skip("non-existing")},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			res, err := Run(dir, test.skipFunc, nil)
+			res, err := Run(dir, test.shouldSkip, nil)
 			require.NoError(t, err)
 			assert.Equal(t, want, res)
 		})
@@ -226,12 +226,14 @@ func Test__testdata_trailing_slash_gets_removed(t *testing.T) {
 func Test__inaccessible_internal_file_is_not_hashed(t *testing.T) {
 	f, err := ioutil.TempFile("testdata/e/f", "inaccessible")
 	require.NoError(t, err)
-	_, err = f.WriteString("53cR31_")
-	require.NoError(t, err)
 	defer func() {
 		err := os.Remove(f.Name())
 		assert.NoError(t, err)
 	}()
+	n, err := f.WriteString("53cR31_")
+	require.NoError(t, err)
+	require.Equal(t, 7, n)
+
 	err = f.Chmod(0) // remove permissions
 	require.NoError(t, err)
 

@@ -12,7 +12,7 @@ import (
 )
 
 func Test__parsed_ShouldSkipPath_empty_always_returns_false(t *testing.T) {
-	f, err := parseSkipNames("")
+	f, err := parseShouldSkip("")
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -34,7 +34,7 @@ func Test__parsed_ShouldSkipPath_empty_always_returns_false(t *testing.T) {
 }
 
 func Test__parsed_ShouldSkipPath_nonempty_returns_true_on_basename_match(t *testing.T) {
-	f, err := parseSkipNames("a,b")
+	f, err := parseShouldSkip("a,b")
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -78,7 +78,7 @@ func Test__cannot_parse_invalid_skip_names(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.names, func(t *testing.T) {
-			_, err := parseSkipNames(test.names)
+			_, err := parseShouldSkip(test.names)
 			assert.EqualError(t, err, test.wantErr)
 		})
 	}
@@ -150,8 +150,9 @@ func Test__Scan_wraps_cache_load_error(t *testing.T) {
 		err := os.Remove(f.Name())
 		assert.NoError(t, err)
 	}()
-	_, err = f.WriteString("{")
+	n, err := f.WriteString("{")
 	require.NoError(t, err)
+	require.Equal(t, 1, n)
 
 	_, err = Scan("x", "", f.Name())
 	assert.EqualError(t, err, fmt.Sprintf("cannot load cache file %q: cannot decode file as JSON: unexpected EOF", f.Name()))

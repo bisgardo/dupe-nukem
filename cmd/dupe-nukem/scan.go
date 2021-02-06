@@ -16,7 +16,7 @@ import (
 )
 
 func Scan(dir, skip, cache string) (*scan.Dir, error) {
-	skipDirs, err := parseSkipNames(skip)
+	shouldSkip, err := parseShouldSkip(skip)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot parse skip dirs expression %q", skip)
 	}
@@ -25,10 +25,10 @@ func Scan(dir, skip, cache string) (*scan.Dir, error) {
 		return nil, errors.Wrapf(err, "cannot load cache file %q", cache)
 	}
 	// TODO Replace '.' with working dir?
-	return scan.Run(dir, skipDirs, cacheDir)
+	return scan.Run(dir, shouldSkip, cacheDir)
 }
 
-func parseSkipNames(input string) (scan.ShouldSkipPath, error) {
+func parseShouldSkip(input string) (scan.ShouldSkipPath, error) {
 	if input == "" {
 		return scan.NoSkip, nil
 	}
