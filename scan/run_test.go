@@ -153,6 +153,55 @@ func Test__testdata_skip_dir_without_subdirs(t *testing.T) {
 	assert.Equal(t, want, res)
 }
 
+func Test__SkipNameSet_empty_always_returns_false(t *testing.T) {
+	shouldSkip := SkipNameSet(nil)
+
+	tests := []struct {
+		name     string
+		dirName  string
+		baseName string
+	}{
+		{name: "empty dir- and basename", dirName: "", baseName: ""},
+		{name: "empty dirname and nonempty basename", dirName: "", baseName: "x"},
+		{name: "nonempty dirname and empty basename", dirName: "x", baseName: ""},
+		{name: "nonempty dir- and basename", dirName: "x", baseName: "y"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			skip := shouldSkip(test.dirName, test.baseName)
+			assert.False(t, skip)
+		})
+	}
+}
+
+func Test__SkipNameSet_nonempty_returns_whether_basename_matches(t *testing.T) {
+	shouldSkip := SkipNameSet(map[string]struct{}{"a": {}, "b": {}})
+
+	tests := []struct {
+		name     string
+		dirName  string
+		baseName string
+		want     bool
+	}{
+		{name: "empty dir- and basename", dirName: "", baseName: "", want: false},
+		{name: "empty dirname and matching basename", dirName: "", baseName: "a", want: true},
+		{name: "empty dirname and nonmatching basename", dirName: "", baseName: "x", want: false},
+		{name: "matching dirname and empty basename", dirName: "a", baseName: "", want: false},
+		{name: "nonmatching dirname and empty basename", dirName: "x", baseName: "", want: false},
+
+		{name: "nonmatching dirname and nonmatching basename", dirName: "x", baseName: "y", want: false},
+		{name: "nonmatching dirname and matching basename", dirName: "x", baseName: "b", want: true},
+		{name: "matching dirname and nonmatching basename", dirName: "a", baseName: "x", want: false},
+		{name: "matching dir- and basename", dirName: "a", baseName: "b", want: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			skip := shouldSkip(test.dirName, test.baseName)
+			assert.Equal(t, test.want, skip)
+		})
+	}
+}
+
 func Test__testdata_skip_dir_with_subdirs(t *testing.T) {
 	root := "testdata"
 	want := &Dir{

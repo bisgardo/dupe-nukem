@@ -20,6 +20,13 @@ func NoSkip(string, string) bool {
 	return false
 }
 
+func SkipNameSet(names map[string]struct{}) ShouldSkipPath {
+	return func(dir, name string) bool {
+		_, ok := names[name]
+		return ok
+	}
+}
+
 // Run runs the "scan" command with all arguments provided.
 // If the root is a symlink, this link is traversed recursively.
 // The root name of the scan result keeps the name of the original symlink.

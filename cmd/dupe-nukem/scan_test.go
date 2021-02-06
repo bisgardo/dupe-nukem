@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/bisgardo/dupe-nukem/scan"
@@ -11,58 +12,85 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test__parsed_ShouldSkipPath_empty_always_returns_false(t *testing.T) {
-	f, err := parseShouldSkip("")
+func Test__parseSkipNames_empty_returns_nil(t *testing.T) {
+	input := ""
+	res, err := parseSkipNames(input)
 	require.NoError(t, err)
-
-	tests := []struct {
-		name     string
-		dirName  string
-		baseName string
-	}{
-		{name: "empty dir- and basename", dirName: "", baseName: ""},
-		{name: "empty dirname and nonempty basename", dirName: "", baseName: "x"},
-		{name: "nonempty dirname and empty basename", dirName: "x", baseName: ""},
-		{name: "nonempty dir- and basename", dirName: "x", baseName: "y"},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			skip := f(test.dirName, test.baseName)
-			assert.False(t, skip)
-		})
-	}
+	assert.Nil(t, res)
 }
 
-func Test__parsed_ShouldSkipPath_nonempty_returns_true_on_basename_match(t *testing.T) {
-	f, err := parseShouldSkip("a,b")
+func Test__parseSkipNames_splits_on_comma(t *testing.T) {
+	input := "a,b"
+	want := []string{"a", "b"}
+	res, err := parseSkipNames(input)
 	require.NoError(t, err)
-
-	tests := []struct {
-		name     string
-		dirName  string
-		baseName string
-		want     bool
-	}{
-		{name: "empty dir- and basename", dirName: "", baseName: "", want: false},
-		{name: "empty dirname and matching basename", dirName: "", baseName: "a", want: true},
-		{name: "empty dirname and nonmatching basename", dirName: "", baseName: "x", want: false},
-		{name: "matching dirname and empty basename", dirName: "a", baseName: "", want: false},
-		{name: "nonmatching dirname and empty basename", dirName: "x", baseName: "", want: false},
-
-		{name: "nonmatching dirname and nonmatching basename", dirName: "x", baseName: "y", want: false},
-		{name: "nonmatching dirname and matching basename", dirName: "x", baseName: "b", want: true},
-		{name: "matching dirname and nonmatching basename", dirName: "a", baseName: "x", want: false},
-		{name: "matching dir- and basename", dirName: "a", baseName: "b", want: true},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			skip := f(test.dirName, test.baseName)
-			assert.Equal(t, test.want, skip)
-		})
-	}
+	assert.Equal(t, want, res)
 }
 
-func Test__cannot_parse_invalid_skip_names(t *testing.T) {
+func Test__parseSkipNames_with_at_prefix_splits_file_on_newline(t *testing.T) {
+	input := "@testdata/skipnames"
+	want := []string{"a", "b", "c"}
+	res, err := parseSkipNames(input)
+	require.NoError(t, err)
+	assert.Equal(t, want, res)
+}
+
+func Test__parseSkipNames_file_with_length_255_is_allowed(t *testing.T) {
+	f, err := ioutil.TempFile("", "allowed-skipnames")
+	require.NoError(t, err)
+	defer func() {
+		err := os.Remove(f.Name())
+		assert.NoError(t, err)
+	}()
+	line := strings.Repeat("x", maxSkipNameFileLineLen-1)
+	n, err := f.WriteString(line)
+	require.NoError(t, err)
+	require.Equal(t, maxSkipNameFileLineLen-1, n)
+
+	input := fmt.Sprintf("@%v", f.Name())
+	want := []string{line}
+	res, err := parseSkipNames(input)
+	require.NoError(t, err)
+	assert.Equal(t, want, res)
+}
+
+// The tests below use loadShouldSkip because validation is performed after parseSkipNames.
+// The ones above use parseSkipNames because it returns a slice which is easier to assert against
+// in the valid cases.
+
+func Test__loadShouldSkip_file_with_length_256_fails(t *testing.T) {
+	f, err := ioutil.TempFile("", "long-skipnames")
+	require.NoError(t, err)
+	defer func() {
+		err := os.Remove(f.Name())
+		assert.NoError(t, err)
+	}()
+	n, err := f.WriteString(strings.Repeat("x", maxSkipNameFileLineLen) + "\n") // let the 256'th character be a newline
+	require.NoError(t, err)
+	require.Equal(t, maxSkipNameFileLineLen+1, n)
+
+	input := fmt.Sprintf("@%v", f.Name())
+	_, err = loadShouldSkip(input)
+	assert.EqualError(t, err, "line 1 is longer than the max allowed length of 256 characters")
+}
+
+func Test__loadShouldSkip_file_with_invalid_line_fails(t *testing.T) {
+	f, err := ioutil.TempFile("", "invalid-skipnames")
+	require.NoError(t, err)
+	defer func() {
+		err := os.Remove(f.Name())
+		assert.NoError(t, err)
+	}()
+	n, err := f.WriteString("with/slash")
+	require.NoError(t, err)
+	require.Equal(t, 10, n)
+
+	input := fmt.Sprintf("@%v", f.Name())
+	_, err = loadShouldSkip(input)
+	assert.EqualError(t, err, `invalid skip name "with/slash": has invalid character '/'`)
+}
+
+func Test__loadShouldSkip_invalid_names_fail(t *testing.T) {
 	tests := []struct {
 		names   string
 		wantErr string
@@ -78,7 +106,7 @@ func Test__cannot_parse_invalid_skip_names(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.names, func(t *testing.T) {
-			_, err := parseShouldSkip(test.names)
+			_, err := loadShouldSkip(test.names)
 			assert.EqualError(t, err, test.wantErr)
 		})
 	}
@@ -230,6 +258,7 @@ func Test__scan_testdata(t *testing.T) {
 		Files: []*scan.File{
 			{Name: "cache1.json", Size: 232, Hash: 17698409774061682325},
 			{Name: "cache2.json.gz", Size: 34, Hash: 11617732806245318878},
+			{Name: "skipnames", Size: 7, Hash: 10951817445047336725},
 		},
 	}
 	res, err := Scan(root, "", "")
@@ -244,6 +273,7 @@ func Test__scan_testdata_with_trailing_slash(t *testing.T) {
 		Files: []*scan.File{
 			{Name: "cache1.json", Size: 232, Hash: 17698409774061682325},
 			{Name: "cache2.json.gz", Size: 34, Hash: 11617732806245318878},
+			{Name: "skipnames", Size: 7, Hash: 10951817445047336725},
 		},
 	}
 	res, err := Scan(root, "", "")

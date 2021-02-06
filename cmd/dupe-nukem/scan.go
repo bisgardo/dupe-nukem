@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
@@ -15,8 +16,10 @@ import (
 	"github.com/pkg/errors"
 )
 
+const maxSkipNameFileLineLen = 256
+
 func Scan(dir, skip, cache string) (*scan.Dir, error) {
-	shouldSkip, err := parseShouldSkip(skip)
+	shouldSkip, err := loadShouldSkip(skip)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot parse skip dirs expression %q", skip)
 	}
@@ -28,22 +31,59 @@ func Scan(dir, skip, cache string) (*scan.Dir, error) {
 	return scan.Run(dir, shouldSkip, cacheDir)
 }
 
-func parseShouldSkip(input string) (scan.ShouldSkipPath, error) {
-	if input == "" {
+func loadShouldSkip(input string) (scan.ShouldSkipPath, error) {
+	names, err := parseSkipNames(input)
+	if err != nil {
+		return nil, err
+	}
+	if len(names) == 0 {
 		return scan.NoSkip, nil
 	}
-	names := strings.Split(input, ",")
-	res := make(map[string]struct{}, len(names))
+	set := make(map[string]struct{}, len(names))
 	for _, n := range names {
 		if err := validateSkipName(n); err != nil {
 			return nil, errors.Wrapf(err, "invalid skip name %q", n)
 		}
-		res[n] = struct{}{}
+		set[n] = struct{}{}
 	}
-	return func(dir, name string) bool {
-		_, ok := res[name]
-		return ok
-	}, nil
+	return scan.SkipNameSet(set), nil
+}
+
+func parseSkipNames(input string) ([]string, error) {
+	if input == "" {
+		return nil, nil
+	}
+	if input[0] == '@' {
+		return parseSkipNameFile(input[1:])
+	}
+	return strings.Split(input, ","), nil
+
+}
+
+func parseSkipNameFile(filename string) ([]string, error) {
+	f, err := os.Open(filename)
+	if err != nil {
+		return nil, errors.Wrapf(err, "cannot read skip names from file %q", filename)
+	}
+	r := bufio.NewReaderSize(f, maxSkipNameFileLineLen)
+	var names []string
+	i := 0
+	for {
+		i++
+		l, isNotSuffix, err := r.ReadLine()
+		if err == io.EOF {
+			return names, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		if isNotSuffix {
+			return nil, fmt.Errorf("line %d is longer than the max allowed length of %d characters", i, maxSkipNameFileLineLen)
+		}
+		if n := strings.TrimSpace(string(l)); n != "" {
+			names = append(names, n)
+		}
+	}
 }
 
 func validateSkipName(name string) error {
