@@ -18,21 +18,21 @@ import (
 
 const maxSkipNameFileLineLen = 256
 
-func Scan(dir, skip, cache string) (*scan.Dir, error) {
-	shouldSkip, err := loadShouldSkip(skip)
+func Scan(dir, skipExpr, cachePath string) (*scan.Dir, error) {
+	shouldSkip, err := loadShouldSkip(skipExpr)
 	if err != nil {
-		return nil, errors.Wrapf(err, "cannot process skip dirs expression %q", skip)
+		return nil, errors.Wrapf(err, "cannot process skip dirs expression %q", skipExpr)
 	}
-	cacheDir, err := loadCacheDir(cache)
+	cacheDir, err := loadCacheDir(cachePath)
 	if err != nil {
-		return nil, errors.Wrapf(err, "cannot load cache file %q", cache)
+		return nil, errors.Wrapf(err, "cannot load cache file %q", cachePath)
 	}
 	// TODO Replace '.' with working dir?
 	return scan.Run(dir, shouldSkip, cacheDir)
 }
 
-func loadShouldSkip(input string) (scan.ShouldSkipPath, error) {
-	names, err := parseSkipNames(input)
+func loadShouldSkip(expr string) (scan.ShouldSkipPath, error) {
+	names, err := parseSkipNames(expr)
 	if err != nil {
 		return nil, err
 	}

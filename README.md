@@ -57,6 +57,7 @@ or point to a file `<f>` that contains a name for each non-empty line using the 
 A reference file `<file>` from a previous call to `scan` may be provided to use as
 a cache for file hashes.
 The hashes of scanned files will be looked up in this file as long as the file sizes match.
+If the filename ends with `.gz`, it will automatically be gzip decompressed.
 
 The root dir in the JSON output is the basename of `<dir>`.
 The commands below will have a way of mapping this root dir back to the concrete location
