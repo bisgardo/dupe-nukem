@@ -20,5 +20,5 @@ func FileModeName(m os.FileMode) string {
 	case m&os.ModeIrregular != 0:
 		return `"irregular" file`
 	}
-	return "regular file"
+	return "file"
 }

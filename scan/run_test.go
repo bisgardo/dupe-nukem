@@ -1,8 +1,10 @@
 package scan
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"testing"
@@ -12,6 +14,8 @@ import (
 )
 
 // INFO Working dir for tests is the directory containing the file.
+
+// TODO Test logged output whenever it's relevant.
 
 func Test__empty_dir(t *testing.T) {
 	dir, err := ioutil.TempDir("", "empty")
@@ -63,7 +67,7 @@ func Test__file_root_fails(t *testing.T) {
 	assert.EqualError(t, err, fmt.Sprintf("invalid root directory %q: not a directory", f.Name()))
 }
 
-func Test__inaccessible_root_fails(t *testing.T) {
+func Test__inaccessible_root_is_skipped(t *testing.T) {
 	d, err := ioutil.TempDir("", "inaccessible")
 	require.NoError(t, err)
 	defer func() {
@@ -72,8 +76,13 @@ func Test__inaccessible_root_fails(t *testing.T) {
 	}()
 	err = os.Chmod(d, 0) // remove permissions
 	require.NoError(t, err)
-	_, err = Run(d, NoSkip, nil)
-	assert.EqualError(t, err, fmt.Sprintf("cannot scan root directory %q: access denied to directory %q", d, d))
+
+	buf := logBuffer()
+	res, err := Run(d, NoSkip, nil)
+	require.NoError(t, err)
+	assert.Equal(t, &Dir{Name: filepath.Base(d)}, res)
+	assert.Equal(t, fmt.Sprintf("skipping inaccessible directory %q\n", d), buf.String())
+
 }
 
 //goland:noinspection GoSnakeCaseUsage
@@ -304,9 +313,7 @@ func Test__inaccessible_internal_file_is_not_hashed(t *testing.T) {
 	assert.Equal(t, want, res)
 }
 
-// TODO Causing everything to error out surely is not the desired behavior.
 func Test__inaccessible_internal_dir_fails(t *testing.T) {
-	root := "testdata"
 	d, err := ioutil.TempDir("testdata/e/f", "inaccessible")
 	require.NoError(t, err)
 	defer func() {
@@ -316,8 +323,23 @@ func Test__inaccessible_internal_dir_fails(t *testing.T) {
 
 	err = os.Chmod(d, 0) // remove permissions
 	require.NoError(t, err)
-	_, err = Run(root, NoSkip, nil)
-	assert.EqualError(t, err, fmt.Sprintf(`cannot scan root directory "testdata": access denied to directory %q`, d))
+
+	root := "testdata/e"
+	want := &Dir{
+		Name: "e",
+		Dirs: []*Dir{
+			{
+				Name:       "f",
+				Files:      []*File{testdata_e_f_a},
+				EmptyFiles: []string{"g"},
+			},
+		},
+	}
+	buf := logBuffer()
+	res, err := Run(root, NoSkip, nil)
+	require.NoError(t, err)
+	assert.Equal(t, want, res)
+	assert.Equal(t, fmt.Sprintf("skipping inaccessible directory %q\n", d), buf.String())
 }
 
 func Test__testdata_cache_with_mismatching_root_fails(t *testing.T) {
@@ -507,4 +529,11 @@ func skip(names ...string) ShouldSkipPath {
 		}
 		return false
 	}
+}
+
+func logBuffer() *bytes.Buffer {
+	var buf bytes.Buffer
+	log.SetFlags(0)
+	log.SetOutput(&buf)
+	return &buf
 }

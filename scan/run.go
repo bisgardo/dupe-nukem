@@ -94,6 +94,10 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		// Propagate error and skip root.
 		if err != nil || path == root {
+			if os.IsPermission(err) {
+				log.Printf("skipping inaccessible %v %q\n", util.FileModeName(info.Mode()), path)
+				return nil
+			}
 			return err
 		}
 		parentPath := filepath.Dir(path)
