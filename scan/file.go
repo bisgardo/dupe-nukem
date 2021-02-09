@@ -1,5 +1,7 @@
 package scan
 
+const useBinarySearch = true
+
 // Dir represents a directory as a name and lists of contained files and subdirectories.
 // All of these lists must be sorted to enable binary search.
 type Dir struct {
@@ -82,30 +84,91 @@ func NewFile(name string, size int64, hash uint64) *File {
 
 // safeFindDir looks for a Dir with the given name in the subdirectory list of the given Dir.
 // Returns nil if the Dir is nil.
-func safeFindDir(d *Dir, name string) *Dir {
+func safeFindDir(d *Dir, name string) (*Dir, int) {
 	if d == nil {
-		return nil
+		return nil, 0
 	}
-	// TODO Use binary search.
-	for _, s := range d.Dirs {
+
+	if useBinarySearch {
+		return findDir(d.Dirs, name, len(d.Dirs)/2)
+	}
+
+	for i, s := range d.Dirs {
 		if s.Name == name {
-			return s
+			return s, i
 		}
 	}
-	return nil
+	return nil, 0
 }
 
 // safeFindFile looks for a File with the given name in the file list of the given Dir.
 // Returns nil if the Dir is nil.
-func safeFindFile(d *Dir, name string) *File {
+func safeFindFile(d *Dir, name string) (*File, int) {
 	if d == nil {
-		return nil
+		return nil, 0
 	}
-	// TODO Use binary search.
-	for _, f := range d.Files {
+
+	if useBinarySearch {
+		return findFile(d.Files, name, len(d.Files)/2)
+	}
+
+	for i, f := range d.Files {
 		if f.Name == name {
-			return f
+			return f, i
 		}
 	}
-	return nil
+	return nil, 0
+}
+
+// findDir searches the provided list for a Dir with the provided name.
+// The search is performed using binary search, so the input list must be sorted.
+// TODO The provided index determines the first element to be considered.
+//      This may be used to improve search performance if a good candidate is known in advance
+//      (say, the element following the previous match).
+// The implementation is exactly identical to findFile but it necessary to implement separately
+// due to the lack of generics in Go.
+func findDir(ds []*Dir, name string, idx int) (*Dir, int) {
+	l, r := 0, len(ds)-1
+	//if idx > r {
+	//	idx = (l + r) / 2
+	//}
+	for l <= r {
+		d := ds[idx]
+		n := d.Name
+		if n == name {
+			return d, idx
+		}
+		if n < name {
+			l = idx + 1
+		} else {
+			r = idx - 1
+		}
+		idx = (l + r) / 2
+	}
+	return nil, 0
+}
+
+// findDir searches the provided list for a File with the provided name.
+// The search is performed using binary search, so the input list must be sorted.
+// The implementation is exactly identical to findDir but it necessary to implement separately
+// due to the lack of generics in Go.
+func findFile(ds []*File, name string, idx int) (*File, int) {
+	l, r := 0, len(ds)-1
+	//if idx > r {
+	//	idx = (l + r) / 2
+	//}
+	for l <= r {
+		f := ds[idx]
+		n := f.Name
+		if n == name {
+			return f, idx
+		}
+		if n < name {
+			l = idx + 1
+		} else {
+			r = idx - 1
+		}
+		idx = (l + r) / 2
+	}
+	return nil, 0
 }

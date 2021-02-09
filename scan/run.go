@@ -78,17 +78,20 @@ func validateRoot(path string) error {
 // In particular, the directory must not have a trailing slash as that will cause the file walk to panic.
 func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, error) {
 	type walkContext struct {
-		prev     *walkContext
-		curDir   *Dir
-		pathLen  int
-		cacheDir *Dir
+		prev                *walkContext
+		curDir              *Dir
+		pathLen             int
+		cacheDir            *Dir
+		lastCacheDirHitIdx  int // has no meaning if cacheDir is nil
+		lastCacheFileHitIdx int // has no meaning if cacheDir is nil
 	}
 
 	head := &walkContext{
-		prev:     nil,
-		curDir:   NewDir(rootName),
-		pathLen:  len(root),
-		cacheDir: cache,
+		prev:               nil,
+		curDir:             NewDir(rootName),
+		pathLen:            len(root),
+		cacheDir:           cache,
+		lastCacheDirHitIdx: -1,
 	}
 
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
@@ -122,11 +125,17 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 		if mode := info.Mode(); mode.IsDir() {
 			dir := NewDir(name)
 			head.curDir.appendDir(dir) // Walk visits in lexical order
+			d, idx := safeFindDir(head.cacheDir, name)
+			if d != nil {
+				head.lastCacheDirHitIdx = idx
+			}
+
 			head = &walkContext{
-				prev:     head,
-				curDir:   dir,
-				pathLen:  len(path),
-				cacheDir: safeFindDir(head.cacheDir, name),
+				prev:               head,
+				curDir:             dir,
+				pathLen:            len(path),
+				cacheDir:           d,
+				lastCacheDirHitIdx: -1,
 			}
 		} else if !mode.IsRegular() {
 			// File is a symlink, named pipe, socket, device, etc.
@@ -139,14 +148,24 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 			// IDEA Parallelize hash computation (via work queue for example).
 			// IDEA Consider adding option to hash a limited number of bytes only
 			//      (the reason being that if two files differ, the first 1MB or so probably differ too).
-			hash := hashFromCache(head.cacheDir, name, size)
+			var hash uint64
+			f, idx := safeFindFile(head.cacheDir, name)
+			if f != nil {
+				head.lastCacheFileHitIdx = idx
+				if f.Size == size {
+					hash = f.Hash
+				}
+			}
 			if hash == 0 {
+				// File was not found in cache or its size didn't match.
 				hash, err = hashFile(path)
 				if err != nil {
 					// Currently report error but keep going.
 					log.Printf("error: cannot hash file %q: %v\n", path, err)
 				}
 			}
+			// If the hash is cached with value 0, this is assumed to be a mistake and considered a cache miss:
+			// There's no way to represent the cached value if it happens to be actually 0.
 			head.curDir.appendFile(NewFile(name, size, hash)) // Walk visits in lexical order
 		}
 		return nil
@@ -155,18 +174,6 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 		head = head.prev
 	}
 	return head.curDir, errors.Wrapf(simplifyFilepathWalkError(err), "cannot scan root directory %q", root)
-}
-
-// hashFromCache looks up the content hash of the given file in the given cache dir.
-// A cache miss is represented by the value 0.
-// If the hash is cached with value 0, this is assumed to be a mistake and considered a cache miss:
-// There's no way to represent the cached value if it happens to be actually 0.
-func hashFromCache(cacheDir *Dir, fileName string, fileSize int64) uint64 {
-	f := safeFindFile(cacheDir, fileName)
-	if f != nil && f.Size == fileSize {
-		return f.Hash
-	}
-	return 0
 }
 
 // hashFile computes the FNV-1a hash of the file at the provided path.
