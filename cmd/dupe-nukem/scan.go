@@ -16,8 +16,12 @@ import (
 	"github.com/pkg/errors"
 )
 
+// maxSkipNameFileLineLen is the size in bytes allocated for reading a skip file.
+// As the file is read line by line, this is the maximum allowed line length.
 const maxSkipNameFileLineLen = 256
 
+// Scan parses the skip expression and cache path passed from the command line
+// and then runs scan.Run with the resulting values.
 func Scan(dir, skipExpr, cachePath string) (*scan.Dir, error) {
 	shouldSkip, err := loadShouldSkip(skipExpr)
 	if err != nil {
@@ -59,7 +63,6 @@ func parseSkipNames(input string) ([]string, error) {
 		return res, errors.Wrapf(err, "cannot read skip names from file %q", f)
 	}
 	return strings.Split(input, ","), nil
-
 }
 
 func parseSkipNameFile(filename string) ([]string, error) {

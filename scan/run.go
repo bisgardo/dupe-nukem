@@ -12,7 +12,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-// ShouldSkipPath is a function for determining if a given path should be skipped when walking a file tree.
+// ShouldSkipPath is a function for determining if a given path
+// should be skipped when walking a file tree.
 type ShouldSkipPath func(dir, name string) bool
 
 // NoSkip always returns false.
@@ -20,6 +21,8 @@ func NoSkip(string, string) bool {
 	return false
 }
 
+// SkipNameSet constructs a ShouldSkipPath which returns true
+// when the base name matches any of the names in the provided set.
 func SkipNameSet(names map[string]struct{}) ShouldSkipPath {
 	return func(dir, name string) bool {
 		_, ok := names[name]
@@ -107,11 +110,10 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 				log.Printf("skipping directory %q based on skip list\n", path)
 				head.curDir.appendSkippedDir(name)
 				return filepath.SkipDir
-			} else {
-				log.Printf("skipping file %q based on skip list\n", path)
-				head.curDir.appendSkippedFile(name)
-				return nil
 			}
+			log.Printf("skipping file %q based on skip list\n", path)
+			head.curDir.appendSkippedFile(name)
+			return nil
 		}
 
 		// We don't get any signal that the walk has returned up the stack so have to detect it ourselves.
