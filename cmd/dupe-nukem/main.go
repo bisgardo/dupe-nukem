@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"os"
+	"log"
 
 	"github.com/spf13/cobra"
 )
@@ -57,7 +57,7 @@ func main() {
 
 	rootCmd.AddCommand(scanCmd)
 	if err := rootCmd.Execute(); err != nil {
-		_, _ = fmt.Fprintln(os.Stderr, "error:", err)
-		os.Exit(1)
+		// Print error with stack trace.
+		log.Fatalf("error: %+v\n", err)
 	}
 }

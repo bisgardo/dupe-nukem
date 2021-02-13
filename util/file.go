@@ -1,12 +1,24 @@
 package util
 
-import "os"
+import (
+	"os"
+)
+
+// FileInfoModeName returns the name of the file's "mode".
+func FileInfoModeName(i os.FileInfo) string {
+	if i == nil {
+		return "file or directory"
+	}
+	return FileModeName(i.Mode())
+}
 
 // FileModeName returns the name of the file's "mode".
 func FileModeName(m os.FileMode) string {
 	switch {
-	case m&os.ModeDir != 0:
+	case m.IsDir():
 		return "directory"
+	case m.IsRegular():
+		return "file"
 	case m&os.ModeSymlink != 0:
 		return "symlink"
 	case m&os.ModeNamedPipe != 0:
@@ -20,5 +32,5 @@ func FileModeName(m os.FileMode) string {
 	case m&os.ModeIrregular != 0:
 		return `"irregular" file`
 	}
-	return "file"
+	return "<" + m.String() + ">"
 }

@@ -61,17 +61,17 @@ func resolveRoot(path string) (string, error) {
 		return "", err
 	}
 	if p != path {
-		log.Printf("following root symlink %q to %q", path, p)
+		log.Printf("following root symlink %q to %q\n", path, p)
 	}
 	return p, validateRoot(p)
 }
 
 func validateRoot(path string) error {
-	s, err := os.Lstat(path)
+	i, err := os.Lstat(path)
 	if err != nil {
 		return err
 	}
-	if !s.IsDir() {
+	if !i.IsDir() {
 		return fmt.Errorf("not a directory")
 	}
 	return nil
@@ -97,21 +97,25 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		// Propagate error and skip root.
 		if err != nil || path == root {
-			if os.IsPermission(err) {
-				log.Printf("skipping inaccessible %v %q\n", util.FileModeName(info.Mode()), path)
+			modeName := util.FileInfoModeName(info)
+			switch {
+			case os.IsPermission(err):
+				log.Printf("skipping inaccessible %v %q\n", modeName, path)
 				return nil
+			case os.IsNotExist(err):
+				// TODO Test - can maybe only do on Windows (with too long path).
+				log.Printf("error: %v %q not found!\n", modeName, path)
 			}
-			return err
+			return errors.Wrapf(util.SimplifyIOError(err), "cannot walk %v %q", modeName, path)
 		}
 		parentPath := filepath.Dir(path)
 		name := filepath.Base(path)
 		if shouldSkip(parentPath, name) {
+			log.Printf("skipping %v %q based on skip list\n", util.FileModeName(info.Mode()), path)
 			if info.IsDir() {
-				log.Printf("skipping directory %q based on skip list\n", path)
 				head.curDir.appendSkippedDir(name)
 				return filepath.SkipDir
 			}
-			log.Printf("skipping file %q based on skip list\n", path)
 			head.curDir.appendSkippedFile(name)
 			return nil
 		}
@@ -156,7 +160,7 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 	for head.prev != nil {
 		head = head.prev
 	}
-	return head.curDir, errors.Wrapf(simplifyFilepathWalkError(err), "cannot scan root directory %q", root)
+	return head.curDir, errors.Wrapf(err, "cannot scan root directory %q", root)
 }
 
 // hashFromCache looks up the content hash of the given file in the given cache dir.
