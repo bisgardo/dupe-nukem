@@ -60,7 +60,7 @@ func resolveRoot(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if p != path {
+	if p != filepath.Clean(path) {
 		log.Printf("following root symlink %q to %q\n", path, p)
 	}
 	return p, validateRoot(p)

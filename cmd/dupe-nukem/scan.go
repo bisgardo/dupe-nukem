@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -31,8 +32,14 @@ func Scan(dir, skipExpr, cachePath string) (*scan.Dir, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot load cache file %q", cachePath)
 	}
-	// TODO Replace '.' with working dir?
-	return scan.Run(dir, shouldSkip, cacheDir)
+	absDir, err := abs(dir)
+	if err != nil {
+		return nil, err
+	}
+	if absDir != dir {
+		log.Printf("absolute path of %q resolved to %q\n", dir, absDir)
+	}
+	return scan.Run(absDir, shouldSkip, cacheDir)
 }
 
 func loadShouldSkip(expr string) (scan.ShouldSkipPath, error) {
@@ -179,4 +186,15 @@ func resolveReader(path string, f *os.File) (io.Reader, error) {
 		return gzip.NewReader(f)
 	}
 	return f, nil
+}
+
+func abs(dir string) (string, error) {
+	a, err := filepath.Abs(dir)
+	if err != nil {
+		return "", errors.Wrapf(util.SimplifyIOError(err), "cannot resolve absolute path of %q", a)
+	}
+	//if runtime.GOOS == "windows" {
+	//	return `\\?\` + a, nil // hack to enable long paths on Windows
+	//}
+	return a, nil
 }
