@@ -74,16 +74,19 @@ func Test__file_root_fails(t *testing.T) {
 	assert.EqualError(t, err, fmt.Sprintf("invalid root directory %q: not a directory", f.Name()))
 }
 
-// DISABLED on Windows: This test only works as expected on the Linux setup of GitHub Actions.
-// The reason is that the project is checked out on a symlinked path which dupe-nukem resolves.
-// This causes another log entry to be emitted and also the internal path to be used.
-// There is no way we can control how GitHub Actions sets up the project
-// as that is internal to their infrastructure.
-// The functionality is probably correct, but needs to be tested some other way.
-// It's also possible that can/should avoid resolving symlinks in cases like this.
+// DISABLED on Windows and macOS (on GitHub): This test only works as expected on the Linux setup of GitHub Actions.
+// The reason is that on the other platforms, the project is checked out on a symlinked path which
+// gets resolved by dupe-nukem.
+// This causes another log entry to be emitted and also the symlinked path (which is not known in advance) to be used.
+// We cannot (or shouldn't at least) control how GitHub Actions sets up the project as that is internal
+// to their infrastructure.
+// It's also possible that we can/should avoid resolving symlinks in cases like this...
+// The fact that the test passes on Linux and Windows (tested locally) gives reasonable confidence
+// that the functionality really is correct on all platforms - the test just needs to be set up some other way.
+// But the encountered case (that inaccessible symlinked root should be skipped) should be properly tested as well!
 func Test__inaccessible_root_is_skipped(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		return
+	if testutil.CI() == "github" && runtime.GOOS != "linux" {
+		return // skip test
 	}
 	d, err := ioutil.TempDir("", "inaccessible")
 	require.NoError(t, err)
@@ -149,7 +152,7 @@ func Test__testdata_skip_root_fails(t *testing.T) {
 // DISABLED on Windows: Creating symlinks require elevated privileges.
 func Test__testdata_skip_symlinked_root_fails(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		return
+		return // skip test
 	}
 	symlinkName := "test_root-symlink"
 	err := os.Symlink("testdata", symlinkName)
@@ -484,7 +487,7 @@ func Test__cache_entry_with_hash_0_is_ignored(t *testing.T) {
 // DISABLED on Windows: Creating symlinks require elevated privileges.
 func Test__root_symlink_is_followed(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		return
+		return // skip test
 	}
 	symlinkName := "test_root-symlink"
 
@@ -507,7 +510,7 @@ func Test__root_symlink_is_followed(t *testing.T) {
 // DISABLED on Windows: Creating symlinks require elevated privileges.
 func Test__root_indirect_symlink_is_followed(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		return
+		return // skip test
 	}
 	indirectSymlink := "test_indirect-root-symlink"
 	symlink := "test-symlink"
@@ -537,7 +540,7 @@ func Test__root_indirect_symlink_is_followed(t *testing.T) {
 // DISABLED on Windows: Creating symlinks require elevated privileges.
 func Test__internal_symlink_is_skipped(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		return
+		return // skip test
 	}
 	symlink := "testdata/e/f/test_internal-symlink"
 
@@ -562,7 +565,7 @@ func Test__internal_symlink_is_skipped(t *testing.T) {
 // DISABLED on Windows: Creating symlinks require elevated privileges.
 func Test__root_symlink_to_ancestor_is_followed_but_skipped_when_internal(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		return
+		return // skip test
 	}
 	symlink := "testdata/e/f/test_ancestor-symlink" // points to "testdata/e"
 
