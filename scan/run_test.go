@@ -460,6 +460,27 @@ func Test__testdata_subdir_cache_not_used_for_different_file_size(t *testing.T) 
 	assert.Equal(t, want, res)
 }
 
+func Test__cache_entry_with_hash_0_is_ignored(t *testing.T) {
+	root := "testdata/b"
+	cache := &Dir{
+		Name: "b",
+		Files: []*File{
+			{
+				Name: "d",
+				Size: 2,
+				Hash: 0, // value 0 is intentionally ignored
+			},
+		},
+	}
+	want := &Dir{
+		Name:  "b",
+		Files: []*File{testdata_b_d},
+	}
+	res, err := Run(root, NoSkip, cache)
+	require.NoError(t, err)
+	assert.Equal(t, want, res)
+}
+
 // DISABLED on Windows: Creating symlinks require elevated privileges.
 func Test__root_symlink_is_followed(t *testing.T) {
 	if runtime.GOOS == "windows" {

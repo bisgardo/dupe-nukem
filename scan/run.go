@@ -137,7 +137,7 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 		} else if !mode.IsRegular() {
 			// File is a symlink, named pipe, socket, device, etc.
 			// We start by not supporting any of that.
-			// IDEA If symlink, print target (and if it exists).
+			// IDEA If symlink, print target (and whether it exists).
 			log.Printf("skipping %v %q during scan\n", util.FileModeName(mode), path)
 		} else if size := info.Size(); size == 0 {
 			head.curDir.appendEmptyFile(name) // Walk visits in lexical order
@@ -165,8 +165,11 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 
 // hashFromCache looks up the content hash of the given file in the given cache dir.
 // A cache miss is represented by the value 0.
-// If the hash is cached with value 0, this is assumed to be a mistake and considered a cache miss:
-// There's no way to represent the cached value if it happens to be actually 0.
+// If the hash is cached with value 0, this is assumed to be a mistake (caused by 0 being the default value of uint64)
+// and considered a cache miss:
+// There's intentionally no way to cache the hash if it happens to be actually 0.
+// This is deemed acceptable as this is expected to practically never happen.
+// If the cached file size doesn't match the expected one, the cache is considered missed as well.
 func hashFromCache(cacheDir *Dir, fileName string, fileSize int64) uint64 {
 	f := safeFindFile(cacheDir, fileName)
 	if f != nil && f.Size == fileSize {
