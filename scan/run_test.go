@@ -7,14 +7,19 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
+	"github.com/bisgardo/dupe-nukem/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// INFO Working dir for tests is the directory containing the file.
+// Working dir for tests is the directory containing the file.
 
+// TODO Figure out how to test symlinks on Windows:
+//      - Create specialized tests that need to be run manually as administrator.
+//      - Handle/test Windows-specific features: shortcuts, junctions.
 // TODO Test logged output whenever it's relevant.
 
 func Test__empty_dir(t *testing.T) {
@@ -63,26 +68,41 @@ func Test__file_root_fails(t *testing.T) {
 		err := os.Remove(f.Name())
 		assert.NoError(t, err)
 	}()
+	err = f.Close()
+	assert.NoError(t, err)
 	_, err = Run(f.Name(), NoSkip, nil)
 	assert.EqualError(t, err, fmt.Sprintf("invalid root directory %q: not a directory", f.Name()))
 }
 
+// DISABLED on Windows: This test only works as expected on the Linux setup of GitHub Actions.
+// The reason is that the project is checked out on a symlinked path which dupe-nukem resolves.
+// This causes another log entry to be emitted and also the internal path to be used.
+// There is no way we can control how GitHub Actions sets up the project
+// as that is internal to their infrastructure.
+// The functionality is probably correct, but needs to be tested some other way.
+// It's also possible that can/should avoid resolving symlinks in cases like this.
 func Test__inaccessible_root_is_skipped(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		return
+	}
 	d, err := ioutil.TempDir("", "inaccessible")
 	require.NoError(t, err)
 	defer func() {
 		err := os.Remove(d)
 		assert.NoError(t, err)
 	}()
-	err = os.Chmod(d, 0) // remove permissions
+	err = testutil.MakeDirInaccessible(d)
 	require.NoError(t, err)
+	defer func() {
+		err := testutil.MakeDirAccessible(d)
+		assert.NoError(t, err)
+	}()
 
 	buf := logBuffer()
 	res, err := Run(d, NoSkip, nil)
 	require.NoError(t, err)
 	assert.Equal(t, &Dir{Name: filepath.Base(d)}, res)
 	assert.Equal(t, fmt.Sprintf("skipping inaccessible directory %q\n", d), buf.String())
-
 }
 
 //goland:noinspection GoSnakeCaseUsage
@@ -126,7 +146,11 @@ func Test__testdata_skip_root_fails(t *testing.T) {
 	assert.EqualError(t, err, `skipping root directory "testdata"`)
 }
 
+// DISABLED on Windows: Creating symlinks require elevated privileges.
 func Test__testdata_skip_symlinked_root_fails(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		return
+	}
 	symlinkName := "test_root-symlink"
 	err := os.Symlink("testdata", symlinkName)
 	require.NoError(t, err)
@@ -281,6 +305,7 @@ func Test__testdata_trailing_slash_gets_removed(t *testing.T) {
 	assert.Equal(t, want, res)
 }
 
+// On Windows, this test only works if the repository is stored on an NTFS drive.
 func Test__inaccessible_internal_file_is_not_hashed(t *testing.T) {
 	f, err := ioutil.TempFile("testdata/e/f", "inaccessible")
 	require.NoError(t, err)
@@ -292,8 +317,11 @@ func Test__inaccessible_internal_file_is_not_hashed(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 7, n)
 
-	err = f.Chmod(0) // remove permissions
+	err = testutil.MakeFileInaccessible(f)
 	require.NoError(t, err)
+
+	err = f.Close()
+	assert.NoError(t, err)
 
 	root := "testdata/e/f"
 	want := &Dir{
@@ -313,6 +341,7 @@ func Test__inaccessible_internal_file_is_not_hashed(t *testing.T) {
 	assert.Equal(t, want, res)
 }
 
+// On Windows, this test only works if the repository is stored on an NTFS drive.
 func Test__inaccessible_internal_dir_fails(t *testing.T) {
 	d, err := ioutil.TempDir("testdata/e/f", "inaccessible")
 	require.NoError(t, err)
@@ -321,8 +350,12 @@ func Test__inaccessible_internal_dir_fails(t *testing.T) {
 		assert.NoError(t, err)
 	}()
 
-	err = os.Chmod(d, 0) // remove permissions
+	err = testutil.MakeDirInaccessible(d)
 	require.NoError(t, err)
+	defer func() {
+		err := testutil.MakeDirAccessible(d)
+		assert.NoError(t, err)
+	}()
 
 	root := "testdata/e"
 	want := &Dir{
@@ -427,7 +460,11 @@ func Test__testdata_subdir_cache_not_used_for_different_file_size(t *testing.T) 
 	assert.Equal(t, want, res)
 }
 
+// DISABLED on Windows: Creating symlinks require elevated privileges.
 func Test__root_symlink_is_followed(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		return
+	}
 	symlinkName := "test_root-symlink"
 
 	err := os.Symlink("testdata/e/f", symlinkName)
@@ -446,7 +483,11 @@ func Test__root_symlink_is_followed(t *testing.T) {
 	assert.Equal(t, want, res)
 }
 
+// DISABLED on Windows: Creating symlinks require elevated privileges.
 func Test__root_indirect_symlink_is_followed(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		return
+	}
 	indirectSymlink := "test_indirect-root-symlink"
 	symlink := "test-symlink"
 
@@ -472,7 +513,11 @@ func Test__root_indirect_symlink_is_followed(t *testing.T) {
 	assert.Equal(t, want, res)
 }
 
+// DISABLED on Windows: Creating symlinks require elevated privileges.
 func Test__internal_symlink_is_skipped(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		return
+	}
 	symlink := "testdata/e/f/test_internal-symlink"
 
 	err := os.Symlink("testdata", symlink)
@@ -493,7 +538,11 @@ func Test__internal_symlink_is_skipped(t *testing.T) {
 	assert.Equal(t, want, res)
 }
 
+// DISABLED on Windows: Creating symlinks require elevated privileges.
 func Test__root_symlink_to_ancestor_is_followed_but_skipped_when_internal(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		return
+	}
 	symlink := "testdata/e/f/test_ancestor-symlink" // points to "testdata/e"
 
 	err := os.Symlink("..", symlink)

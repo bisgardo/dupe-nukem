@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/bisgardo/dupe-nukem/scan"
+	"github.com/bisgardo/dupe-nukem/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -46,6 +47,8 @@ func Test__parseSkipNames_file_with_length_255_is_allowed(t *testing.T) {
 	n, err := f.WriteString(line)
 	require.NoError(t, err)
 	require.Equal(t, maxSkipNameFileLineLen-1, n)
+	err = f.Close()
+	assert.NoError(t, err)
 
 	input := fmt.Sprintf("@%v", f.Name())
 	want := []string{line}
@@ -68,6 +71,8 @@ func Test__loadShouldSkip_file_with_length_256_fails(t *testing.T) {
 	n, err := f.WriteString(strings.Repeat("x", maxSkipNameFileLineLen) + "\n") // let the 256'th character be a newline
 	require.NoError(t, err)
 	require.Equal(t, maxSkipNameFileLineLen+1, n)
+	err = f.Close()
+	assert.NoError(t, err)
 
 	input := fmt.Sprintf("@%v", f.Name())
 	_, err = loadShouldSkip(input)
@@ -84,6 +89,8 @@ func Test__loadShouldSkip_file_with_invalid_line_fails(t *testing.T) {
 	n, err := f.WriteString("with/slash")
 	require.NoError(t, err)
 	require.Equal(t, 10, n)
+	err = f.Close()
+	assert.NoError(t, err)
 
 	input := fmt.Sprintf("@%v", f.Name())
 	_, err = loadShouldSkip(input)
@@ -170,8 +177,10 @@ func Test__Scan_wraps_cache_file_not_accessible_error(t *testing.T) {
 		err := os.Remove(f.Name())
 		assert.NoError(t, err)
 	}()
-	err = f.Chmod(0) // remove permissions
+	err = testutil.MakeFileInaccessible(f)
 	require.NoError(t, err)
+	err = f.Close()
+	assert.NoError(t, err)
 	_, err = Scan("x", "", f.Name())
 	assert.EqualError(t, err, fmt.Sprintf("cannot load cache file %q: cannot open file: access denied", f.Name()))
 }
@@ -186,6 +195,8 @@ func Test__Scan_wraps_cache_load_error(t *testing.T) {
 	n, err := f.WriteString("{")
 	require.NoError(t, err)
 	require.Equal(t, 1, n)
+	err = f.Close()
+	assert.NoError(t, err)
 
 	_, err = Scan("x", "", f.Name())
 	assert.EqualError(t, err, fmt.Sprintf("cannot load cache file %q: cannot decode file as JSON: unexpected EOF", f.Name()))

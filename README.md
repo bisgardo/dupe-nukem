@@ -35,6 +35,11 @@ Only the `scan` command (of regular directories) has been implemented.
 The commands listed below make up an approximate subset of the envisioned interface
 to give a rough idea of what should be done.
 
+### Windows
+
+A few tests related to symlinking are disabled on Windows because creating elevated privileges are required to create symlinks.
+Other tests fail unless the repository to be mounted on an NTFS formatted drive (which a VirtualBox shared folder might, for instance, not be).
+
 ## Install
 
 Instructions will be here as soon as there's something to install!
