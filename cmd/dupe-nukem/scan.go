@@ -72,11 +72,16 @@ func parseSkipNames(input string) ([]string, error) {
 	return strings.Split(input, ","), nil
 }
 
-func parseSkipNameFile(filename string) ([]string, error) {
-	f, err := os.Open(filename)
+func parseSkipNameFile(path string) ([]string, error) {
+	f, err := os.Open(path)
 	if err != nil {
 		return nil, errors.Wrapf(util.SimplifyIOError(err), "cannot open file")
 	}
+	defer func() {
+		if err := f.Close(); err != nil {
+			log.Printf("error: cannot close skip name file '%v': %v\n", path, err)
+		}
+	}()
 	r := bufio.NewReaderSize(f, maxSkipNameFileLineLen)
 	var names []string
 	i := 0
