@@ -100,6 +100,7 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 			modeName := util.FileInfoModeName(info)
 			switch {
 			case os.IsPermission(err):
+				// TODO Add to skip list?
 				log.Printf("skipping inaccessible %v %q\n", modeName, path)
 				return nil
 			case os.IsNotExist(err):

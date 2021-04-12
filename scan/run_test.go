@@ -296,16 +296,18 @@ func Test__testdata_subdir_skip_empty_file(t *testing.T) {
 	assert.Equal(t, want, res)
 }
 
-func Test__testdata_trailing_slash_gets_removed(t *testing.T) {
+func Test__testdata_trailing_slash_gets_removed_and_not_logged(t *testing.T) {
 	root := "testdata/e/f/"
 	want := &Dir{
 		Name:       "f",
 		Files:      []*File{testdata_e_f_a},
 		EmptyFiles: []string{"g"},
 	}
+	buf := logBuffer()
 	res, err := Run(root, NoSkip, nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
+	assert.Empty(t, buf.String())
 }
 
 // On Windows, this test only works if the repository is stored on an NTFS drive.
@@ -345,7 +347,7 @@ func Test__inaccessible_internal_file_is_not_hashed(t *testing.T) {
 }
 
 // On Windows, this test only works if the repository is stored on an NTFS drive.
-func Test__inaccessible_internal_dir_fails(t *testing.T) {
+func Test__inaccessible_internal_dir_is_logged(t *testing.T) {
 	d, err := ioutil.TempDir("testdata/e/f", "inaccessible")
 	require.NoError(t, err)
 	defer func() {
@@ -485,13 +487,14 @@ func Test__cache_entry_with_hash_0_is_ignored(t *testing.T) {
 }
 
 // DISABLED on Windows: Creating symlinks require elevated privileges.
-func Test__root_symlink_is_followed(t *testing.T) {
+func Test__root_symlink_is_followed_and_logged(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		return // skip test
 	}
 	symlinkName := "test_root-symlink"
+	symlinkTarget := "testdata/e/f"
 
-	err := os.Symlink("testdata/e/f", symlinkName)
+	err := os.Symlink(symlinkTarget, symlinkName)
 	require.NoError(t, err)
 	defer func() {
 		err := os.Remove(symlinkName)
@@ -502,22 +505,25 @@ func Test__root_symlink_is_followed(t *testing.T) {
 		Files:      []*File{testdata_e_f_a},
 		EmptyFiles: []string{"g"},
 	}
+	buf := logBuffer()
 	res, err := Run(symlinkName, NoSkip, nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
+	assert.Equal(t, fmt.Sprintf("following root symlink %q to %q\n", symlinkName, symlinkTarget), buf.String())
 }
 
 // DISABLED on Windows: Creating symlinks require elevated privileges.
-func Test__root_indirect_symlink_is_followed(t *testing.T) {
+func Test__root_indirect_symlink_is_followed_and_logged(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		return // skip test
 	}
 	indirectSymlink := "test_indirect-root-symlink"
 	symlink := "test-symlink"
+	symlinkTarget := "testdata/e/f"
 
 	err := os.Symlink(symlink, indirectSymlink)
 	require.NoError(t, err)
-	err = os.Symlink("testdata/e/f", symlink)
+	err = os.Symlink(symlinkTarget, symlink)
 	require.NoError(t, err)
 	defer func() {
 		err := os.Remove(indirectSymlink)
@@ -532,9 +538,11 @@ func Test__root_indirect_symlink_is_followed(t *testing.T) {
 		Files:      []*File{testdata_e_f_a},
 		EmptyFiles: []string{"g"},
 	}
+	buf := logBuffer()
 	res, err := Run(indirectSymlink, NoSkip, nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
+	assert.Equal(t, fmt.Sprintf("following root symlink %q to %q\n", indirectSymlink, symlinkTarget), buf.String())
 }
 
 // DISABLED on Windows: Creating symlinks require elevated privileges.
@@ -563,7 +571,7 @@ func Test__internal_symlink_is_skipped(t *testing.T) {
 }
 
 // DISABLED on Windows: Creating symlinks require elevated privileges.
-func Test__root_symlink_to_ancestor_is_followed_but_skipped_when_internal(t *testing.T) {
+func Test__root_symlink_to_ancestor_is_followed_and_logged_but_skipped_when_internal(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		return // skip test
 	}
@@ -586,9 +594,19 @@ func Test__root_symlink_to_ancestor_is_followed_but_skipped_when_internal(t *tes
 			},
 		},
 	}
+	buf := logBuffer()
 	res, err := Run(symlink, NoSkip, nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
+	assert.Equal(t,
+		fmt.Sprintf(
+			"following root symlink %q to %q\nskipping symlink %q during scan\n",
+			symlink,
+			filepath.Dir(filepath.Dir(symlink)),
+			symlink,
+		),
+		buf.String(),
+	)
 }
 
 /* UTILITIES */
