@@ -1,0 +1,15 @@
+{
+  "name": "x",
+  "dirs": [
+    {
+      "name": "y",
+      "files": [
+        {"name": "a", "size": 21, "hash": 42},
+        {"name": "b", "size": 53}
+      ]
+    }
+  ],
+  "files": [
+    {"name": "c", "size": 11, "hash": 11}
+  ]
+}
