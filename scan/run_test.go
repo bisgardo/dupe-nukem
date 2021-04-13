@@ -1,10 +1,8 @@
 package scan
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -101,7 +99,7 @@ func Test__inaccessible_root_is_skipped(t *testing.T) {
 		assert.NoError(t, err)
 	}()
 
-	buf := logBuffer()
+	buf := testutil.LogBuffer()
 	res, err := Run(d, NoSkip, nil)
 	require.NoError(t, err)
 	assert.Equal(t, &Dir{Name: filepath.Base(d)}, res)
@@ -345,7 +343,7 @@ func Test__inaccessible_internal_file_is_not_hashed(t *testing.T) {
 }
 
 // On Windows, this test only works if the repository is stored on an NTFS drive.
-func Test__inaccessible_internal_dir_fails(t *testing.T) {
+func Test__inaccessible_internal_dir_is_logged(t *testing.T) {
 	d, err := ioutil.TempDir("testdata/e/f", "inaccessible")
 	require.NoError(t, err)
 	defer func() {
@@ -371,7 +369,7 @@ func Test__inaccessible_internal_dir_fails(t *testing.T) {
 			},
 		},
 	}
-	buf := logBuffer()
+	buf := testutil.LogBuffer()
 	res, err := Run(root, NoSkip, nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
@@ -602,11 +600,4 @@ func skip(names ...string) ShouldSkipPath {
 		}
 		return false
 	}
-}
-
-func logBuffer() *bytes.Buffer {
-	var buf bytes.Buffer
-	log.SetFlags(0)
-	log.SetOutput(&buf)
-	return &buf
 }

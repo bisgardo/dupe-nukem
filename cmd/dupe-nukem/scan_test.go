@@ -202,14 +202,14 @@ func Test__Scan_wraps_cache_load_error(t *testing.T) {
 	assert.EqualError(t, err, fmt.Sprintf("cannot load cache file %q: cannot decode file as JSON: unexpected EOF", f.Name()))
 }
 
-func Test__checkCache(t *testing.T) {
+func Test__checkCache_rejects_unsorted_lists(t *testing.T) {
 	testdata := func() *scan.Dir {
 		return &scan.Dir{
 			Name: "x",
 			Dirs: []*scan.Dir{
 				{
 					Name:       "y",
-					Files:      []*scan.File{{Name: "a"}, {Name: "b"}},
+					Files:      []*scan.File{{Name: "a", Size: 1, Hash: 1}, {Name: "b", Size: 1, Hash: 1}},
 					EmptyFiles: []string{"c", "d", "e"},
 				},
 				{
@@ -217,7 +217,7 @@ func Test__checkCache(t *testing.T) {
 					Dirs: []*scan.Dir{{Name: "r"}, {Name: "s"}, {Name: "t"}},
 				},
 			},
-			Files:      []*scan.File{{Name: "a"}, {Name: "b"}, {Name: "c"}},
+			Files:      []*scan.File{{Name: "a", Size: 1, Hash: 1}, {Name: "b", Size: 1, Hash: 1}, {Name: "c", Size: 1, Hash: 1}},
 			EmptyFiles: []string{"c", "d"},
 		}
 	}
@@ -265,6 +265,41 @@ func Test__checkCache(t *testing.T) {
 		err := checkCache(d)
 		assert.EqualError(t, err, `in subdirectory "z" on index 1: list of subdirectories of "z" is not sorted: "s" on index 2 should come before "t" on index 1`)
 	})
+}
+
+func Test__checkCache_rejects_nonempty_file_with_size_0(t *testing.T) {
+	err := checkCache(&scan.Dir{
+		Name:  "x",
+		Files: []*scan.File{{Name: "a", Size: 0, Hash: 1}},
+	})
+	assert.EqualError(t, err, `non-empty file "a" on index 0 has size 0`)
+}
+
+func Test__checkCache_rejects_nonempty_file_with_empty_name(t *testing.T) {
+	err := checkCache(&scan.Dir{
+		Name:  "x",
+		Files: []*scan.File{{Name: "", Size: 1, Hash: 1}},
+	})
+	assert.EqualError(t, err, `name of non-empty file on index 0 is empty`)
+}
+
+func Test__checkCache_rejects_empty_file_with_empty_name(t *testing.T) {
+	err := checkCache(&scan.Dir{
+		Name:       "x",
+		EmptyFiles: []string{""},
+	})
+	assert.EqualError(t, err, `name of empty file on index 0 is empty`)
+}
+
+func Test__checkCache_logs_warning_on_hash_0(t *testing.T) {
+	// We shouldn't reject this as it could theoretically come from a file that actually hashes to zero.
+	buf := testutil.LogBuffer()
+	err := checkCache(&scan.Dir{
+		Name:  "x",
+		Files: []*scan.File{{Name: "a", Size: 1, Hash: 0}},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "warning: file \"a\" is cached with hash 0 - this hash will be ignored\n", buf.String())
 }
 
 func Test__scan_testdata(t *testing.T) {
