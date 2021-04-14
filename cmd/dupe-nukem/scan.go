@@ -156,6 +156,7 @@ func checkCache(dir *scan.Dir) error {
 	// Check subdirs.
 	var ld *scan.Dir
 	for i, d := range dir.Dirs {
+		// Check that list is sorted.
 		if ld != nil && ld.Name > d.Name {
 			return fmt.Errorf("list of subdirectories of %q is not sorted: %q on index %d should come before %q on index %d", dir.Name, d.Name, i, ld.Name, i-1)
 		}
@@ -169,18 +170,40 @@ func checkCache(dir *scan.Dir) error {
 	// Check non-empty files.
 	var lf *scan.File
 	for i, f := range dir.Files {
+		// Check that list is sorted.
 		if lf != nil && lf.Name > f.Name {
 			return fmt.Errorf("list of non-empty files in directory %q is not sorted: %q on index %d should come before %q on index %d", dir.Name, f.Name, i, lf.Name, i-1)
 		}
 		lf = f
+
+		// Check that name is non-empty.
+		if f.Name == "" {
+			return fmt.Errorf("name of non-empty file on index %d is empty", i)
+		}
+
+		// Check that size is non-zero.
+		if f.Size == 0 {
+			return fmt.Errorf("non-empty file %q on index %d has size 0", f.Name, i)
+		}
+
+		// Check if hash is zero.
+		if f.Hash == 0 {
+			log.Printf("warning: file %q is cached with hash 0 - this hash will be ignored\n", f.Name)
+		}
 	}
 	// Check empty files.
 	var lef string
 	for i, ef := range dir.EmptyFiles {
+		// Check that list is sorted.
 		if lef > ef {
 			return fmt.Errorf("list of empty files in directory %q is not sorted: %q on index %d should come before %q on index %d", dir.Name, ef, i, lef, i-1)
 		}
 		lef = ef
+
+		// Check that name is non-empty.
+		if ef == "" {
+			return fmt.Errorf("name of empty file on index %d is empty", i)
+		}
 	}
 	return nil
 }

@@ -1,10 +1,8 @@
 package scan
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -26,7 +24,7 @@ func Test__empty_dir(t *testing.T) {
 	dir, err := ioutil.TempDir("", "empty")
 	require.NoError(t, err)
 	defer func() {
-		err := os.RemoveAll(dir)
+		err := os.Remove(dir)
 		assert.NoError(t, err)
 	}()
 
@@ -101,7 +99,7 @@ func Test__inaccessible_root_is_skipped(t *testing.T) {
 		assert.NoError(t, err)
 	}()
 
-	buf := logBuffer()
+	buf := testutil.LogBuffer()
 	res, err := Run(d, NoSkip, nil)
 	require.NoError(t, err)
 	assert.Equal(t, &Dir{Name: filepath.Base(d)}, res)
@@ -345,7 +343,7 @@ func Test__inaccessible_internal_file_is_not_hashed(t *testing.T) {
 }
 
 // On Windows, this test only works if the repository is stored on an NTFS drive.
-func Test__inaccessible_internal_dir_fails(t *testing.T) {
+func Test__inaccessible_internal_dir_is_logged(t *testing.T) {
 	d, err := ioutil.TempDir("testdata/e/f", "inaccessible")
 	require.NoError(t, err)
 	defer func() {
@@ -371,7 +369,7 @@ func Test__inaccessible_internal_dir_fails(t *testing.T) {
 			},
 		},
 	}
-	buf := logBuffer()
+	buf := testutil.LogBuffer()
 	res, err := Run(root, NoSkip, nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
@@ -442,7 +440,7 @@ func Test__testdata_with_hashes_from_cache(t *testing.T) {
 	assert.Equal(t, want, res)
 }
 
-func Test__testdata_subdir_cache_not_used_for_different_file_size(t *testing.T) {
+func Test__testdata_subdir_cache_not_used_for_mismatching_file_size(t *testing.T) {
 	root := "testdata/b"
 	cache := &Dir{
 		Name: "b",
@@ -482,6 +480,46 @@ func Test__cache_entry_with_hash_0_is_ignored(t *testing.T) {
 	res, err := Run(root, NoSkip, cache)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
+}
+
+// DISABLED on Windows and macOS (on GitHub) for the same reasons as 'Test__inaccessible_root_is_skipped'.
+func Test__hash_computed_as_0_is_logged(t *testing.T) {
+	if testutil.CI() == "github" && runtime.GOOS != "linux" {
+		return // skip test
+	}
+
+	v := "77kepQFQ8Kl" // from 'https://md5hashing.net/hash/fnv1a64/0000000000000000'
+
+	d, err := ioutil.TempDir("", "hash0")
+	require.NoError(t, err)
+	defer func() {
+		err := os.Remove(d)
+		assert.NoError(t, err)
+	}()
+
+	f, err := ioutil.TempFile(d, "hash0")
+	require.NoError(t, err)
+	defer func() {
+		err := os.Remove(f.Name())
+		assert.NoError(t, err)
+	}()
+	_, err = f.WriteString(v)
+	require.NoError(t, err)
+	err = f.Close()
+	assert.NoError(t, err)
+	buf := testutil.LogBuffer()
+	res, err := Run(d, NoSkip, nil)
+	want := &Dir{
+		Name: filepath.Base(d),
+		Files: []*File{{
+			Name: filepath.Base(f.Name()),
+			Size: 11,
+			Hash: 0,
+		}},
+	}
+	require.NoError(t, err)
+	assert.Equal(t, want, res)
+	assert.Equal(t, fmt.Sprintf("info: hash of file %q evaluated to 0 - this might result in warnings which can be safely ignored\n", f.Name()), buf.String())
 }
 
 // DISABLED on Windows: Creating symlinks require elevated privileges.
@@ -602,11 +640,4 @@ func skip(names ...string) ShouldSkipPath {
 		}
 		return false
 	}
-}
-
-func logBuffer() *bytes.Buffer {
-	var buf bytes.Buffer
-	log.SetFlags(0)
-	log.SetOutput(&buf)
-	return &buf
 }

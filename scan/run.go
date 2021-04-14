@@ -151,6 +151,8 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 				if err != nil {
 					// Currently report error but keep going.
 					log.Printf("error: cannot hash file %q: %v\n", path, err)
+				} else if hash == 0 {
+					log.Printf("info: hash of file %q evaluated to 0 - this might result in warnings which can be safely ignored\n", path)
 				}
 			}
 			head.curDir.appendFile(NewFile(name, size, hash)) // Walk visits in lexical order
@@ -178,9 +180,8 @@ func hashFromCache(cacheDir *Dir, fileName string, fileSize int64) uint64 {
 	return 0
 }
 
-// hashFile computes the FNV-1a hash of the file at the provided path.
+// hashFile computes the FNV-1a hash of the contents of the file at the provided path.
 func hashFile(path string) (uint64, error) {
-	h := fnv.New64a() // is just a *uint64 internally
 	f, err := os.Open(path)
 	if err != nil {
 		return 0, errors.Wrap(util.SimplifyIOError(err), "cannot open file")
@@ -190,6 +191,12 @@ func hashFile(path string) (uint64, error) {
 			log.Printf("error: cannot close file '%v': %v\n", path, err)
 		}
 	}()
-	n, err := io.Copy(h, f)
+	return hash(f)
+}
+
+// hash computes the FNV-1a hash of the contents of the provided reader.
+func hash(r io.Reader) (uint64, error) {
+	h := fnv.New64a() // is just a *uint64 internally
+	n, err := io.Copy(h, r)
 	return h.Sum64(), errors.Wrapf(err, "error reading file after approx. %d bytes", n)
 }
