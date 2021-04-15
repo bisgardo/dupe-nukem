@@ -49,7 +49,7 @@ Instructions will be here as soon as there's something to install!
 ### 1. Scan
 
 ```
-dupe-nukem scan --dir <dir> [--skip <expr>] [--cache <file>]
+dupe-nukem scan --dir <dir> [--skip <expr>] [--cache <file>] [--out <file>]
 ```
 
 Builds structure of `<dir>` and dumps it, along with all hashes, in JSON.
@@ -63,6 +63,8 @@ A reference file `<file>` from a previous call to `scan` may be provided to use 
 a cache for file hashes.
 The hashes of scanned files will be looked up in this file as long as the file sizes match.
 If the filename ends with `.gz`, it will automatically be gzip decompressed.
+
+[ TODO document '--out' ]
 
 The root dir in the JSON output is the basename of `<dir>`.
 The commands below will have a way of mapping this root dir back to the concrete location
