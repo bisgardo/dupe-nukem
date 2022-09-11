@@ -17,6 +17,13 @@ jobs:
       with:
         go-version: 1.17
 
+    - name: Install goimports
+      run: go install golang.org/x/tools/cmd/goimports@latest
+
+    - name: Run goimports and fail if it reports anything
+      run: |
+        [ -z "$(goimports -l -local github.com/bisgardo/dupe-nukem . | tee /dev/stderr)" ] || false
+
     - name: Verify dependencies
       run: go mod verify
 

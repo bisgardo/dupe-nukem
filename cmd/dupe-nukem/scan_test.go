@@ -7,10 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bisgardo/dupe-nukem/scan"
-	"github.com/bisgardo/dupe-nukem/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/bisgardo/dupe-nukem/scan"
+	"github.com/bisgardo/dupe-nukem/testutil"
 )
 
 func Test__parseSkipNames_empty_returns_nil(t *testing.T) {

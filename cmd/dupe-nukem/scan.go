@@ -12,9 +12,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
+
 	"github.com/bisgardo/dupe-nukem/scan"
 	"github.com/bisgardo/dupe-nukem/util"
-	"github.com/pkg/errors"
 )
 
 // maxSkipNameFileLineLen is the size in bytes allocated for reading a skip file.

@@ -8,8 +8,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/bisgardo/dupe-nukem/util"
 	"github.com/pkg/errors"
+
+	"github.com/bisgardo/dupe-nukem/util"
 )
 
 // ShouldSkipPath is a function for determining if a given path

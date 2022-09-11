@@ -8,9 +8,10 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/bisgardo/dupe-nukem/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/bisgardo/dupe-nukem/testutil"
 )
 
 // Working dir for tests is the directory containing the file.
