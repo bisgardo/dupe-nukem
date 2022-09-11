@@ -37,8 +37,8 @@ to give a rough idea of what should be done.
 
 ### Windows
 
-A few tests related to symlinking are disabled on Windows because creating elevated privileges are required to create symlinks.
-Other tests fail unless the repository to be mounted on an NTFS formatted drive (which a VirtualBox shared folder might, for instance, not be).
+A few tests related to symlinking are disabled on Windows because elevated privileges are required to create symlinks.
+Other tests fail unless the repository is mounted on an NTFS formatted drive (which for instance a VirtualBox shared folder might not be).
 
 ## Install
 
@@ -116,3 +116,5 @@ Lists all files in `<dir-file>` that were not matched in any of the target direc
 
 There should be options on what to do if files are matched with different names or directory structure.
 I guess the latter is a matter of whether we match by files or directories?
+
+This command is not yet implemented.
