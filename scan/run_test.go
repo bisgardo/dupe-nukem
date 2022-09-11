@@ -374,7 +374,7 @@ func Test__inaccessible_internal_dir_is_logged(t *testing.T) {
 	res, err := Run(root, NoSkip, nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
-	assert.Equal(t, fmt.Sprintf("skipping inaccessible directory %q\n", d), buf.String())
+	assert.Equal(t, fmt.Sprintf("skipping inaccessible directory %q\n", filepath.Clean(d)), buf.String())
 }
 
 func Test__testdata_cache_with_mismatching_root_fails(t *testing.T) {
