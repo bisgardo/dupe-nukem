@@ -42,13 +42,35 @@ Other tests fail unless the repository is mounted on an NTFS formatted drive (wh
 
 ## Install
 
-Instructions will be here as soon as there's something to install!
+Clone the source:
+
+```shell
+git clone https://github.com/bisgardo/dupe-nukem.git
+cd dupe-nukem
+```
+
+Build the source directly:
+
+```shell
+make build
+```
+
+A simple dockerfile is also provided to allow building in a tightly controlled environment. For example:
+
+```shell
+docker build -t dupe-nukem --build-arg=build_image=golang:1.15-buster --build-arg=base_image=debian:buster-slim --pull .
+docker run --rm --volume=<volume-mounts> dupe-nukem <args>
+```
+
+Due to the file-based nature of this tool, running it in Docker is quite a hassle with volume mounts.
+For this reason, the intended purpose of this is building with different versions,
+either for testing or extracting the binary for use outside of Docker.
 
 ## Commands
 
 ### 1. Scan
 
-```
+```shell
 dupe-nukem scan --dir <dir> [--skip <expr>] [--cache <file>]
 ```
 
@@ -79,7 +101,7 @@ but this feature is not yet implemented.
 
 *This command is not yet implemented.*
 
-```
+```shell
 dupe-nukem match --source <dir-file> --targets <dir-files>
 ```
 
@@ -93,7 +115,7 @@ This command is not yet implemented.
 
 *This command is not yet implemented.*
 
-```
+```shell
 dupe-nukem validate --match <match-file>
 ```
 
@@ -108,7 +130,7 @@ This command is not yet implemented.
 
 *This command is not yet implemented.*
 
-```
+```shell
 dupe-nukem diff --dir <dir-file> --match <match-file>
 ```
 
