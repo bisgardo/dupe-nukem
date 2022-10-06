@@ -6,26 +6,26 @@ import "github.com/bisgardo/dupe-nukem/scan"
 type Index map[uint64][]*File
 
 type Dir struct {
-	parent  *Dir
-	scanDir *scan.Dir
+	Parent  *Dir
+	ScanDir *scan.Dir
 }
 
 func NewDir(parent *Dir, scanDir *scan.Dir) *Dir {
 	return &Dir{
-		parent:  parent,
-		scanDir: scanDir,
+		Parent:  parent,
+		ScanDir: scanDir,
 	}
 }
 
 type File struct {
-	dir      *Dir
-	scanFile *scan.File
+	Dir      *Dir
+	ScanFile *scan.File
 }
 
 func NewFile(dir *Dir, scanFile *scan.File) *File {
 	return &File{
-		dir:      dir,
-		scanFile: scanFile,
+		Dir:      dir,
+		ScanFile: scanFile,
 	}
 }
 
@@ -39,7 +39,7 @@ func buildIndexRecursively(scanDir *scan.Dir, parent *Dir, res Index) {
 	}
 }
 
-func BuildIndex(root *scan.Dir, parent *Dir) Index {
+func BuildIndex(root *scan.Dir) Index {
 	res := make(Index)
 	buildIndexRecursively(root, nil, res)
 	return res

@@ -4,10 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/bisgardo/dupe-nukem/scan"
+	"github.com/spf13/cobra"
 	"log"
 	"os"
-
-	"github.com/spf13/cobra"
 )
 
 func main() {
@@ -79,13 +78,41 @@ func main() {
 			return err
 		},
 	}
+	matchCmd := &cobra.Command{
+		Use:   "match",
+		Short: "Match files in source dir against files in target dirs",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			flags := cmd.Flags()
+			sourceFile, err := flags.GetString("source")
+			if err != nil {
+				return err
+			}
+			targetFiles, err := flags.GetStringArray("target")
+			if err != nil {
+				return err
+			}
+			res, err := Match(sourceFile, targetFiles)
+			if err != nil {
+				return err
+			}
+			for hash, matches := range res {
+				// TODO Write proper format...
+				fmt.Printf("%v -> %v\n", hash, matches)
+			}
+			return nil
+		},
+	}
+	hashFlags := hashCmd.Flags()
+	hashFlags.String("file", "", "file to hash")
+
 	scanFlags := scanCmd.Flags()
 	scanFlags.String("dir", "", "directory to scan")
 	scanFlags.String("skip", "", "comma-separated list of directories to skip")
 	scanFlags.String("cache", "", "file from a previous call to 'scan' to use as hash cache")
 
-	hashFlags := hashCmd.Flags()
-	hashFlags.String("file", "", "file to hash")
+	matchFlags := matchCmd.Flags()
+	matchFlags.String("source", "", "scan file of the source directory")
+	matchFlags.StringArray("target", nil, "scan files of a target directory")
 
 	rootCmd.AddCommand(scanCmd)
 	rootCmd.AddCommand(hashCmd)

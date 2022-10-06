@@ -8,60 +8,63 @@ import (
 	"testing"
 )
 
+//goland:noinspection GoSnakeCaseUsage
+var (
+	testdata_x_a = scan.NewFile("a", 2, 620331299357648818) // contents: "a"
+	testdata_x_b = scan.NewFile("b", 2, 623218616892763229) // contents: "b"
+	testdata_x_c = scan.NewFile("c", 2, 622257643729896040) // contents: "c"
+	testdata_y_a = scan.NewFile("a", 2, 620331299357648818) // contents: "a"
+	testdata_y_b = scan.NewFile("b", 2, 620331299357648818) // contents: "a"
+	testdata_y_c = scan.NewFile("c", 2, 617474768148124315) // contents: "d"
+)
+
 func Test__testdata_index(t *testing.T) {
 	root := "testdata"
 
-	x_a := scan.NewFile("a", 2, 620331299357648818)
-	x_b := scan.NewFile("b", 2, 623218616892763229)
-	x_c := scan.NewFile("c", 2, 622257643729896040)
-	y_a := scan.NewFile("a", 2, 620331299357648818)
-	y_b := scan.NewFile("b", 2, 620331299357648818)
-	y_c := scan.NewFile("c", 2, 617474768148124315)
-
-	x := &scan.Dir{
+	scanX := &scan.Dir{
 		Name:  "x",
-		Files: []*scan.File{x_a, x_b, x_c},
+		Files: []*scan.File{testdata_x_a, testdata_x_b, testdata_x_c},
 	}
-	y := &scan.Dir{
+	scanY := &scan.Dir{
 		Name:  "y",
-		Files: []*scan.File{y_a, y_b, y_c},
+		Files: []*scan.File{testdata_y_a, testdata_y_b, testdata_y_c},
 	}
+
 	testdata := &Dir{
-		parent: nil,
-		scanDir: &scan.Dir{
+		Parent: nil,
+		ScanDir: &scan.Dir{
 			Name: "testdata",
-			Dirs: []*scan.Dir{x, y},
+			Dirs: []*scan.Dir{scanX, scanY},
 		},
 	}
-
-	x2 := &Dir{
-		parent:  testdata,
-		scanDir: x,
+	x := &Dir{
+		Parent:  testdata,
+		ScanDir: scanX,
 	}
-	y2 := &Dir{
-		parent:  testdata,
-		scanDir: y,
+	y := &Dir{
+		Parent:  testdata,
+		ScanDir: scanY,
 	}
 
 	want := Index{
 		620331299357648818: []*File{
-			NewFile(x2, x_a),
-			NewFile(y2, y_a),
-			NewFile(y2, y_b),
+			NewFile(x, testdata_x_a),
+			NewFile(y, testdata_y_a),
+			NewFile(y, testdata_y_b),
 		},
 		623218616892763229: []*File{
-			NewFile(x2, x_b),
+			NewFile(x, testdata_x_b),
 		},
 		622257643729896040: []*File{
-			NewFile(x2, x_c),
+			NewFile(x, testdata_x_c),
 		},
 		617474768148124315: []*File{
-			NewFile(y2, y_c),
+			NewFile(y, testdata_y_c),
 		},
 	}
 	scanRoot, err := scan.Run(root, scan.NoSkip, nil)
 	require.NoError(t, err)
 
-	res := BuildIndex(scanRoot, nil)
+	res := BuildIndex(scanRoot)
 	assert.Equal(t, want, res)
 }

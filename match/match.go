@@ -4,7 +4,7 @@ import "github.com/bisgardo/dupe-nukem/scan"
 
 type Matches map[uint64][]*File
 
-func buildMatchesRecursively(srcDir *scan.Dir, targets []Index, res Matches) {
+func innerBuildMatches(srcDir *scan.Dir, targets []Index, res Matches) {
 	for _, f := range srcDir.Files {
 		var matches []*File
 		for _, t := range targets {
@@ -17,12 +17,12 @@ func buildMatchesRecursively(srcDir *scan.Dir, targets []Index, res Matches) {
 		}
 	}
 	for _, d := range srcDir.Dirs {
-		buildMatchesRecursively(d, targets, res)
+		innerBuildMatches(d, targets, res)
 	}
 }
 
-func BuildMatches(srcRoot *scan.Dir, targets ...Index) Matches {
+func BuildMatches(srcRoot *scan.Dir, targets []Index) Matches {
 	res := make(Matches)
-	buildMatchesRecursively(srcRoot, targets, res)
+	innerBuildMatches(srcRoot, targets, res)
 	return res
 }
