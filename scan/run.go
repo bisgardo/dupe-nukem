@@ -148,7 +148,7 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 			//      (the reason being that if two files differ, the first 1MB or so probably differ too).
 			hash := hashFromCache(head.cacheDir, name, size)
 			if hash == 0 {
-				hash, err = hashFile(path)
+				hash, err = HashFile(path)
 				if err != nil {
 					// Currently report error but keep going.
 					log.Printf("error: cannot hash file %q: %v\n", path, err)
@@ -181,8 +181,8 @@ func hashFromCache(cacheDir *Dir, fileName string, fileSize int64) uint64 {
 	return 0
 }
 
-// hashFile computes the FNV-1a hash of the contents of the file at the provided path.
-func hashFile(path string) (uint64, error) {
+// HashFile computes the FNV-1a hash of the contents of the file at the provided path.
+func HashFile(path string) (uint64, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return 0, errors.Wrap(util.SimplifyIOError(err), "cannot open file")
@@ -192,11 +192,11 @@ func hashFile(path string) (uint64, error) {
 			log.Printf("error: cannot close file '%v': %v\n", path, err)
 		}
 	}()
-	return hash(f)
+	return Hash(f)
 }
 
-// hash computes the FNV-1a hash of the contents of the provided reader.
-func hash(r io.Reader) (uint64, error) {
+// Hash computes the FNV-1a hash of the contents of the provided reader.
+func Hash(r io.Reader) (uint64, error) {
 	h := fnv.New64a() // is just a *uint64 internally
 	n, err := io.Copy(h, r)
 	return h.Sum64(), errors.Wrapf(err, "error reading file after approx. %d bytes", n)
