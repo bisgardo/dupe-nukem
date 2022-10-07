@@ -31,9 +31,6 @@ func NewFile(dir *Dir, scanFile *scan.File) *File {
 	}
 }
 
-// FileSet is a set of files.
-type FileSet map[*File]struct{}
-
 func innerBuildIndex(scanDir *scan.Dir, parent *Dir, res Index) {
 	dir := NewDir(parent, scanDir)
 	for _, f := range scanDir.Files {
