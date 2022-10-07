@@ -19,6 +19,23 @@ func main() {
 	//      Use another flag to specify encryption password.
 	//      Also output a file with a cryptographic hash of the data structure (or include in the file?).
 	rootCmd := &cobra.Command{Use: "dupe-nukem", SilenceUsage: true, SilenceErrors: true}
+	hashCmd := &cobra.Command{
+		Use:   "hash",
+		Short: "Print the FNV-1a hash in decimal notation of the contents of the file at the provided path or stdin if none was provided",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			flags := cmd.Flags()
+			file, err := flags.GetString("file")
+			if err != nil {
+				return err
+			}
+			res, err := Hash(file)
+			if err != nil {
+				return err
+			}
+			fmt.Println(res)
+			return nil
+		},
+	}
 	scanCmd := &cobra.Command{
 		Use:   "scan",
 		Short: "Scan directory and dump result as JSON",
@@ -50,11 +67,15 @@ func main() {
 			return err
 		},
 	}
-	flags := scanCmd.Flags()
-	flags.String("dir", "", "directory to scan")
-	flags.String("skip", "", "comma-separated list of directories to skip")
-	flags.String("cache", "", "file from a previous call to 'scan' to use as hash cache")
+	hashFlags := hashCmd.Flags()
+	hashFlags.String("file", "", "file to hash")
 
+	scanFlags := scanCmd.Flags()
+	scanFlags.String("dir", "", "directory to scan")
+	scanFlags.String("skip", "", "comma-separated list of directories to skip")
+	scanFlags.String("cache", "", "file from a previous call to 'scan' to use as hash cache")
+
+	rootCmd.AddCommand(hashCmd)
 	rootCmd.AddCommand(scanCmd)
 	if err := rootCmd.Execute(); err != nil {
 		// Print error with stack trace.

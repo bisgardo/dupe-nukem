@@ -2,14 +2,13 @@ package scan
 
 import (
 	"fmt"
-	"hash/fnv"
-	"io"
 	"log"
 	"os"
 	"path/filepath"
 
 	"github.com/pkg/errors"
 
+	"github.com/bisgardo/dupe-nukem/hash"
 	"github.com/bisgardo/dupe-nukem/util"
 )
 
@@ -105,7 +104,7 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 				return nil
 			case os.IsNotExist(err):
 				// TODO Test - can maybe only do on Windows (with too long path).
-				log.Printf("error: %v %q not found!\n", modeName, path)
+				log.Printf("error: %v %q not found\n", modeName, path)
 			}
 			return errors.Wrapf(util.SimplifyIOError(err), "cannot walk %v %q", modeName, path)
 		}
@@ -146,23 +145,24 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 			// IDEA Parallelize hash computation (via work queue for example).
 			// IDEA Consider adding option to hash a limited number of bytes only
 			//      (the reason being that if two files differ, the first 1MB or so probably differ too).
-			hash := hashFromCache(head.cacheDir, name, size)
-			if hash == 0 {
-				hash, err = hashFile(path)
+			h := hashFromCache(head.cacheDir, name, size)
+			if h == 0 {
+				h, err = hash.File(path)
 				if err != nil {
 					// Currently report error but keep going.
 					log.Printf("error: cannot hash file %q: %v\n", path, err)
-				} else if hash == 0 {
+				} else if h == 0 {
 					log.Printf("info: hash of file %q evaluated to 0 - this might result in warnings which can be safely ignored\n", path)
 				}
 			}
-			head.curDir.appendFile(NewFile(name, size, hash)) // Walk visits in lexical order
+			head.curDir.appendFile(NewFile(name, size, h)) // Walk visits in lexical order
 		}
 		return nil
 	})
 	for head.prev != nil {
 		head = head.prev
 	}
+	// TODO Just store and return rootDir?
 	return head.curDir, errors.Wrapf(err, "cannot scan root directory %q", root)
 }
 
@@ -179,25 +179,4 @@ func hashFromCache(cacheDir *Dir, fileName string, fileSize int64) uint64 {
 		return f.Hash
 	}
 	return 0
-}
-
-// hashFile computes the FNV-1a hash of the contents of the file at the provided path.
-func hashFile(path string) (uint64, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return 0, errors.Wrap(util.SimplifyIOError(err), "cannot open file")
-	}
-	defer func() {
-		if err := f.Close(); err != nil {
-			log.Printf("error: cannot close file '%v': %v\n", path, err)
-		}
-	}()
-	return hash(f)
-}
-
-// hash computes the FNV-1a hash of the contents of the provided reader.
-func hash(r io.Reader) (uint64, error) {
-	h := fnv.New64a() // is just a *uint64 internally
-	n, err := io.Copy(h, r)
-	return h.Sum64(), errors.Wrapf(err, "error reading file after approx. %d bytes", n)
 }
