@@ -105,6 +105,7 @@ func main() {
 
 	rootCmd.AddCommand(scanCmd)
 	rootCmd.AddCommand(hashCmd)
+	rootCmd.AddCommand(matchCmd)
 	if err := rootCmd.Execute(); err != nil {
 		// Print error with stack trace.
 		log.Fatalf("error: %+v\n", err)
