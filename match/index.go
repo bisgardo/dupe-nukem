@@ -1,8 +1,10 @@
 package match
 
-import "github.com/bisgardo/dupe-nukem/scan"
+import (
+	"github.com/bisgardo/dupe-nukem/scan"
+)
 
-// Index is a map from hash to the files with this hash.
+// Index is a map from hash to the files whose contents hash to this hash.
 type Index map[uint64][]*File
 
 type Dir struct {
@@ -29,18 +31,21 @@ func NewFile(dir *Dir, scanFile *scan.File) *File {
 	}
 }
 
-func buildIndexRecursively(scanDir *scan.Dir, parent *Dir, res Index) {
+// FileSet is a set of files.
+type FileSet map[*File]struct{}
+
+func innerBuildIndex(scanDir *scan.Dir, parent *Dir, res Index) {
 	dir := NewDir(parent, scanDir)
 	for _, f := range scanDir.Files {
 		res[f.Hash] = append(res[f.Hash], NewFile(dir, f))
 	}
 	for _, d := range scanDir.Dirs {
-		buildIndexRecursively(d, dir, res)
+		innerBuildIndex(d, dir, res)
 	}
 }
 
 func BuildIndex(root *scan.Dir) Index {
 	res := make(Index)
-	buildIndexRecursively(root, nil, res)
+	innerBuildIndex(root, nil, res)
 	return res
 }

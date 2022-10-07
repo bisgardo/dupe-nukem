@@ -16,34 +16,28 @@ var (
 	testdata_y_a = scan.NewFile("a", 2, 620331299357648818) // contents: "a"
 	testdata_y_b = scan.NewFile("b", 2, 620331299357648818) // contents: "a"
 	testdata_y_c = scan.NewFile("c", 2, 617474768148124315) // contents: "d"
+
+	testdata_x = &scan.Dir{Name: "x", Files: []*scan.File{testdata_x_a, testdata_x_b, testdata_x_c}}
+	testdata_y = &scan.Dir{Name: "y", Files: []*scan.File{testdata_y_a, testdata_y_b, testdata_y_c}}
 )
 
 func Test__testdata_index(t *testing.T) {
 	root := "testdata"
 
-	scanX := &scan.Dir{
-		Name:  "x",
-		Files: []*scan.File{testdata_x_a, testdata_x_b, testdata_x_c},
-	}
-	scanY := &scan.Dir{
-		Name:  "y",
-		Files: []*scan.File{testdata_y_a, testdata_y_b, testdata_y_c},
-	}
-
 	testdata := &Dir{
 		Parent: nil,
 		ScanDir: &scan.Dir{
 			Name: "testdata",
-			Dirs: []*scan.Dir{scanX, scanY},
+			Dirs: []*scan.Dir{testdata_x, testdata_y},
 		},
 	}
 	x := &Dir{
 		Parent:  testdata,
-		ScanDir: scanX,
+		ScanDir: testdata_x,
 	}
 	y := &Dir{
 		Parent:  testdata,
-		ScanDir: scanY,
+		ScanDir: testdata_y,
 	}
 
 	want := Index{

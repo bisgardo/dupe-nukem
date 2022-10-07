@@ -31,13 +31,14 @@ func loadSourceDir(path string) (*scan.Dir, error) {
 }
 
 func loadTargetIndexes(paths []string) ([]match.Index, error) {
+	// TODO Optimization: If a target is also the source there's no need for loading the file again.
 	res := make([]match.Index, len(paths))
 	for i, path := range paths {
-		r, err := loadScanFile(path)
+		scanDir, err := loadScanFile(path)
 		if err != nil {
 			return nil, err
 		}
-		res[i] = match.BuildIndex(r)
+		res[i] = match.BuildIndex(scanDir)
 	}
 	return res, nil
 }
@@ -63,13 +64,14 @@ func sortedHashes(m match.Matches) []uint64 {
 	return hashes
 }
 
-func toFilePaths(files []*match.File) []string {
-	res := make([]string, len(files))
-	for i, f := range files {
+func toFilePaths(files match.FileSet) []string {
+	res := make([]string, 0, len(files))
+	for f := range files {
 		var buf bytes.Buffer
 		writeFilePath(f, buf)
-		res[i] = buf.String()
+		res = append(res, buf.String())
 	}
+	sort.Strings(res)
 	return res
 }
 
