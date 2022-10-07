@@ -8,12 +8,15 @@ import (
 	"github.com/bisgardo/dupe-nukem/scan"
 )
 
-type HashMatches struct {
-	Hash    uint64
-	Matches []string
+// HashMatch is a hash value and the paths of the files in the target directories whose contents hash to this value.
+type HashMatch struct {
+	Hash  uint64
+	Paths []string
 }
 
-func Match(srcScanFile string, targetScanFiles []string) ([]HashMatches, error) {
+// Match computes the hash-based matches between the files recorded in the scan file located at the path srcScanFile
+// and the files recorded in the scan files located at paths targetScanFiles.
+func Match(srcScanFile string, targetScanFiles []string) ([]HashMatch, error) {
 	srcRoot, err := loadSourceDir(srcScanFile)
 	if err != nil {
 		return nil, err
@@ -31,7 +34,7 @@ func loadSourceDir(path string) (*scan.Dir, error) {
 }
 
 func loadTargetIndexes(paths []string) ([]match.Index, error) {
-	// TODO Optimization: If a target is also the source there's no need for loading the file again.
+	// TODO [optimization] If a target is also the source there's no need for loading the file again.
 	res := make([]match.Index, len(paths))
 	for i, path := range paths {
 		scanDir, err := loadScanFile(path)
@@ -43,19 +46,19 @@ func loadTargetIndexes(paths []string) ([]match.Index, error) {
 	return res, nil
 }
 
-func sortedHashMatches(m match.Matches) []HashMatches {
+func sortedHashMatches(m match.Index) []HashMatch {
 	hashes := sortedHashes(m)
-	res := make([]HashMatches, len(hashes))
+	res := make([]HashMatch, len(hashes))
 	for i, h := range hashes {
-		res[i] = HashMatches{
-			Hash:    h,
-			Matches: toFilePaths(m[h]),
+		res[i] = HashMatch{
+			Hash:  h,
+			Paths: toFilePaths(m[h]),
 		}
 	}
 	return res
 }
 
-func sortedHashes(m match.Matches) []uint64 {
+func sortedHashes(m match.Index) []uint64 {
 	hashes := make([]uint64, 0, len(m))
 	for h := range m {
 		hashes = append(hashes, h)
@@ -64,14 +67,13 @@ func sortedHashes(m match.Matches) []uint64 {
 	return hashes
 }
 
-func toFilePaths(files match.FileSet) []string {
-	res := make([]string, 0, len(files))
-	for f := range files {
+func toFilePaths(files []*match.File) []string {
+	res := make([]string, len(files))
+	for i, f := range files {
 		var buf bytes.Buffer
 		writeFilePath(f, buf)
-		res = append(res, buf.String())
+		res[i] = buf.String()
 	}
-	sort.Strings(res)
 	return res
 }
 

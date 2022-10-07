@@ -23,6 +23,14 @@ func Test__testdata_match_single_target(t *testing.T) {
 	srcRoot := "testdata/x"
 	targetRoot := "testdata/y"
 
+	y := &Dir{
+		Parent: nil,
+		ScanDir: &scan.Dir{
+			Name:  "y",
+			Files: []*scan.File{testdata_y_a, testdata_y_b, testdata_y_c},
+		},
+	}
+
 	scanX, err := scan.Run(srcRoot, scan.NoSkip, nil)
 	require.NoError(t, err)
 	scanY, err := scan.Run(targetRoot, scan.NoSkip, nil)
@@ -30,11 +38,10 @@ func Test__testdata_match_single_target(t *testing.T) {
 
 	indexY := BuildIndex(scanY)
 
-	// Have to dig out files from index because comparison of maps with pointer keys relies on pointer identity.
-	want := Matches{
-		620331299357648818: FileSet{
-			indexY[620331299357648818][0]: struct{}{},
-			indexY[620331299357648818][1]: struct{}{},
+	want := Index{
+		620331299357648818: []*File{
+			NewFile(y, testdata_y_a),
+			NewFile(y, testdata_y_b),
 		},
 	}
 	res := BuildMatches(scanX, []Index{indexY})
@@ -45,6 +52,14 @@ func Test__testdata_match_single_target_reversed(t *testing.T) {
 	srcRoot := "testdata/y"
 	targetRoot := "testdata/x"
 
+	x := &Dir{
+		Parent: nil,
+		ScanDir: &scan.Dir{
+			Name:  "x",
+			Files: []*scan.File{testdata_x_a, testdata_x_b, testdata_x_c},
+		},
+	}
+
 	scanY, err := scan.Run(srcRoot, scan.NoSkip, nil)
 	require.NoError(t, err)
 	scanX, err := scan.Run(targetRoot, scan.NoSkip, nil)
@@ -54,9 +69,9 @@ func Test__testdata_match_single_target_reversed(t *testing.T) {
 
 	// Note that there's only a single match for files that are duplicated in the source ('y/a' and 'y/b' in this case).
 	// This is (at least partially) the reason why we build the match mapping on hashes instead of individual files.
-	want := Matches{
-		620331299357648818: FileSet{
-			indexX[620331299357648818][0]: struct{}{},
+	want := Index{
+		620331299357648818: []*File{
+			NewFile(x, testdata_x_a),
 		},
 	}
 	res := BuildMatches(scanY, []Index{indexX})
@@ -66,20 +81,28 @@ func Test__testdata_match_single_target_reversed(t *testing.T) {
 func Test__testdata_match_self(t *testing.T) {
 	root := "testdata/x"
 
+	x := &Dir{
+		Parent: nil,
+		ScanDir: &scan.Dir{
+			Name:  "x",
+			Files: []*scan.File{testdata_x_a, testdata_x_b, testdata_x_c},
+		},
+	}
+
 	scanX, err := scan.Run(root, scan.NoSkip, nil)
 	require.NoError(t, err)
 
 	indexX := BuildIndex(scanX)
 
-	want := Matches{
-		620331299357648818: FileSet{
-			indexX[620331299357648818][0]: struct{}{},
+	want := Index{
+		620331299357648818: []*File{
+			NewFile(x, testdata_x_a),
 		},
-		623218616892763229: FileSet{
-			indexX[623218616892763229][0]: struct{}{},
+		623218616892763229: []*File{
+			NewFile(x, testdata_x_b),
 		},
-		622257643729896040: FileSet{
-			indexX[622257643729896040][0]: struct{}{},
+		622257643729896040: []*File{
+			NewFile(x, testdata_x_c),
 		},
 	}
 	res := BuildMatches(scanX, []Index{indexX})
