@@ -87,9 +87,10 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 		cacheDir *Dir
 	}
 
+	rootDir := NewDir(rootName)
 	head := &walkContext{
 		prev:     nil,
-		curDir:   NewDir(rootName),
+		curDir:   rootDir,
 		pathLen:  len(root),
 		cacheDir: cache,
 	}
@@ -159,11 +160,7 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 		}
 		return nil
 	})
-	for head.prev != nil {
-		head = head.prev
-	}
-	// TODO Just store and return rootDir?
-	return head.curDir, errors.Wrapf(err, "cannot scan root directory %q", root)
+	return rootDir, errors.Wrapf(err, "cannot scan root directory %q", root)
 }
 
 // hashFromCache looks up the content hash of the given file in the given cache dir.
