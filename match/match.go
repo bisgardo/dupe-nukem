@@ -2,7 +2,7 @@ package match
 
 import "github.com/bisgardo/dupe-nukem/scan"
 
-func innerBuildMatches(srcDir *scan.Dir, targets []Index, res Index) {
+func innerBuildMatchIndex(srcDir *scan.Dir, targets []Index, res Index) {
 	for _, file := range srcDir.Files {
 		matches, ok := res[file.Hash]
 		if ok {
@@ -26,13 +26,13 @@ func innerBuildMatches(srcDir *scan.Dir, targets []Index, res Index) {
 		}
 	}
 	for _, d := range srcDir.Dirs {
-		innerBuildMatches(d, targets, res)
+		innerBuildMatchIndex(d, targets, res)
 	}
 }
 
-// BuildMatches merges the target indexes on the key set defined as the set of hashes of all files in srcRoot.
-func BuildMatches(srcRoot *scan.Dir, targets []Index) Index {
+// BuildMatchIndex merges the target indexes on the key set defined as the set of hashes of all files in srcRoot.
+func BuildMatchIndex(srcRoot *scan.Dir, targets []Index) Index {
 	res := make(Index)
-	innerBuildMatches(srcRoot, targets, res)
+	innerBuildMatchIndex(srcRoot, targets, res)
 	return res
 }

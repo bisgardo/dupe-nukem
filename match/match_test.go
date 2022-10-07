@@ -15,7 +15,7 @@ func Test__testdata_match_no_targets_is_empty(t *testing.T) {
 	scanX, err := scan.Run(srcRoot, scan.NoSkip, nil)
 	require.NoError(t, err)
 
-	res := BuildMatches(scanX, []Index{})
+	res := BuildMatchIndex(scanX, []Index{})
 	assert.Empty(t, res)
 }
 
@@ -44,7 +44,7 @@ func Test__testdata_match_single_target(t *testing.T) {
 			NewFile(y, testdata_y_b),
 		},
 	}
-	res := BuildMatches(scanX, []Index{indexY})
+	res := BuildMatchIndex(scanX, []Index{indexY})
 	assert.Equal(t, want, res)
 }
 
@@ -74,7 +74,7 @@ func Test__testdata_match_single_target_reversed(t *testing.T) {
 			NewFile(x, testdata_x_a),
 		},
 	}
-	res := BuildMatches(scanY, []Index{indexX})
+	res := BuildMatchIndex(scanY, []Index{indexX})
 	assert.Equal(t, want, res)
 }
 
@@ -105,6 +105,6 @@ func Test__testdata_match_self(t *testing.T) {
 			NewFile(x, testdata_x_c),
 		},
 	}
-	res := BuildMatches(scanX, []Index{indexX})
+	res := BuildMatchIndex(scanX, []Index{indexX})
 	assert.Equal(t, want, res)
 }
