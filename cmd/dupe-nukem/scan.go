@@ -227,3 +227,19 @@ func abs(dir string) (string, error) {
 	//}
 	return a, nil
 }
+
+// TODO Should be in file like 'io.go'?
+func loadScanFile(path string) (*scan.Dir, error) {
+	var res *scan.Dir
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := f.Close(); err != nil {
+			log.Printf("error: cannot close scan file '%v': %v\n", path, err)
+		}
+	}()
+	err = json.NewDecoder(f).Decode(res)
+	return res, errors.Wrapf(err, "cannot load scan file '%v'", path)
+}
