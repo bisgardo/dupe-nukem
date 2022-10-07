@@ -2,6 +2,7 @@ package hash
 
 import (
 	"bytes"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -25,5 +26,12 @@ func Test__hash_file(t *testing.T) {
 // TODO Test other kinds of (broken) files.
 func Test__hash_dir_fails(t *testing.T) {
 	_, err := File("testdata")
-	assert.EqualError(t, err, "read error after 0 bytes: read testdata: is a directory")
+
+	// The function should never be called with a directory (all current callers check this beforehand),
+	// in which case it doesn't matter too much that the error message sucks.
+	if runtime.GOOS == "windows" {
+		assert.EqualError(t, err, "read error after 0 bytes: read testdata: The handle is invalid.")
+	} else {
+		assert.EqualError(t, err, "read error after 0 bytes: read testdata: is a directory")
+	}
 }
