@@ -3,9 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/bisgardo/dupe-nukem/scan"
 	"log"
-	"os"
 
 	"github.com/spf13/cobra"
 )
@@ -23,28 +21,18 @@ func main() {
 	rootCmd := &cobra.Command{Use: "dupe-nukem", SilenceUsage: true, SilenceErrors: true}
 	hashCmd := &cobra.Command{
 		Use:   "hash",
-		Short: "Compute the FNV-1a hash of the contents of the file at the provided path or stdin",
+		Short: "Compute the FNV-1a hash of the contents of the file at the provided path or stdin if none was provided",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			flags := cmd.Flags()
 			file, err := flags.GetString("file")
 			if err != nil {
 				return err
 			}
-			var hash uint64
-			if file == "" {
-				var err error
-				hash, err = scan.Hash(os.Stdin)
-				if err != nil {
-					return err
-				}
-			} else {
-				var err error
-				hash, err = scan.HashFile(file)
-				if err != nil {
-					return err
-				}
+			res, err := Hash(file)
+			if err != nil {
+				return err
 			}
-			fmt.Println(hash)
+			fmt.Println(res)
 			return nil
 		},
 	}
