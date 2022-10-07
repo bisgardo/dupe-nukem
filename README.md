@@ -58,7 +58,7 @@ make build
 A simple dockerfile is also provided to allow building in a tightly controlled environment. For example:
 
 ```shell
-docker build -t dupe-nukem --build-arg=build_image=golang:1.16-buster --build-arg=base_image=debian:buster-slim --pull .
+docker build -t dupe-nukem --build-arg=build_image=golang:1.15-buster --build-arg=base_image=debian:buster-slim --pull .
 docker run --rm --volume=<volume-mounts> dupe-nukem <args>
 ```
 
