@@ -107,14 +107,6 @@ func Test__inaccessible_root_is_skipped(t *testing.T) {
 	assert.Equal(t, fmt.Sprintf("skipping inaccessible directory %q\n", d), buf.String())
 }
 
-//goland:noinspection GoSnakeCaseUsage
-var (
-	testdata_b_d   = &File{Name: "d", Size: 2, Hash: 644258871406045975} // contents: "x"
-	testdata_e_f_a = &File{Name: "a", Size: 2, Hash: 646158827499216133} // contents: "z"
-	testdata_a     = &File{Name: "a", Size: 2, Hash: 644258871406045975} // contents: "x"
-	testdata_c     = &File{Name: "c", Size: 2, Hash: 643306694336204474} // contents: "y"
-)
-
 func Test__testdata_no_skip(t *testing.T) {
 	root := "testdata"
 	want := &Dir{
