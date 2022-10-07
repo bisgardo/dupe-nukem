@@ -1,9 +1,10 @@
 package main
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func Test__hash_stdin(t *testing.T) {
@@ -21,5 +22,5 @@ func Test__hash_file(t *testing.T) {
 
 func Test__hash_dir_fails(t *testing.T) {
 	_, err := Hash("testdata")
-	assert.EqualError(t, err, "cannot hash file \"testdata\": is a directory")
+	assert.EqualError(t, err, "cannot hash directory \"testdata\"")
 }
