@@ -1,11 +1,12 @@
 package match
 
 import (
-	"github.com/bisgardo/dupe-nukem/scan"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"testing"
+	"github.com/bisgardo/dupe-nukem/scan"
 )
 
 //goland:noinspection GoSnakeCaseUsage
