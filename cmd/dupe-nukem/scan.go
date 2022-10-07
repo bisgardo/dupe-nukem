@@ -80,7 +80,7 @@ func parseSkipNameFile(path string) ([]string, error) {
 	}
 	defer func() {
 		if err := f.Close(); err != nil {
-			log.Printf("error: cannot close skip name file '%v': %v\n", path, err)
+			log.Printf("error: cannot close skip name file %q: %v\n", path, err)
 		}
 	}()
 	r := bufio.NewReaderSize(f, maxSkipNameFileLineLen)
@@ -133,7 +133,7 @@ func loadCacheDir(path string) (*scan.Dir, error) {
 	}
 	defer func() {
 		if err := f.Close(); err != nil {
-			log.Printf("error: cannot close cache file '%v': %v\n", path, err)
+			log.Printf("error: cannot close cache file %q: %v\n", path, err)
 		}
 	}()
 	var cacheDir scan.Dir
@@ -237,9 +237,9 @@ func loadScanFile(path string) (*scan.Dir, error) {
 	}
 	defer func() {
 		if err := f.Close(); err != nil {
-			log.Printf("error: cannot close scan file '%v': %v\n", path, err)
+			log.Printf("error: cannot close scan file %q: %v\n", path, err)
 		}
 	}()
 	err = json.NewDecoder(f).Decode(res)
-	return res, errors.Wrapf(err, "cannot load scan file '%v'", path)
+	return res, errors.Wrapf(err, "cannot load scan file %q", path)
 }
