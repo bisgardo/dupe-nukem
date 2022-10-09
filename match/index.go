@@ -4,7 +4,7 @@ import (
 	"github.com/bisgardo/dupe-nukem/scan"
 )
 
-// Index is a map from hash to the files whose contents hash to this hash.
+// Index is a map from hash to the files whose contents hash to this value.
 type Index map[uint64][]*File
 
 type Dir struct {

@@ -84,6 +84,7 @@ func Test__file_root_fails(t *testing.T) {
 // that the functionality really is correct on all platforms - the test just needs to be set up some other way.
 // But the encountered case (that inaccessible symlinked root should be skipped) should be properly tested as well!
 func Test__inaccessible_root_is_skipped(t *testing.T) {
+	//goland:noinspection GoBoolExpressions
 	if testutil.CI() == "github" && runtime.GOOS != "linux" {
 		return // skip test
 	}
@@ -142,6 +143,7 @@ func Test__testdata_skip_root_fails(t *testing.T) {
 
 // DISABLED on Windows: Creating symlinks require elevated privileges.
 func Test__testdata_skip_symlinked_root_fails(t *testing.T) {
+	//goland:noinspection GoBoolExpressions
 	if runtime.GOOS == "windows" {
 		return // skip test
 	}
@@ -477,6 +479,7 @@ func Test__cache_entry_with_hash_0_is_ignored(t *testing.T) {
 
 // DISABLED on Windows and macOS (on GitHub) for the same reasons as 'Test__inaccessible_root_is_skipped'.
 func Test__hash_computed_as_0_is_logged(t *testing.T) {
+	//goland:noinspection GoBoolExpressions
 	if testutil.CI() == "github" && runtime.GOOS != "linux" {
 		return // skip test
 	}
@@ -517,6 +520,7 @@ func Test__hash_computed_as_0_is_logged(t *testing.T) {
 
 // DISABLED on Windows: Creating symlinks require elevated privileges.
 func Test__root_symlink_is_followed(t *testing.T) {
+	//goland:noinspection GoBoolExpressions
 	if runtime.GOOS == "windows" {
 		return // skip test
 	}
@@ -540,6 +544,7 @@ func Test__root_symlink_is_followed(t *testing.T) {
 
 // DISABLED on Windows: Creating symlinks require elevated privileges.
 func Test__root_indirect_symlink_is_followed(t *testing.T) {
+	//goland:noinspection GoBoolExpressions
 	if runtime.GOOS == "windows" {
 		return // skip test
 	}
@@ -570,6 +575,7 @@ func Test__root_indirect_symlink_is_followed(t *testing.T) {
 
 // DISABLED on Windows: Creating symlinks require elevated privileges.
 func Test__internal_symlink_is_skipped(t *testing.T) {
+	//goland:noinspection GoBoolExpressions
 	if runtime.GOOS == "windows" {
 		return // skip test
 	}
@@ -595,6 +601,7 @@ func Test__internal_symlink_is_skipped(t *testing.T) {
 
 // DISABLED on Windows: Creating symlinks require elevated privileges.
 func Test__root_symlink_to_ancestor_is_followed_but_skipped_when_internal(t *testing.T) {
+	//goland:noinspection GoBoolExpressions
 	if runtime.GOOS == "windows" {
 		return // skip test
 	}

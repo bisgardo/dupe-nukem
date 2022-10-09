@@ -16,11 +16,11 @@ type HashMatch struct {
 // Run computes the hash-based matches between the files recorded in the scan file located at the path srcScanFile
 // and the files recorded in the scan files located at paths targetScanFiles.
 func Run(srcRoot *scan.Dir, targets []Index) ([]HashMatch, error) {
-	matches := BuildMatchIndex(srcRoot, targets)
+	matches := BuildMatch(srcRoot, targets)
 	return sortedHashMatches(matches), nil
 }
 
-func sortedHashMatches(m Index) []HashMatch {
+func sortedHashMatches(m Matches) []HashMatch {
 	hashes := sortedHashes(m)
 	res := make([]HashMatch, len(hashes))
 	for i, h := range hashes {
@@ -32,7 +32,7 @@ func sortedHashMatches(m Index) []HashMatch {
 	return res
 }
 
-func sortedHashes(m Index) []uint64 {
+func sortedHashes(m Matches) []uint64 {
 	hashes := make([]uint64, 0, len(m))
 	for h := range m {
 		hashes = append(hashes, h)

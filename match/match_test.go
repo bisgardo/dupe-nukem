@@ -15,7 +15,7 @@ func Test__testdata_match_no_targets_is_empty(t *testing.T) {
 	scanX, err := scan.Run(srcRoot, scan.NoSkip, nil)
 	require.NoError(t, err)
 
-	res := BuildMatchIndex(scanX, []Index{})
+	res := BuildMatch(scanX, []Index{})
 	assert.Empty(t, res)
 }
 
@@ -38,13 +38,13 @@ func Test__testdata_match_single_target(t *testing.T) {
 
 	indexY := BuildIndex(scanY)
 
-	want := Index{
+	want := Matches{
 		620331299357648818: []*File{
 			NewFile(y, testdata_y_a),
 			NewFile(y, testdata_y_b),
 		},
 	}
-	res := BuildMatchIndex(scanX, []Index{indexY})
+	res := BuildMatch(scanX, []Index{indexY})
 	assert.Equal(t, want, res)
 }
 
@@ -69,12 +69,12 @@ func Test__testdata_match_single_target_reversed(t *testing.T) {
 
 	// Note that there's only a single match for files that are duplicated in the source ('y/a' and 'y/b' in this case).
 	// This is (at least partially) the reason why we build the match mapping on hashes instead of individual files.
-	want := Index{
+	want := Matches{
 		620331299357648818: []*File{
 			NewFile(x, testdata_x_a),
 		},
 	}
-	res := BuildMatchIndex(scanY, []Index{indexX})
+	res := BuildMatch(scanY, []Index{indexX})
 	assert.Equal(t, want, res)
 }
 
@@ -94,7 +94,7 @@ func Test__testdata_match_self(t *testing.T) {
 
 	indexX := BuildIndex(scanX)
 
-	want := Index{
+	want := Matches{
 		620331299357648818: []*File{
 			NewFile(x, testdata_x_a),
 		},
@@ -105,6 +105,6 @@ func Test__testdata_match_self(t *testing.T) {
 			NewFile(x, testdata_x_c),
 		},
 	}
-	res := BuildMatchIndex(scanX, []Index{indexX})
+	res := BuildMatch(scanX, []Index{indexX})
 	assert.Equal(t, want, res)
 }
