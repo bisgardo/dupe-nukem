@@ -240,6 +240,6 @@ func loadScanFile(path string) (*scan.Dir, error) {
 			log.Printf("error: cannot close scan file %q: %v\n", path, err)
 		}
 	}()
-	err = json.NewDecoder(f).Decode(res)
+	err = json.NewDecoder(f).Decode(&res)
 	return res, errors.Wrapf(err, "cannot load scan file %q", path)
 }

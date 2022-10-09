@@ -9,8 +9,8 @@ import (
 
 // HashMatch is a hash value and the paths of the files in the target directories whose contents hash to this value.
 type HashMatch struct {
-	Hash  uint64
-	Paths []string
+	Hash  uint64   `json:"hash"`
+	Paths []string `json:"paths"`
 }
 
 // Run computes the hash-based matches between the files recorded in the scan file located at the path srcScanFile
@@ -45,19 +45,19 @@ func toFilePaths(files []*File) []string {
 	res := make([]string, len(files))
 	for i, f := range files {
 		var buf bytes.Buffer
-		writeFilePath(f, buf)
+		writeFilePath(f, &buf)
 		res[i] = buf.String()
 	}
 	return res
 }
 
-func writeFilePath(f *File, buf bytes.Buffer) {
+func writeFilePath(f *File, buf *bytes.Buffer) {
 	writeDirPath(f.Dir, buf)
 	buf.WriteRune('/')
 	buf.WriteString(f.ScanFile.Name)
 }
 
-func writeDirPath(d *Dir, buf bytes.Buffer) {
+func writeDirPath(d *Dir, buf *bytes.Buffer) {
 	if d.Parent != nil {
 		writeDirPath(d.Parent, buf)
 		buf.WriteRune('/')

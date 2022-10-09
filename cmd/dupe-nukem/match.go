@@ -25,6 +25,7 @@ func loadSourceDir(path string) (*scan.Dir, error) {
 
 func loadTargetIndexes(paths []string) ([]match.Index, error) {
 	// TODO [optimization] If a target is also the source there's no need for loading the file again.
+	// TODO [optimization] Load files in parallel?
 	res := make([]match.Index, len(paths))
 	for i, path := range paths {
 		scanDir, err := loadScanFile(path)

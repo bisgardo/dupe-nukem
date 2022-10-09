@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/spf13/cobra"
 )
@@ -72,6 +73,7 @@ func main() {
 		Short: "Match files in source dir against files in target dirs",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			flags := cmd.Flags()
+			// TODO Should the flags also accept dirs? Would implicitly do scan for those.
 			sourceFile, err := flags.GetString("source")
 			if err != nil {
 				return err
@@ -84,9 +86,12 @@ func main() {
 			if err != nil {
 				return err
 			}
-			for hash, matches := range res {
-				// TODO Write proper format...
-				fmt.Printf("%v -> %v\n", hash, matches)
+
+			enc := json.NewEncoder(os.Stdout)
+			for _, matches := range res {
+				if err := enc.Encode(matches); err != nil {
+					return err
+				}
 			}
 			return nil
 		},
