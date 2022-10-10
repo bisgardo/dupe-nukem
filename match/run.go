@@ -8,6 +8,12 @@ import (
 )
 
 // HashMatch is a hash value and the paths of the files in the target directories whose contents hash to this value.
+// TODO As the target's roots could have the same name, the matched paths must be prefixed by a target ID.
+//      An ok initial solution could be to reject targets with similar roots.
+//      Alternatively, we could use the scan file paths as ID.
+//      Or have 'scan' require an ID to be provided which is recorded into the scan file (could default to root name),
+//      and reject targets with the same ID - or allowing overwrite on the command line!
+//      That sounds like the scan file should have a root type (which could also record the absolute dir path...).
 type HashMatch struct {
 	Hash  uint64   `json:"hash"`
 	Paths []string `json:"paths"`

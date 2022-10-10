@@ -73,11 +73,12 @@ func main() {
 		Short: "Match files in source dir against files in target dirs",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			flags := cmd.Flags()
-			// TODO Should the flags also accept dirs? Would implicitly do scan for those.
+			// IDEA Could let the flags also accept dirs. Would do implicit scan for those.
 			sourceFile, err := flags.GetString("source")
 			if err != nil {
 				return err
 			}
+			// TODO If no targets are provided, use source as (singleton) target to search for internal duplicates.
 			targetFiles, err := flags.GetStringArray("target")
 			if err != nil {
 				return err
