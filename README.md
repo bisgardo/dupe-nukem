@@ -99,8 +99,6 @@ but this feature is not yet implemented.
 
 ### 2. Match
 
-*This command is not yet implemented.*
-
 ```shell
 dupe-nukem match --source <dir-file> --targets <dir-files>
 ```
@@ -109,7 +107,7 @@ Search for subdirectories of source directory in target directories
 (each of these directories represented by files output by invocations of `scan`).
 Prints all matching files with their directory structure (relative to the subdirectory) preserved.
 
-This command is not yet implemented.
+TODO: Update
 
 ### 3. Validate (optional)
 
