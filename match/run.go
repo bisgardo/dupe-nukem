@@ -21,9 +21,9 @@ type HashMatch struct {
 
 // Run computes the hash-based matches between the files recorded in the scan file located at the path srcScanFile
 // and the files recorded in the scan files located at paths targetScanFiles.
-func Run(srcRoot *scan.Dir, targets []Index) ([]HashMatch, error) {
+func Run(srcRoot *scan.Dir, targets []Index) []HashMatch {
 	matches := BuildMatch(srcRoot, targets)
-	return sortedHashMatches(matches), nil
+	return sortedHashMatches(matches)
 }
 
 func sortedHashMatches(m Matches) []HashMatch {
