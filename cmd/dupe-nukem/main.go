@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"os"
 
 	"github.com/spf13/cobra"
 )
@@ -88,12 +87,11 @@ func main() {
 				return err
 			}
 
-			enc := json.NewEncoder(os.Stdout)
-			for _, matches := range res {
-				if err := enc.Encode(matches); err != nil {
-					return err
-				}
+			bs, err := json.MarshalIndent(res, "", "  ")
+			if err != nil {
+				return err
 			}
+			fmt.Println(string(bs))
 			return nil
 		},
 	}

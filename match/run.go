@@ -2,7 +2,7 @@ package match
 
 import (
 	"bytes"
-	"sort"
+	"strconv"
 
 	"github.com/bisgardo/dupe-nukem/scan"
 )
@@ -14,59 +14,85 @@ import (
 //      Or have 'scan' require an ID to be provided which is recorded into the scan file (could default to root name),
 //      and reject targets with the same ID - or allowing overwrite on the command line!
 //      That sounds like the scan file should have a root type (which could also record the absolute dir path...).
-type HashMatch struct {
-	Hash  uint64   `json:"hash"`
-	Paths []string `json:"paths"`
+//type HashMatch struct {
+//	Hash  uint64   `json:"hash"`
+//	Paths []string `json:"paths"`
+//}
+
+type TargetID struct {
+	ID string `json:"id"`
+}
+
+type Result struct {
+	TargetIDs []TargetID          `json:"targets"`
+	Matches   map[uint64][]string `json:"matches"` // TODO match on both hash and size!
 }
 
 // Run computes the hash-based matches between the files recorded in the scan file located at the path srcScanFile
 // and the files recorded in the scan files located at paths targetScanFiles.
-func Run(srcRoot *scan.Dir, targets []Index) []HashMatch {
-	matches := BuildMatch(srcRoot, targets)
-	return sortedHashMatches(matches)
+func Run(srcRoot *scan.Dir, targets []Target) *Result {
+	matchRes := BuildMatch(srcRoot, targets)
+	targetIDs := make([]TargetID, len(targets))
+	for i, t := range targets {
+		targetIDs[i] = t.ID
+	}
+	matchedPaths := make(map[uint64][]string, len(matchRes))
+	for hash, matches := range matchRes {
+		matchedPaths[hash] = matchesToFilePaths(matches)
+	}
+	return &Result{
+		TargetIDs: targetIDs,
+		Matches:   matchedPaths,
+	}
 }
 
-func sortedHashMatches(m Matches) []HashMatch {
-	hashes := sortedHashes(m)
-	res := make([]HashMatch, len(hashes))
-	for i, h := range hashes {
-		res[i] = HashMatch{
-			Hash:  h,
-			Paths: toFilePaths(m[h]),
-		}
+//func sortedHashMatches(m Matches) []HashMatch {
+//	hashes := sortedHashes(m)
+//	res := make([]HashMatch, len(hashes))
+//	for i, h := range hashes {
+//		res[i] = HashMatch{
+//			Hash:  h,
+//			Paths: matchesToFilePaths(m[h]),
+//		}
+//	}
+//	return res
+//}
+//
+//func sortedHashes(m Matches) []uint64 {
+//	hashes := make([]uint64, 0, len(m))
+//	for h := range m {
+//		hashes = append(hashes, h)
+//	}
+//	sort.Slice(hashes, func(i, j int) bool { return hashes[i] < hashes[j] })
+//	return hashes
+//}
+
+func matchesToFilePaths(matches []Match) []string {
+	res := make([]string, len(matches))
+	for i, m := range matches {
+		res[i] = filePath(m.TargetIndex, m.File)
 	}
 	return res
 }
 
-func sortedHashes(m Matches) []uint64 {
-	hashes := make([]uint64, 0, len(m))
-	for h := range m {
-		hashes = append(hashes, h)
-	}
-	sort.Slice(hashes, func(i, j int) bool { return hashes[i] < hashes[j] })
-	return hashes
-}
-
-func toFilePaths(files []*File) []string {
-	res := make([]string, len(files))
-	for i, f := range files {
-		var buf bytes.Buffer
-		writeFilePath(f, &buf)
-		res[i] = buf.String()
-	}
-	return res
+func filePath(targetIndex int, f *File) string {
+	var buf bytes.Buffer
+	buf.WriteString(strconv.Itoa(targetIndex))
+	buf.WriteByte(targetIdPathSep)
+	writeFilePath(f, &buf)
+	return buf.String()
 }
 
 func writeFilePath(f *File, buf *bytes.Buffer) {
 	writeDirPath(f.Dir, buf)
-	buf.WriteRune('/')
+	buf.WriteByte('/')
 	buf.WriteString(f.ScanFile.Name)
 }
 
 func writeDirPath(d *Dir, buf *bytes.Buffer) {
 	if d.Parent != nil {
 		writeDirPath(d.Parent, buf)
-		buf.WriteRune('/')
+		buf.WriteByte('/')
 	}
 	buf.WriteString(d.ScanDir.Name)
 }

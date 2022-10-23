@@ -4,9 +4,6 @@ import (
 	"github.com/bisgardo/dupe-nukem/scan"
 )
 
-// Index is a map from hash to the files whose contents hash to this value.
-type Index map[uint64][]*File
-
 type Dir struct {
 	Parent  *Dir
 	ScanDir *scan.Dir
@@ -31,6 +28,15 @@ func NewFile(dir *Dir, scanFile *scan.File) *File {
 	}
 }
 
+// Index is a map from hash to the files whose contents hash to this value.
+type Index map[uint64][]*File
+
+func BuildIndex(root *scan.Dir) Index {
+	res := make(Index)
+	innerBuildIndex(root, nil, res)
+	return res
+}
+
 func innerBuildIndex(scanDir *scan.Dir, parent *Dir, res Index) {
 	dir := NewDir(parent, scanDir)
 	for _, f := range scanDir.Files {
@@ -39,10 +45,4 @@ func innerBuildIndex(scanDir *scan.Dir, parent *Dir, res Index) {
 	for _, d := range scanDir.Dirs {
 		innerBuildIndex(d, dir, res)
 	}
-}
-
-func BuildIndex(root *scan.Dir) Index {
-	res := make(Index)
-	innerBuildIndex(root, nil, res)
-	return res
 }

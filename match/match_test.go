@@ -15,7 +15,7 @@ func Test__testdata_match_no_targets_is_empty(t *testing.T) {
 	scanX, err := scan.Run(srcRoot, scan.NoSkip, nil)
 	require.NoError(t, err)
 
-	res := BuildMatch(scanX, []Index{})
+	res := BuildMatch(scanX, nil)
 	assert.Empty(t, res)
 }
 
@@ -39,12 +39,18 @@ func Test__testdata_match_single_target(t *testing.T) {
 	indexY := BuildIndex(scanY)
 
 	want := Matches{
-		620331299357648818: []*File{
-			NewFile(y, testdata_y_a),
-			NewFile(y, testdata_y_b),
+		620331299357648818: []Match{
+			{
+				TargetIndex: 0,
+				File:        NewFile(y, testdata_y_a),
+			},
+			{
+				TargetIndex: 0,
+				File:        NewFile(y, testdata_y_b),
+			},
 		},
 	}
-	res := BuildMatch(scanX, []Index{indexY})
+	res := BuildMatch(scanX, []Target{{ID: TargetID{ID: ""}, Index: indexY}})
 	assert.Equal(t, want, res)
 }
 
@@ -70,11 +76,14 @@ func Test__testdata_match_single_target_reversed(t *testing.T) {
 	// Note that there's only a single match for files that are duplicated in the source ('y/a' and 'y/b' in this case).
 	// This is (at least partially) the reason why we build the match mapping on hashes instead of individual files.
 	want := Matches{
-		620331299357648818: []*File{
-			NewFile(x, testdata_x_a),
+		620331299357648818: []Match{
+			{
+				TargetIndex: 0,
+				File:        NewFile(x, testdata_x_a),
+			},
 		},
 	}
-	res := BuildMatch(scanY, []Index{indexX})
+	res := BuildMatch(scanY, []Target{{ID: TargetID{ID: ""}, Index: indexX}})
 	assert.Equal(t, want, res)
 }
 
@@ -95,16 +104,25 @@ func Test__testdata_match_self(t *testing.T) {
 	indexX := BuildIndex(scanX)
 
 	want := Matches{
-		620331299357648818: []*File{
-			NewFile(x, testdata_x_a),
+		620331299357648818: []Match{
+			{
+				TargetIndex: 0,
+				File:        NewFile(x, testdata_x_a),
+			},
 		},
-		623218616892763229: []*File{
-			NewFile(x, testdata_x_b),
+		623218616892763229: []Match{
+			{
+				TargetIndex: 0,
+				File:        NewFile(x, testdata_x_b),
+			},
 		},
-		622257643729896040: []*File{
-			NewFile(x, testdata_x_c),
+		622257643729896040: []Match{
+			{
+				TargetIndex: 0,
+				File:        NewFile(x, testdata_x_c),
+			},
 		},
 	}
-	res := BuildMatch(scanX, []Index{indexX})
+	res := BuildMatch(scanX, []Target{{ID: TargetID{ID: ""}, Index: indexX}})
 	assert.Equal(t, want, res)
 }
