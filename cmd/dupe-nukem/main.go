@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -53,12 +54,10 @@ func main() {
 			if err != nil {
 				return err
 			}
-
 			res, err := Scan(dir, skipExpr, cacheFile)
 			if err != nil {
 				return err
 			}
-
 			bs, err := json.MarshalIndent(res, "", "  ")
 			if err != nil {
 				return err
@@ -77,16 +76,21 @@ func main() {
 			if err != nil {
 				return err
 			}
-			// TODO If no targets are provided, use source as (singleton) target to search for internal duplicates.
+			if sourceFile == "" {
+				return errors.New("no source file provided")
+			}
 			targetFiles, err := flags.GetStringArray("target")
 			if err != nil {
 				return err
+			}
+			// Use source as singleton target if no targets are provided (to search for internal duplicates).
+			if len(targetFiles) == 0 {
+				targetFiles = []string{sourceFile}
 			}
 			res, err := Match(sourceFile, targetFiles)
 			if err != nil {
 				return err
 			}
-
 			bs, err := json.MarshalIndent(res, "", "  ")
 			if err != nil {
 				return err

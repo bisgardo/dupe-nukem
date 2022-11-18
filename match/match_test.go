@@ -39,7 +39,7 @@ func Test__testdata_match_single_target(t *testing.T) {
 	indexY := BuildIndex(scanY)
 
 	want := Matches{
-		620331299357648818: []Match{
+		key{size: 2, hash: 620331299357648818}: []Match{
 			{
 				TargetIndex: 0,
 				File:        NewFile(y, testdata_y_a),
@@ -76,7 +76,10 @@ func Test__testdata_match_single_target_reversed(t *testing.T) {
 	// Note that there's only a single match for files that are duplicated in the source ('y/a' and 'y/b' in this case).
 	// This is (at least partially) the reason why we build the match mapping on hashes instead of individual files.
 	want := Matches{
-		620331299357648818: []Match{
+		key{
+			size: 2,
+			hash: 620331299357648818,
+		}: []Match{
 			{
 				TargetIndex: 0,
 				File:        NewFile(x, testdata_x_a),
@@ -104,19 +107,28 @@ func Test__testdata_match_self(t *testing.T) {
 	indexX := BuildIndex(scanX)
 
 	want := Matches{
-		620331299357648818: []Match{
+		key{
+			size: 2,
+			hash: 620331299357648818,
+		}: []Match{
 			{
 				TargetIndex: 0,
 				File:        NewFile(x, testdata_x_a),
 			},
 		},
-		623218616892763229: []Match{
+		key{
+			size: 2,
+			hash: 623218616892763229,
+		}: []Match{
 			{
 				TargetIndex: 0,
 				File:        NewFile(x, testdata_x_b),
 			},
 		},
-		622257643729896040: []Match{
+		key{
+			size: 2,
+			hash: 622257643729896040,
+		}: []Match{
 			{
 				TargetIndex: 0,
 				File:        NewFile(x, testdata_x_c),

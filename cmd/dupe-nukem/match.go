@@ -2,6 +2,8 @@ package main
 
 import (
 	"log"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -12,13 +14,14 @@ import (
 
 // Match computes the hash-based matches between the files recorded in the scan file located at the path srcScanFile
 // and the files recorded in the scan files located at paths targetScanFiles.
-func Match(srcScanFile string, targetScanFiles []string) (*match.Result, error) {
+func Match(srcScanFilePath string, targetScanFilePaths []string) (*match.Result, error) {
 	time0 := time.Now()
-	srcRoot, err := loadScanDir(srcScanFile)
+	log.Printf("loading source scan file %q...\n", srcScanFilePath)
+	srcRoot, err := loadScanDirFile(srcScanFilePath)
 	if err != nil {
-		return nil, errors.Wrapf(err, "cannot load source scan file %q", srcScanFile)
+		return nil, errors.Wrapf(err, "cannot load source scan file %q", srcScanFilePath)
 	}
-	targets, err := loadTargets(targetScanFiles)
+	targets, err := loadTargets(targetScanFilePaths, srcScanFilePath, srcRoot)
 	if err != nil {
 		return nil, err
 	}
@@ -30,34 +33,57 @@ func Match(srcScanFile string, targetScanFiles []string) (*match.Result, error) 
 	return res, nil
 }
 
-func loadScanDir(path string) (*scan.Dir, error) {
-	// TODO Expect 'path' to actually be '<ID>=<path>' and prefix matches by the ID.
-	log.Printf("loading scan file %q...\n", path)
-	return loadScanDirFile(path)
+type targetKey struct {
+	cleanPath string
+	id        match.TargetID
 }
 
-func loadTargets(paths []string) ([]match.Target, error) {
-	// TODO [optimization] If a target is also the source there's no need for loading the file again.
-	// TODO [optimization] Load files in parallel?
-	res := make([]match.Target, len(paths))
-	ids := make(map[string]struct{})
-	for i, path := range paths {
-		scanDir, err := loadScanDir(path)
-		if err != nil {
-			return nil, errors.Wrapf(err, "cannot load target #%d scan file %q", i+1, path)
+func loadTargets(idPaths []string, srcScanFilePath string, srcScanDir *scan.Dir) ([]match.Target, error) {
+	keys := make([]targetKey, len(idPaths))
+	for i, p := range idPaths {
+		id, path := extractId(p, '=')
+		cleanPath := filepath.Clean(path)
+		for _, k := range keys {
+			if k.cleanPath == cleanPath {
+				return nil, errors.Errorf("duplicate path %q on target #%d", id, i+1)
+			}
 		}
-		index := match.BuildIndex(scanDir)
-		id := path // TODO should be overridable
-		if _, ok := ids[id]; ok {
-			return nil, errors.Errorf("duplicate ID %q for target #%d", id, i+1)
-		}
-		ids[id] = struct{}{}
-		res[i] = match.Target{
-			Index: index,
-			ID: match.TargetID{
+		keys = append(keys, targetKey{
+			cleanPath: cleanPath,
+			id: match.TargetID{
 				ID: id,
 			},
+		})
+	}
+
+	// TODO [optimization] Load in parallel?
+	res := make([]match.Target, len(idPaths))
+	for i, k := range keys {
+		scanDir, err := loadTargetScanDir(k.cleanPath, srcScanFilePath, srcScanDir)
+		if err != nil {
+			return nil, err
+		}
+		index := match.BuildIndex(scanDir)
+		res[i] = match.Target{
+			Index: index,
+			ID:    k.id,
 		}
 	}
 	return res, nil
+}
+
+func extractId(p string, splitter rune) (string, string) {
+	if i := strings.IndexRune(p, splitter); i >= 0 {
+		return p[0:i], p[i+1:]
+	}
+	return p, p
+}
+
+func loadTargetScanDir(path string, srcScanFilePath string, srcScanDir *scan.Dir) (*scan.Dir, error) {
+	if filepath.Clean(path) == filepath.Clean(srcScanFilePath) {
+		log.Printf("reusing loaded source scan file %q as a target\n", srcScanFilePath)
+		return srcScanDir, nil
+	}
+	log.Printf("loading target scan file %q\n", srcScanFilePath)
+	return loadScanDirFile(path)
 }

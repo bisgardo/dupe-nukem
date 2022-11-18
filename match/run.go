@@ -25,7 +25,7 @@ type TargetID struct {
 
 type Result struct {
 	TargetIDs []TargetID          `json:"targets"`
-	Matches   map[uint64][]string `json:"matches"` // TODO match on both hash and size!
+	Matches   map[string][]string `json:"matches"`
 }
 
 // Run computes the hash-based matches between the files recorded in the scan file located at the path srcScanFile
@@ -36,9 +36,9 @@ func Run(srcRoot *scan.Dir, targets []Target) *Result {
 	for i, t := range targets {
 		targetIDs[i] = t.ID
 	}
-	matchedPaths := make(map[uint64][]string, len(matchRes))
-	for hash, matches := range matchRes {
-		matchedPaths[hash] = matchesToFilePaths(matches)
+	matchedPaths := make(map[string][]string, len(matchRes))
+	for k, matches := range matchRes {
+		matchedPaths[k.String()] = matchesToFilePaths(matches)
 	}
 	return &Result{
 		TargetIDs: targetIDs,
