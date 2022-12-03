@@ -129,7 +129,7 @@ func loadScanDirCacheFile(path string) (*scan.Dir, error) {
 	if err != nil {
 		return nil, err
 	}
-	// TODO Unless it's too expensive, just sort lists instead of validating.
+	// TODO Unless it's too expensive, just sort lists instead of only validating.
 	if err := checkCache(scanDir); err != nil {
 		return nil, errors.Wrap(err, "invalid cache contents")
 	}

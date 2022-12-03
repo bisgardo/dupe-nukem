@@ -214,13 +214,13 @@ func Test__SkipNameSet_nonempty_returns_whether_basename_matches(t *testing.T) {
 	}{
 		{name: "empty dir- and basename", dirName: "", baseName: "", want: false},
 		{name: "empty dirname and matching basename", dirName: "", baseName: "a", want: true},
-		{name: "empty dirname and nonmatching basename", dirName: "", baseName: "x", want: false},
+		{name: "empty dirname and non-matching basename", dirName: "", baseName: "x", want: false},
 		{name: "matching dirname and empty basename", dirName: "a", baseName: "", want: false},
-		{name: "nonmatching dirname and empty basename", dirName: "x", baseName: "", want: false},
+		{name: "non-matching dirname and empty basename", dirName: "x", baseName: "", want: false},
 
-		{name: "nonmatching dirname and nonmatching basename", dirName: "x", baseName: "y", want: false},
-		{name: "nonmatching dirname and matching basename", dirName: "x", baseName: "b", want: true},
-		{name: "matching dirname and nonmatching basename", dirName: "a", baseName: "x", want: false},
+		{name: "non-matching dirname and non-matching basename", dirName: "x", baseName: "y", want: false},
+		{name: "non-matching dirname and matching basename", dirName: "x", baseName: "b", want: true},
+		{name: "matching dirname and non-matching basename", dirName: "a", baseName: "x", want: false},
 		{name: "matching dir- and basename", dirName: "a", baseName: "b", want: true},
 	}
 	for _, test := range tests {
