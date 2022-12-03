@@ -131,7 +131,7 @@ func Test__Scan_wraps_parse_error_of_skip_names(t *testing.T) {
 }
 
 func Test__loadCacheDir_empty_loads_nil(t *testing.T) {
-	res, err := loadCacheDir("")
+	res, err := loadScanDirCacheFile("")
 	require.NoError(t, err)
 	assert.Nil(t, res)
 }
@@ -153,7 +153,7 @@ func Test__loadCacheDir_loads_scan_format(t *testing.T) {
 			{Name: "c", Size: 11, Hash: 11},
 		},
 	}
-	res, err := loadCacheDir(f)
+	res, err := loadScanDirCacheFile(f)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
 }
@@ -161,14 +161,14 @@ func Test__loadCacheDir_loads_scan_format(t *testing.T) {
 func Test__loadCacheDir_loads_compressed_scan_format(t *testing.T) {
 	f := "testdata/cache2.json.gz"
 	want := &scan.Dir{Name: "y"}
-	res, err := loadCacheDir(f)
+	res, err := loadScanDirCacheFile(f)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
 }
 
 func Test__Scan_wraps_cache_file_not_found_error(t *testing.T) {
 	_, err := Scan("x", "", "missing")
-	assert.EqualError(t, err, `cannot load cache file "missing": cannot open file: not found`)
+	assert.EqualError(t, err, `cannot load scan cache file "missing": cannot open file: not found`)
 }
 
 func Test__Scan_wraps_cache_file_not_accessible_error(t *testing.T) {
@@ -183,7 +183,7 @@ func Test__Scan_wraps_cache_file_not_accessible_error(t *testing.T) {
 	err = f.Close()
 	assert.NoError(t, err)
 	_, err = Scan("x", "", f.Name())
-	assert.EqualError(t, err, fmt.Sprintf("cannot load cache file %q: cannot open file: access denied", f.Name()))
+	assert.EqualError(t, err, fmt.Sprintf("cannot load scan cache file %q: cannot open file: access denied", f.Name()))
 }
 
 func Test__Scan_wraps_cache_load_error(t *testing.T) {
@@ -200,7 +200,7 @@ func Test__Scan_wraps_cache_load_error(t *testing.T) {
 	assert.NoError(t, err)
 
 	_, err = Scan("x", "", f.Name())
-	assert.EqualError(t, err, fmt.Sprintf("cannot load cache file %q: cannot decode file as JSON: unexpected EOF", f.Name()))
+	assert.EqualError(t, err, fmt.Sprintf("cannot load scan cache file %q: cannot decode file as JSON: unexpected EOF", f.Name()))
 }
 
 func Test__checkCache_rejects_unsorted_lists(t *testing.T) {

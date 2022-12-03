@@ -53,12 +53,10 @@ func main() {
 			if err != nil {
 				return err
 			}
-
 			res, err := Scan(dir, skipExpr, cacheFile)
 			if err != nil {
 				return err
 			}
-
 			bs, err := json.MarshalIndent(res, "", "  ")
 			if err != nil {
 				return err

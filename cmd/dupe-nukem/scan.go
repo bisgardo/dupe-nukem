@@ -2,13 +2,10 @@ package main
 
 import (
 	"bufio"
-	"compress/gzip"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -29,11 +26,11 @@ func Scan(dir, skipExpr, cachePath string) (*scan.Dir, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot process skip dirs expression %q", skipExpr)
 	}
-	cacheDir, err := loadCacheDir(cachePath)
+	cacheDir, err := loadScanDirCacheFile(cachePath)
 	if err != nil {
-		return nil, errors.Wrapf(err, "cannot load cache file %q", cachePath)
+		return nil, errors.Wrapf(err, "cannot load scan cache file %q", cachePath)
 	}
-	absDir, err := abs(dir)
+	absDir, err := absPath(dir)
 	if err != nil {
 		return nil, err
 	}
@@ -122,35 +119,22 @@ func validateSkipName(name string) error {
 	return nil
 }
 
-func loadCacheDir(path string) (*scan.Dir, error) {
+func loadScanDirCacheFile(path string) (*scan.Dir, error) {
 	if path == "" {
 		return nil, nil
 	}
+	log.Printf("loading scan cache file %q...\n", path)
 	start := time.Now()
-	f, err := os.Open(path)
+	scanDir, err := loadScanDirFile(path)
 	if err != nil {
-		return nil, errors.Wrap(util.SimplifyIOError(err), "cannot open file")
+		return nil, err
 	}
-	defer func() {
-		if err := f.Close(); err != nil {
-			log.Printf("error: cannot close cache file %q: %v\n", path, err)
-		}
-	}()
-	var cacheDir scan.Dir
-	r, err := resolveReader(path, f)
-	if err != nil {
-		return nil, errors.Wrap(err, "cannot resolve reader")
-	}
-	if err := json.NewDecoder(r).Decode(&cacheDir); err != nil {
-		return nil, errors.Wrap(err, "cannot decode file as JSON")
-	}
-
-	// TODO Unless it's too expensive, just sorts lists instead of validating.
-	if err := checkCache(&cacheDir); err != nil {
+	// TODO Unless it's too expensive, just sort lists instead of only validating.
+	if err := checkCache(scanDir); err != nil {
 		return nil, errors.Wrap(err, "invalid cache contents")
 	}
-	log.Printf("cache loaded from %q in %v\n", path, timeSince(start))
-	return &cacheDir, nil
+	log.Printf("scan cache loaded successfully from %q in %v\n", path, timeSince(start))
+	return scanDir, nil
 }
 
 func checkCache(dir *scan.Dir) error {
@@ -207,23 +191,4 @@ func checkCache(dir *scan.Dir) error {
 		}
 	}
 	return nil
-}
-
-func resolveReader(path string, f *os.File) (io.Reader, error) {
-	// TODO Read magic number instead of extension.
-	if strings.HasSuffix(path, ".gz") {
-		return gzip.NewReader(f)
-	}
-	return f, nil
-}
-
-func abs(dir string) (string, error) {
-	a, err := filepath.Abs(dir)
-	if err != nil {
-		return "", errors.Wrapf(util.SimplifyIOError(err), "cannot resolve absolute path of %q", a)
-	}
-	//if runtime.GOOS == "windows" {
-	//	return `\\?\` + a, nil // hack to enable long paths on Windows
-	//}
-	return a, nil
 }

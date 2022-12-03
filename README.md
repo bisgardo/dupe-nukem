@@ -92,7 +92,7 @@ in the filesystem (or URI in general).
 The reason for this behavior is that the scanning may be performed in one context (e.g. locally)
 and validation etc. in another (e.g. remotely or mounted on a different path).
 It could make sense to keep the (absolute) path of the scanned directory in the file
-while still being able to remap by need in later commands, so this decision is not final.
+while still being able to remap by need in later commands, so this might change in the future.
 
 The command is intended to also be able to scan archive files,
 but this feature is not yet implemented.

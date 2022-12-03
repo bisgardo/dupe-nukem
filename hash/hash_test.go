@@ -29,6 +29,7 @@ func Test__hash_dir_fails(t *testing.T) {
 
 	// The function should never be called with a directory (all current callers check this beforehand),
 	// in which case it doesn't matter too much that the error message sucks.
+	//goland:noinspection GoBoolExpressions
 	if runtime.GOOS == "windows" {
 		assert.EqualError(t, err, "read error after 0 bytes: read testdata: The handle is invalid.")
 	} else {
