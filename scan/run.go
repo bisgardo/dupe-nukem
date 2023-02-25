@@ -102,12 +102,17 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 			switch {
 			case os.IsPermission(err):
 				log.Printf("skipping inaccessible %v %q\n", modeName, path)
+				// TODO Should return 'filepath.SkipDir' to skip children?
 				return nil
 			case os.IsNotExist(err):
-				// TODO Test - can maybe only do on Windows (with too long path).
-				log.Printf("error: %v %q not found\n", modeName, path)
+				// TODO Can maybe test on Windows (with too long path)?
+				log.Printf("error: %v %q not found\n", modeName, path) // cannot test
 			}
-			return errors.Wrapf(util.SimplifyIOError(err), "cannot walk %v %q", modeName, path)
+			// TODO Should be able to test
+			//      - creating a file with an invalid timestamp (use 'os.Chtimes(filename, time.Unix(0, 0), time.Unix(0, 0))')
+			//      - setting the file descriptor limit to a value lower than the number of files in a directory (use 'syscall.Setrlimit(syscall.RLIMIT_NOFILE, &rLimit)')
+			//      These approaches should also be useful for testing other things currently deemed "cannot test".
+			return errors.Wrapf(util.SimplifyIOError(err), "cannot walk %v %q", modeName, path) // cannot test
 		}
 		parentPath := filepath.Dir(path)
 		name := filepath.Base(path)
@@ -160,7 +165,7 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 		}
 		return nil
 	})
-	return rootDir, errors.Wrapf(err, "cannot scan root directory %q", root)
+	return rootDir, errors.Wrapf(err, "cannot scan root directory %q", root) // cannot test
 }
 
 // hashFromCache looks up the content hash of the given file in the given cache dir.

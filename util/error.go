@@ -15,11 +15,14 @@ var (
 // SimplifyIOError replaces "file does not exist" and "permission denied" errors with simpler, constant ones.
 func SimplifyIOError(err error) error {
 	cause := errors.Cause(err)
-	switch {
-	case os.IsNotExist(cause):
+	if os.IsNotExist(cause) {
 		return errNotFound
-	case os.IsPermission(cause):
+	}
+	if os.IsPermission(cause) {
 		return errAccessDenied
+	}
+	if pathErr, ok := cause.(*os.PathError); ok {
+		return errors.Errorf("%v (%s)", pathErr.Err, pathErr.Op)
 	}
 	return err
 }

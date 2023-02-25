@@ -2,8 +2,12 @@ package hash
 
 import (
 	"bytes"
+	"io/ioutil"
+	"os"
 	"runtime"
 	"testing"
+
+	"github.com/bisgardo/dupe-nukem/testutil"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,11 +32,29 @@ func Test__hash_dir_fails(t *testing.T) {
 	_, err := File("testdata")
 
 	// The function should never be called with a directory (all current callers check this beforehand),
-	// in which case it doesn't matter too much that the error message sucks.
+	// so it doesn't really matter that the error message sucks.
 	//goland:noinspection GoBoolExpressions
 	if runtime.GOOS == "windows" {
 		assert.EqualError(t, err, "read error after 0 bytes: read testdata: The handle is invalid.")
 	} else {
 		assert.EqualError(t, err, "read error after 0 bytes: read testdata: is a directory")
 	}
+}
+
+func Test__hash_inaccessible_file_fails(t *testing.T) {
+	// This test is basically identical to 'Test__hash_wraps_file_error' (in package 'main'),
+	// but the purpose is slightly different (as indicated by the test name).
+	f, err := ioutil.TempFile("", "")
+	require.NoError(t, err)
+	filename := f.Name()
+	defer func() {
+		err := os.Remove(filename)
+		require.NoError(t, err)
+	}()
+	err = testutil.MakeFileInaccessible(f)
+	require.NoError(t, err)
+	err = f.Close()
+	assert.NoError(t, err)
+	_, err = File(filename)
+	assert.EqualError(t, err, "cannot open file: access denied")
 }

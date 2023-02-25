@@ -71,13 +71,14 @@ func parseSkipNames(input string) ([]string, error) {
 }
 
 func parseSkipNameFile(path string) ([]string, error) {
+	// TODO Pass 'open' function (see comment in 'loadScanDirFile').
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, errors.Wrapf(util.SimplifyIOError(err), "cannot open file")
 	}
 	defer func() {
 		if err := f.Close(); err != nil {
-			log.Printf("error: cannot close skip name file %q: %v\n", path, err)
+			log.Printf("error: cannot close skip name file %q: %v\n", path, err) // cannot test
 		}
 	}()
 	r := bufio.NewReaderSize(f, maxSkipNameFileLineLen)
@@ -129,7 +130,7 @@ func loadScanDirCacheFile(path string) (*scan.Dir, error) {
 	if err != nil {
 		return nil, err
 	}
-	// TODO Unless it's too expensive, just sort lists instead of only validating.
+	// TODO Unless it's too expensive, just sort lists instead of only validating?
 	if err := checkCache(scanDir); err != nil {
 		return nil, errors.Wrap(err, "invalid cache contents")
 	}

@@ -141,7 +141,7 @@ func Test__testdata_skip_root_fails(t *testing.T) {
 	assert.EqualError(t, err, `skipping root directory "testdata"`)
 }
 
-// DISABLED on Windows: Creating symlinks require elevated privileges.
+// DISABLED on Windows: Creating symlinks requires elevated privileges.
 func Test__testdata_skip_symlinked_root_fails(t *testing.T) {
 	//goland:noinspection GoBoolExpressions
 	if runtime.GOOS == "windows" {
@@ -289,6 +289,19 @@ func Test__testdata_subdir_skip_empty_file(t *testing.T) {
 	assert.Equal(t, want, res)
 }
 
+func Test__testdata_skip_files_is_logged(t *testing.T) {
+	root := "testdata"
+	buf := testutil.LogBuffer()
+	_, err := Run(root, skip("a"), nil)
+	require.NoError(t, err)
+	want := fmt.Sprintf(
+		"skipping file %q based on skip list\nskipping file %q based on skip list\n",
+		filepath.Clean("testdata/a"),
+		filepath.Clean("testdata/e/f/a"),
+	)
+	assert.Equal(t, want, buf.String())
+}
+
 func Test__testdata_trailing_slash_gets_removed(t *testing.T) {
 	root := "testdata/e/f/"
 	want := &Dir{
@@ -302,7 +315,7 @@ func Test__testdata_trailing_slash_gets_removed(t *testing.T) {
 }
 
 // On Windows, this test only works if the repository is stored on an NTFS drive.
-func Test__inaccessible_internal_file_is_not_hashed(t *testing.T) {
+func Test__inaccessible_internal_file_is_not_hashed_and_is_logged(t *testing.T) {
 	f, err := ioutil.TempFile("testdata/e/f", "inaccessible")
 	require.NoError(t, err)
 	defer func() {
@@ -332,9 +345,11 @@ func Test__inaccessible_internal_file_is_not_hashed(t *testing.T) {
 		},
 		EmptyFiles: []string{"g"},
 	}
+	buf := testutil.LogBuffer()
 	res, err := Run(root, NoSkip, nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
+	assert.Equal(t, fmt.Sprintf("error: cannot hash file %q: cannot open file: access denied\n", filepath.Clean(f.Name())), buf.String())
 }
 
 // On Windows, this test only works if the repository is stored on an NTFS drive.
@@ -478,6 +493,7 @@ func Test__cache_entry_with_hash_0_is_ignored(t *testing.T) {
 }
 
 // DISABLED on Windows and macOS (on GitHub) for the same reasons as 'Test__inaccessible_root_is_skipped'.
+// TODO Why is this test so complex? Does/should it test more than just logging?
 func Test__hash_computed_as_0_is_logged(t *testing.T) {
 	//goland:noinspection GoBoolExpressions
 	if testutil.CI() == "github" && runtime.GOOS != "linux" {
@@ -519,48 +535,50 @@ func Test__hash_computed_as_0_is_logged(t *testing.T) {
 }
 
 // DISABLED on Windows: Creating symlinks require elevated privileges.
-func Test__root_symlink_is_followed(t *testing.T) {
+func Test__root_symlink_is_followed_and_logged(t *testing.T) {
 	//goland:noinspection GoBoolExpressions
 	if runtime.GOOS == "windows" {
 		return // skip test
 	}
-	symlinkName := "test_root-symlink"
+	symlinkTarget := "testdata/e/f"
+	symlink := "test_root-symlink"
 
-	err := os.Symlink("testdata/e/f", symlinkName)
+	err := os.Symlink(symlinkTarget, symlink)
 	require.NoError(t, err)
 	defer func() {
-		err := os.Remove(symlinkName)
+		err := os.Remove(symlink)
 		assert.NoError(t, err)
 	}()
 	want := &Dir{
-		Name:       symlinkName,
+		Name:       symlink,
 		Files:      []*File{testdata_e_f_a},
 		EmptyFiles: []string{"g"},
 	}
-	res, err := Run(symlinkName, NoSkip, nil)
+	buf := testutil.LogBuffer()
+	res, err := Run(symlink, NoSkip, nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
+	assert.Equal(t, fmt.Sprintf("following root symlink %q to %q\n", symlink, symlinkTarget), buf.String())
 }
 
 // DISABLED on Windows: Creating symlinks require elevated privileges.
-func Test__root_indirect_symlink_is_followed(t *testing.T) {
+func Test__root_indirect_symlink_is_followed_and_logged(t *testing.T) {
 	//goland:noinspection GoBoolExpressions
 	if runtime.GOOS == "windows" {
 		return // skip test
 	}
+	symlinkTarget := "testdata/e/f"
 	indirectSymlink := "test_indirect-root-symlink"
 	symlink := "test-symlink"
 
-	err := os.Symlink(symlink, indirectSymlink)
+	err := os.Symlink(symlinkTarget, symlink)
 	require.NoError(t, err)
-	err = os.Symlink("testdata/e/f", symlink)
+	err = os.Symlink(symlink, indirectSymlink)
 	require.NoError(t, err)
 	defer func() {
 		err := os.Remove(indirectSymlink)
 		assert.NoError(t, err)
-	}()
-	defer func() {
-		err := os.Remove(symlink)
+		err = os.Remove(symlink)
 		assert.NoError(t, err)
 	}()
 	want := &Dir{
@@ -568,13 +586,15 @@ func Test__root_indirect_symlink_is_followed(t *testing.T) {
 		Files:      []*File{testdata_e_f_a},
 		EmptyFiles: []string{"g"},
 	}
+	buf := testutil.LogBuffer()
 	res, err := Run(indirectSymlink, NoSkip, nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
+	assert.Equal(t, fmt.Sprintf("following root symlink %q to %q\n", indirectSymlink, symlinkTarget), buf.String())
 }
 
 // DISABLED on Windows: Creating symlinks require elevated privileges.
-func Test__internal_symlink_is_skipped(t *testing.T) {
+func Test__internal_symlink_is_skipped_and_logged(t *testing.T) {
 	//goland:noinspection GoBoolExpressions
 	if runtime.GOOS == "windows" {
 		return // skip test
@@ -594,9 +614,11 @@ func Test__internal_symlink_is_skipped(t *testing.T) {
 		Files:      []*File{testdata_e_f_a}, // doesn't include the symlink as file nor the dir it points at
 		EmptyFiles: []string{"g"},
 	}
+	buf := testutil.LogBuffer()
 	res, err := Run(root, NoSkip, nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
+	assert.Equal(t, fmt.Sprintf("skipping symlink %q during scan\n", symlink), buf.String())
 }
 
 // DISABLED on Windows: Creating symlinks require elevated privileges.

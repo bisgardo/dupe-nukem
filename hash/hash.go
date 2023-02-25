@@ -19,7 +19,7 @@ func File(path string) (uint64, error) {
 	}
 	defer func() {
 		if err := f.Close(); err != nil {
-			log.Printf("error: cannot close file %q: %v\n", path, err)
+			log.Printf("error: cannot close file %q: %v\n", path, err) // cannot test
 		}
 	}()
 	return Reader(f)
@@ -29,5 +29,5 @@ func File(path string) (uint64, error) {
 func Reader(r io.Reader) (uint64, error) {
 	h := fnv.New64a() // is just a *uint64 internally
 	n, err := io.Copy(h, r)
-	return h.Sum64(), errors.Wrapf(err, "read error after %d bytes", n)
+	return h.Sum64(), errors.Wrapf(err, "read error after %d bytes", n) // cannot test
 }

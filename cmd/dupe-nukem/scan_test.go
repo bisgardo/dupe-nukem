@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -136,34 +138,55 @@ func Test__loadCacheDir_empty_loads_nil(t *testing.T) {
 	assert.Nil(t, res)
 }
 
-func Test__loadCacheDir_loads_scan_format(t *testing.T) {
-	f := "testdata/cache1.json"
-	want := &scan.Dir{
-		Name: "x",
-		Dirs: []*scan.Dir{
-			{
-				Name: "y",
-				Files: []*scan.File{
-					{Name: "a", Size: 21, Hash: 42},
-					{Name: "b", Size: 53, Hash: 0},
-				},
-			},
-		},
-		Files: []*scan.File{
-			{Name: "c", Size: 11, Hash: 11},
-		},
-	}
-	res, err := loadScanDirCacheFile(f)
+func Test__loadScanDirCacheFile_logs_file_before_and_after_loading(t *testing.T) {
+	f := "testdata/cache2.json.gz"
+	buf := testutil.LogBuffer()
+	_, err := loadScanDirCacheFile(f)
 	require.NoError(t, err)
-	assert.Equal(t, want, res)
+	ls := strings.Split(buf.String(), "\n")
+	assert.Len(t, ls, 3)
+	assert.Equal(t, "loading scan cache file \"testdata/cache2.json.gz\"...", ls[0])
+	assert.Regexp(t, "^scan cache loaded successfully from \"testdata/cache2.json.gz\" in [\\w.]+s$", ls[1])
+	assert.Empty(t, ls[2])
 }
 
-func Test__loadCacheDir_loads_compressed_scan_format(t *testing.T) {
-	f := "testdata/cache2.json.gz"
-	want := &scan.Dir{Name: "y"}
-	res, err := loadScanDirCacheFile(f)
+func Test__loadScanDirCacheFile_logs_nonexistent_file_before_loading(t *testing.T) {
+	f := "testdata/nonexistent-cache"
+	buf := testutil.LogBuffer()
+	_, err := loadScanDirCacheFile(f)
+	require.Error(t, err)
+	ls := strings.Split(buf.String(), "\n")
+	assert.Len(t, ls, 2)
+	assert.Equal(t, "loading scan cache file \"testdata/nonexistent-cache\"...", ls[0])
+	assert.Empty(t, ls[1])
+}
+
+func Test__loadScanDirCacheFile_wraps_invalid_cache_error(t *testing.T) {
+	f, err := ioutil.TempFile("", "invalid")
 	require.NoError(t, err)
-	assert.Equal(t, want, res)
+	defer func() {
+		err := os.Remove(f.Name())
+		assert.NoError(t, err)
+	}()
+	_, err = f.WriteString(`{"name":"x","empty_files":["b","a"]}`)
+	require.NoError(t, err)
+	err = f.Close()
+	assert.NoError(t, err)
+
+	_, err = loadScanDirCacheFile(f.Name())
+	assert.EqualError(t, err, `invalid cache contents: list of empty files in directory "x" is not sorted: "a" on index 1 should come before "b" on index 0`)
+}
+
+func Test__Scan_wraps_invalid_dir_error(t *testing.T) {
+	dir, err := os.Getwd()
+	require.NoError(t, err)
+	_, err = Scan(string([]byte{0}), "", "")
+	want := fmt.Sprintf("invalid root directory \"%s/\\x00\": invalid argument (lstat)", dir)
+	if runtime.GOOS == "windows" {
+		// On Windows this case actually test that Scan does *not* wrap "unable to resolve absolute path" error.
+		want = "cannot resolve absolute path of \"\\x00\": invalid argument"
+	}
+	assert.EqualError(t, err, want)
 }
 
 func Test__Scan_wraps_cache_file_not_found_error(t *testing.T) {
@@ -303,6 +326,8 @@ func Test__checkCache_logs_warning_on_hash_0(t *testing.T) {
 	assert.Equal(t, "warning: file \"a\" is cached with hash 0 - this hash will be ignored\n", buf.String())
 }
 
+// TODO Add test that demonstrates that the cache is loaded/used by letting the cache data *not* match the actual files.
+
 func Test__scan_testdata(t *testing.T) {
 	root := "testdata"
 	want := &scan.Dir{
@@ -331,4 +356,23 @@ func Test__scan_testdata_with_trailing_slash(t *testing.T) {
 	res, err := Scan(root, "", "")
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
+}
+
+func Test__scan_logs_absolute_path_of_relative_dir(t *testing.T) {
+	dir := "./testdata"
+	absDir, err := filepath.Abs(dir)
+	require.NoError(t, err)
+	buf := testutil.LogBuffer()
+	_, err = Scan(dir, "", "")
+	require.NoError(t, err)
+	assert.Equal(t, fmt.Sprintf("absolute path of %q resolved to %q\n", dir, absDir), buf.String())
+}
+
+func Test__scan_does_not_log_absolute_dir_path(t *testing.T) {
+	absDir, err := filepath.Abs("./testdata")
+	require.NoError(t, err)
+	buf := testutil.LogBuffer()
+	_, err = Scan(absDir, "", "")
+	require.NoError(t, err)
+	assert.Empty(t, buf.String())
 }
