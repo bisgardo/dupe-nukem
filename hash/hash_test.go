@@ -2,6 +2,7 @@ package hash
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"runtime"
@@ -34,11 +35,16 @@ func Test__hash_dir_fails(t *testing.T) {
 	// The function should never be called with a directory (all current callers check this beforehand),
 	// so it doesn't really matter that the error message sucks.
 	//goland:noinspection GoBoolExpressions
+	wantReason := "is a directory"
 	if runtime.GOOS == "windows" {
-		assert.EqualError(t, err, "read error after 0 bytes: read testdata: The handle is invalid.")
-	} else {
-		assert.EqualError(t, err, "read error after 0 bytes: read testdata: is a directory")
+		if runtime.Version() < "go1.20" {
+			wantReason = "The handle is invalid."
+		} else {
+			// Incredible that they managed to change the message into an even less accurate one.
+			wantReason = "Incorrect function."
+		}
 	}
+	assert.EqualError(t, err, fmt.Sprintf("read error after 0 bytes: read testdata: %s", wantReason))
 }
 
 func Test__hash_inaccessible_file_fails(t *testing.T) {

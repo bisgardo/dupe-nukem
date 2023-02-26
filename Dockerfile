@@ -1,4 +1,4 @@
-ARG build_image=golang:1.17-bullseye
+ARG build_image=golang:1.20-bullseye
 ARG base_image=debian:bullseye-slim
 
 FROM ${build_image} AS build
