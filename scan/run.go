@@ -61,7 +61,7 @@ func SkipNameSet(names map[string]struct{}) ShouldSkipPath {
 func Run(root string, shouldSkip ShouldSkipPath, cache *Dir) (*Result, error) {
 	rootPath, err := resolveRoot(root)
 	if err != nil {
-		return nil, errors.Wrapf(util.IOError(err), "invalid root directory %q", root)
+		return nil, errors.Wrapf(util.CleanIOError(err), "invalid root directory %q", root)
 	}
 	if cache != nil && cache.Name != rootPath {
 		// While there's no technical reason for this requirement,
@@ -132,21 +132,23 @@ func run(rootPath string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, error) {
 		// Propagate error and skip root.
 		if err != nil || path == rootPath {
 			modeName := util.FileInfoModeName(info)
-			switch {
-			case os.IsPermission(err):
+			err := util.CleanIOError(err)
+			if errors.Is(err, util.ErrNotFound) {
+				// TODO: Can maybe test on Windows (with too long path)?
+				log.Printf("error: %v %q not found\n", modeName, path) // cannot test
+				return nil
+			}
+			if errors.Is(err, util.ErrAccessDenied) {
 				log.Printf("skipping inaccessible %v %q\n", modeName, path)
 				// TODO: Should return 'filepath.SkipDir' to skip children?
 				return nil
-			case os.IsNotExist(err):
-				// TODO: Can maybe test on Windows (with too long path)?
-				log.Printf("error: %v %q not found\n", modeName, path) // cannot test
 			}
 			// TODO: Should be able to test
 			//       - creating a file with an invalid timestamp (use 'os.Chtimes(filename, time.Unix(0, 0), time.Unix(0, 0))')
 			//       - setting the file descriptor limit to a value lower than the number of files in a directory
 			//         (use 'syscall.Setrlimit(syscall.RLIMIT_NOFILE, &rLimit)')
 			//       These approaches should also be useful for testing other things currently deemed "cannot test".
-			return errors.Wrapf(util.IOError(err), "cannot walk %v %q", modeName, path) // cannot test
+			return errors.Wrapf(err, "cannot walk %v %q", modeName, path) // cannot test
 		}
 		parentPath := filepath.Dir(path)
 

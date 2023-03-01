@@ -21,7 +21,7 @@ func New() hash.Hash64 {
 func File(path string) (uint64, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return 0, errors.Wrap(util.IOError(err), "cannot open file") // caller wraps path
+		return 0, errors.Wrap(util.CleanIOError(err), "cannot open file") // caller wraps path
 	}
 	defer func() {
 		if err := f.Close(); err != nil {

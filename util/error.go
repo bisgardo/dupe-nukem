@@ -9,17 +9,19 @@ import (
 )
 
 var (
-	errNotFound     = fmt.Errorf("not found")
-	errAccessDenied = fmt.Errorf("access denied")
+	// ErrNotFound indicates that a file doesn't exist.
+	ErrNotFound = fmt.Errorf("not found")
+	// ErrAccessDenied indicates that a file isn't accessible.
+	ErrAccessDenied = fmt.Errorf("access denied")
 )
 
-// IOError replaces "file does not exist" and "permission denied" errors with simpler, constant ones.
-func IOError(err error) error {
+// CleanIOError rewrites "file does not exist" and "permission denied" errors with simpler ones.
+func CleanIOError(err error) error {
 	if errors.Is(err, os.ErrNotExist) {
-		return errNotFound
+		return ErrNotFound
 	}
 	if errors.Is(err, os.ErrPermission) {
-		return errAccessDenied
+		return ErrAccessDenied
 	}
 	var pathErr *os.PathError
 	if errors.As(err, &pathErr) {
@@ -28,8 +30,8 @@ func IOError(err error) error {
 	return err
 }
 
-// JSONError rewrites JSON decoding errors into more concise, platform-independent ones.
-func JSONError(err error) error {
+// CleanJSONError rewrites JSON decoding errors into more concise, platform-independent ones.
+func CleanJSONError(err error) error {
 	var jsonErr *json.UnmarshalTypeError
 	if errors.As(err, &jsonErr) {
 		return errors.Errorf(
