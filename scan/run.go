@@ -12,7 +12,7 @@ import (
 	"github.com/bisgardo/dupe-nukem/util"
 )
 
-// ShouldSkipPath is a function for determining if a given path
+// ShouldSkipPath is a function for determining whether a given path
 // should be skipped when walking a file tree.
 type ShouldSkipPath func(dir, name string) bool
 
@@ -21,8 +21,10 @@ func NoSkip(string, string) bool {
 	return false
 }
 
+var _ ShouldSkipPath = NoSkip // declare that NoSkip conforms to ShouldSkipPath
+
 // SkipNameSet constructs a ShouldSkipPath which returns true
-// when the base name matches any of the names in the provided set.
+// if the base name matches any of the names in the provided set.
 func SkipNameSet(names map[string]struct{}) ShouldSkipPath {
 	return func(dir, name string) bool {
 		_, ok := names[name]
@@ -31,11 +33,11 @@ func SkipNameSet(names map[string]struct{}) ShouldSkipPath {
 }
 
 // Run runs the "scan" command with all arguments provided.
-// If the root is a symlink, this link is traversed recursively.
+// If the root is a symlink, then this link is traversed recursively.
 // The root name of the scan result keeps the name of the original symlink.
 // The following sanity checks are performed:
 // - The root directory must not be skipped.
-// - If a cache is provided, it's root must have the same name as the provided root.
+// - If a cache is provided, its root must have the same name as the provided root.
 // - The root is an existing directory.
 func Run(root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, error) {
 	rootName := filepath.Base(root)
@@ -102,16 +104,17 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 			switch {
 			case os.IsPermission(err):
 				log.Printf("skipping inaccessible %v %q\n", modeName, path)
-				// TODO Should return 'filepath.SkipDir' to skip children?
+				// TODO: Should return 'filepath.SkipDir' to skip children?
 				return nil
 			case os.IsNotExist(err):
-				// TODO Can maybe test on Windows (with too long path)?
+				// TODO: Can maybe test on Windows (with too long path)?
 				log.Printf("error: %v %q not found\n", modeName, path) // cannot test
 			}
-			// TODO Should be able to test
-			//      - creating a file with an invalid timestamp (use 'os.Chtimes(filename, time.Unix(0, 0), time.Unix(0, 0))')
-			//      - setting the file descriptor limit to a value lower than the number of files in a directory (use 'syscall.Setrlimit(syscall.RLIMIT_NOFILE, &rLimit)')
-			//      These approaches should also be useful for testing other things currently deemed "cannot test".
+			// TODO: Should be able to test
+			//       - creating a file with an invalid timestamp (use 'os.Chtimes(filename, time.Unix(0, 0), time.Unix(0, 0))')
+			//       - setting the file descriptor limit to a value lower than the number of files in a directory
+			//         (use 'syscall.Setrlimit(syscall.RLIMIT_NOFILE, &rLimit)')
+			//       These approaches should also be useful for testing other things currently deemed "cannot test".
 			return errors.Wrapf(util.SimplifyIOError(err), "cannot walk %v %q", modeName, path) // cannot test
 		}
 		parentPath := filepath.Dir(path)
@@ -143,14 +146,14 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 		} else if !mode.IsRegular() {
 			// File is a symlink, named pipe, socket, device, etc.
 			// We start by not supporting any of that.
-			// IDEA If symlink, print target (and whether it exists).
+			// IDEA: If symlink, print target (and whether it exists).
 			log.Printf("skipping %v %q during scan\n", util.FileModeName(mode), path)
 		} else if size := info.Size(); size == 0 {
 			head.curDir.appendEmptyFile(name) // Walk visits in lexical order
 		} else {
-			// IDEA Parallelize hash computation (via work queue for example).
-			// IDEA Consider adding option to hash a limited number of bytes only
-			//      (the reason being that if two files differ, the first 1MB or so probably differ too).
+			// IDEA: Parallelize hash computation (via work queue for example).
+			// IDEA: Consider adding option to hash a limited number of bytes only
+			//       (the reason being that if two files differ, the first 1MB or so probably differ too).
 			h := hashFromCache(head.cacheDir, name, size)
 			if h == 0 {
 				h, err = hash.File(path)
@@ -158,6 +161,7 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 					// Currently report error but keep going.
 					log.Printf("error: cannot hash file %q: %v\n", path, err)
 				} else if h == 0 {
+					// TODO: What warnings? And why?
 					log.Printf("info: hash of file %q evaluated to 0 - this might result in warnings which can be safely ignored\n", path)
 				}
 			}
@@ -175,6 +179,7 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 // There's intentionally no way to cache the hash if it happens to be actually 0.
 // This is deemed acceptable as this is expected to practically never happen.
 // If the cached file size doesn't match the expected one, the cache is considered missed as well.
+// TODO: Also check timestamp.
 func hashFromCache(cacheDir *Dir, fileName string, fileSize int64) uint64 {
 	f := safeFindFile(cacheDir, fileName)
 	if f != nil && f.Size == fileSize {

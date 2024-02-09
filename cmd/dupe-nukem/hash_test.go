@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -39,7 +38,7 @@ func Test__hash_wraps_file_error(t *testing.T) {
 	// This test is basically identical to 'Test__hash_inaccessible_file_fails' (in package 'hash'),
 	// but, as indicated by the test name, the purpose is slightly different:
 	// Hashing an inaccessible file just happens to be the easiest way to trigger an error.
-	f, err := ioutil.TempFile("", "")
+	f, err := os.CreateTemp("", "")
 	require.NoError(t, err)
 	filename := f.Name()
 	defer func() {

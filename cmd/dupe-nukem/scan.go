@@ -59,7 +59,7 @@ func loadShouldSkip(expr string) (scan.ShouldSkipPath, error) {
 }
 
 func parseSkipNames(input string) ([]string, error) {
-	if input == "" {
+	if len(input) == 0 {
 		return nil, nil
 	}
 	if input[0] == '@' {
@@ -71,7 +71,7 @@ func parseSkipNames(input string) ([]string, error) {
 }
 
 func parseSkipNameFile(path string) ([]string, error) {
-	// TODO Pass 'open' function (see comment in 'loadScanDirFile').
+	// TODO: Pass 'open' function (see comment in 'loadScanDirFile').
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, errors.Wrapf(util.SimplifyIOError(err), "cannot open file")
@@ -130,7 +130,7 @@ func loadScanDirCacheFile(path string) (*scan.Dir, error) {
 	if err != nil {
 		return nil, err
 	}
-	// TODO Unless it's too expensive, just sort lists instead of only validating?
+	// TODO: Unless it's too expensive, just sort lists instead of only validating?
 	if err := checkCache(scanDir); err != nil {
 		return nil, errors.Wrap(err, "invalid cache contents")
 	}
