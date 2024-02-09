@@ -9,15 +9,15 @@ import (
 )
 
 func main() {
-	// ANNOYANCE The description of cobra's default help command is upper case and cannot be changed
-	//           without doing the whole command ourselves (inconsistently, flags are lower case!).
-	//           So for now we follow the same convention.
-	//           Consider vendoring or finding a replacement for this library to fix this
-	//           and also get rid of all of its irrelevant dependencies.
-	// IDEA Require output file as a parameter rather than just using stdout.
-	//      Use the filename or an additional flag to add compression.
-	//      Use another flag to specify encryption password.
-	//      Also output a file with a cryptographic hash of the data structure (or include in the file?).
+	// ANNOYANCE: The description of cobra's default help command is upper case and cannot be changed
+	//            without doing the whole command ourselves (inconsistently, flags are lower case!).
+	//            So for now we follow the same convention.
+	//            Consider vendoring or finding a replacement for this library to fix this
+	//            and also get rid of all of its irrelevant dependencies.
+	// IDEA: Require output file as a parameter rather than just using stdout.
+	//       Use the filename or an additional flag to add compression.
+	//       Use another flag to specify encryption password.
+	//       Also output a file with a cryptographic hash of the data structure (or include in the file?).
 	rootCmd := &cobra.Command{Use: "dupe-nukem", SilenceUsage: true, SilenceErrors: true}
 	hashCmd := &cobra.Command{
 		Use:   "hash",

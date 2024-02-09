@@ -62,7 +62,7 @@ func (d *Dir) appendSkippedDir(dirName string) {
 	d.SkippedDirs = append(d.SkippedDirs, dirName)
 }
 
-// TODO Add function for validating (or ensuring?) that the lists are indeed ordered correctly.
+// TODO: Add function for validating (or ensuring?) that the lists are indeed ordered correctly.
 
 // File represents a file as a name, size, and fnv hash.
 type File struct {
@@ -81,12 +81,12 @@ func NewFile(name string, size int64, hash uint64) *File {
 }
 
 // safeFindDir looks for a Dir with the given name in the subdirectory list of the given Dir.
-// Returns nil if the Dir is nil.
+// Returns nil if the Dir is nil or doesn't have a subdirectory with that name.
 func safeFindDir(d *Dir, name string) *Dir {
 	if d == nil {
 		return nil
 	}
-	// TODO Use binary search.
+	// TODO: Use binary search.
 	for _, s := range d.Dirs {
 		if s.Name == name {
 			return s
@@ -96,12 +96,12 @@ func safeFindDir(d *Dir, name string) *Dir {
 }
 
 // safeFindFile looks for a File with the given name in the file list of the given Dir.
-// Returns nil if the Dir is nil.
+// Returns nil if the Dir is nil or doesn't have a file with that name.
 func safeFindFile(d *Dir, name string) *File {
 	if d == nil {
 		return nil
 	}
-	// TODO Use binary search.
+	// TODO: Use binary search.
 	for _, f := range d.Files {
 		if f.Name == name {
 			return f
