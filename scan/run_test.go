@@ -13,6 +13,24 @@ import (
 	"github.com/bisgardo/dupe-nukem/testutil"
 )
 
+func makeTestData(t *testing.T) (string, func()) {
+	testdataDir, err := os.MkdirTemp("", "testdata")
+	require.NoError(t, err)
+	require.NoError(t, os.Mkdir(fmt.Sprintf("%v/b", testdataDir), 0755))
+	require.NoError(t, os.Mkdir(fmt.Sprintf("%v/e", testdataDir), 0755))
+	require.NoError(t, os.Mkdir(fmt.Sprintf("%v/e/f", testdataDir), 0755))
+
+	require.NoError(t, os.WriteFile(fmt.Sprintf("%v/a", testdataDir), []byte("x\n"), 0644))
+	require.NoError(t, os.WriteFile(fmt.Sprintf("%v/c", testdataDir), []byte("y\n"), 0644))
+	require.NoError(t, os.WriteFile(fmt.Sprintf("%v/b/d", testdataDir), []byte("x\n"), 0644))
+	require.NoError(t, os.WriteFile(fmt.Sprintf("%v/e/f/a", testdataDir), []byte("z\n"), 0644))
+	require.NoError(t, os.WriteFile(fmt.Sprintf("%v/e/f/g", testdataDir), []byte(""), 0644))
+
+	return testdataDir, func() {
+		require.NoError(t, os.RemoveAll(testdataDir))
+	}
+}
+
 // Working dir for tests is the directory containing the file.
 
 // TODO: Figure out how to test symlinks on Windows:
@@ -108,9 +126,11 @@ func Test__inaccessible_root_is_skipped(t *testing.T) {
 }
 
 func Test__testdata_no_skip(t *testing.T) {
-	root := "testdata"
+	root, cleanup := makeTestData(t)
+	defer cleanup()
+
 	want := &Dir{
-		Name: "testdata",
+		Name: filepath.Base(root),
 		Dirs: []*Dir{
 			{
 				Name:  "b",
