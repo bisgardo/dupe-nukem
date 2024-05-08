@@ -1,7 +1,6 @@
 package main
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -12,7 +11,7 @@ import (
 )
 
 func Test__resolveReader_rejects_invalid_compressed_scan_file(t *testing.T) {
-	f, err := ioutil.TempFile("", "invalid-*.gz") // the '*' is swapped out for gibberish instead of it being appended after the '.gz'
+	f, err := os.CreateTemp("", "invalid-*.gz") // the '*' is swapped out for gibberish instead of it being appended after the '.gz'
 	require.NoError(t, err)
 	defer func() {
 		err := f.Close()
@@ -60,7 +59,7 @@ func Test__loadScanDirFile_loads_compressed_scan_file(t *testing.T) {
 }
 
 func Test__loadScanDirFile_wraps_scan_file_error(t *testing.T) {
-	f, err := ioutil.TempFile("", "invalid-*.gz") // the '*' is swapped out for gibberish instead of it being appended after the '.gz'
+	f, err := os.CreateTemp("", "invalid-*.gz") // the '*' is swapped out for gibberish instead of it being appended after the '.gz'
 	require.NoError(t, err)
 	defer func() {
 		err := f.Close()

@@ -2,7 +2,6 @@ package scan
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -16,13 +15,13 @@ import (
 
 // Working dir for tests is the directory containing the file.
 
-// TODO Figure out how to test symlinks on Windows:
-//      - Create specialized tests that need to be run manually as administrator.
-//      - Handle/test Windows-specific features: shortcuts, junctions.
-// TODO Test logged output whenever it's relevant.
+// TODO: Figure out how to test symlinks on Windows:
+//       - Create specialized tests that need to be run manually as administrator.
+//       - Handle/test Windows-specific features: shortcuts, junctions.
+// TODO: Test logged output whenever it's relevant.
 
 func Test__empty_dir(t *testing.T) {
-	dir, err := ioutil.TempDir("", "empty")
+	dir, err := os.MkdirTemp("", "empty")
 	require.NoError(t, err)
 	defer func() {
 		err := os.Remove(dir)
@@ -61,7 +60,7 @@ func Test__nonexistent_dir_fails(t *testing.T) {
 }
 
 func Test__file_root_fails(t *testing.T) {
-	f, err := ioutil.TempFile("", "root")
+	f, err := os.CreateTemp("", "root")
 	require.NoError(t, err)
 	defer func() {
 		err := os.Remove(f.Name())
@@ -88,7 +87,7 @@ func Test__inaccessible_root_is_skipped(t *testing.T) {
 	if testutil.CI() == "github" && runtime.GOOS != "linux" {
 		return // skip test
 	}
-	d, err := ioutil.TempDir("", "inaccessible")
+	d, err := os.MkdirTemp("", "inaccessible")
 	require.NoError(t, err)
 	defer func() {
 		err := os.Remove(d)
@@ -316,7 +315,7 @@ func Test__testdata_trailing_slash_gets_removed(t *testing.T) {
 
 // On Windows, this test only works if the repository is stored on an NTFS drive.
 func Test__inaccessible_internal_file_is_not_hashed_and_is_logged(t *testing.T) {
-	f, err := ioutil.TempFile("testdata/e/f", "inaccessible")
+	f, err := os.CreateTemp("testdata/e/f", "inaccessible")
 	require.NoError(t, err)
 	defer func() {
 		err := os.Remove(f.Name())
@@ -354,7 +353,7 @@ func Test__inaccessible_internal_file_is_not_hashed_and_is_logged(t *testing.T) 
 
 // On Windows, this test only works if the repository is stored on an NTFS drive.
 func Test__inaccessible_internal_dir_is_logged(t *testing.T) {
-	d, err := ioutil.TempDir("testdata/e/f", "inaccessible")
+	d, err := os.MkdirTemp("testdata/e/f", "inaccessible")
 	require.NoError(t, err)
 	defer func() {
 		err := os.Remove(d)
@@ -493,7 +492,7 @@ func Test__cache_entry_with_hash_0_is_ignored(t *testing.T) {
 }
 
 // DISABLED on Windows and macOS (on GitHub) for the same reasons as 'Test__inaccessible_root_is_skipped'.
-// TODO Why is this test so complex? Does/should it test more than just logging?
+// TODO: Why is this test so complex? Does/should it test more than just logging?
 func Test__hash_computed_as_0_is_logged(t *testing.T) {
 	//goland:noinspection GoBoolExpressions
 	if testutil.CI() == "github" && runtime.GOOS != "linux" {
@@ -502,14 +501,14 @@ func Test__hash_computed_as_0_is_logged(t *testing.T) {
 
 	v := "77kepQFQ8Kl" // from 'https://md5hashing.net/hash/fnv1a64/0000000000000000'
 
-	d, err := ioutil.TempDir("", "hash0")
+	d, err := os.MkdirTemp("", "hash0")
 	require.NoError(t, err)
 	defer func() {
 		err := os.Remove(d)
 		assert.NoError(t, err)
 	}()
 
-	f, err := ioutil.TempFile(d, "hash0")
+	f, err := os.CreateTemp(d, "hash0")
 	require.NoError(t, err)
 	defer func() {
 		err := os.Remove(f.Name())

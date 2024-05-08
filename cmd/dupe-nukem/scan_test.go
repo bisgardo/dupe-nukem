@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -40,7 +39,7 @@ func Test__parseSkipNames_with_at_prefix_splits_file_on_newline(t *testing.T) {
 }
 
 func Test__parseSkipNames_file_with_length_255_is_allowed(t *testing.T) {
-	f, err := ioutil.TempFile("", "allowed-skipnames")
+	f, err := os.CreateTemp("", "allowed-skipnames")
 	require.NoError(t, err)
 	defer func() {
 		err := os.Remove(f.Name())
@@ -65,7 +64,7 @@ func Test__parseSkipNames_file_with_length_255_is_allowed(t *testing.T) {
 // in the valid cases.
 
 func Test__loadShouldSkip_file_with_length_256_fails(t *testing.T) {
-	f, err := ioutil.TempFile("", "long-skipnames")
+	f, err := os.CreateTemp("", "long-skipnames")
 	require.NoError(t, err)
 	defer func() {
 		err := os.Remove(f.Name())
@@ -83,7 +82,7 @@ func Test__loadShouldSkip_file_with_length_256_fails(t *testing.T) {
 }
 
 func Test__loadShouldSkip_file_with_invalid_line_fails(t *testing.T) {
-	f, err := ioutil.TempFile("", "invalid-skipnames")
+	f, err := os.CreateTemp("", "invalid-skipnames")
 	require.NoError(t, err)
 	defer func() {
 		err := os.Remove(f.Name())
@@ -162,7 +161,7 @@ func Test__loadScanDirCacheFile_logs_nonexistent_file_before_loading(t *testing.
 }
 
 func Test__loadScanDirCacheFile_wraps_invalid_cache_error(t *testing.T) {
-	f, err := ioutil.TempFile("", "invalid")
+	f, err := os.CreateTemp("", "invalid")
 	require.NoError(t, err)
 	defer func() {
 		err := os.Remove(f.Name())
@@ -195,7 +194,7 @@ func Test__Scan_wraps_cache_file_not_found_error(t *testing.T) {
 }
 
 func Test__Scan_wraps_cache_file_not_accessible_error(t *testing.T) {
-	f, err := ioutil.TempFile("", "inaccessible")
+	f, err := os.CreateTemp("", "inaccessible")
 	require.NoError(t, err)
 	defer func() {
 		err := os.Remove(f.Name())
@@ -210,7 +209,7 @@ func Test__Scan_wraps_cache_file_not_accessible_error(t *testing.T) {
 }
 
 func Test__Scan_wraps_cache_load_error(t *testing.T) {
-	f, err := ioutil.TempFile("", "malformed")
+	f, err := os.CreateTemp("", "malformed")
 	require.NoError(t, err)
 	defer func() {
 		err := os.Remove(f.Name())
@@ -326,7 +325,7 @@ func Test__checkCache_logs_warning_on_hash_0(t *testing.T) {
 	assert.Equal(t, "warning: file \"a\" is cached with hash 0 - this hash will be ignored\n", buf.String())
 }
 
-// TODO Add test that demonstrates that the cache is loaded/used by letting the cache data *not* match the actual files.
+// TODO: Add test that demonstrates that the cache is loaded/used by letting the cache data *not* match the actual files.
 
 func Test__scan_testdata(t *testing.T) {
 	root := "testdata"

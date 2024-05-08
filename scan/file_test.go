@@ -61,14 +61,20 @@ func Test__safeFindDir_finds_subdir(t *testing.T) {
 		name string
 		want *Dir
 	}{
-		{dir: testDir_x, name: "x", want: nil},
-		{dir: testDir_x, name: "y", want: testDir_y},
-		{dir: testDir_x, name: "r", want: testDir_r},
-		{dir: testDir_y, name: "y", want: nil},
-		{dir: testDir_y, name: "z", want: testDir_z},
-		{dir: testDir_z, name: "", want: nil},
-		{dir: testDir_r, name: "s", want: testDir_r.Dirs[0]},
-		{dir: testDir_r, name: "t", want: testDir_r.Dirs[1]},
+		{dir: testDir_x, name: "", want: nil},                // doesn't find garbage
+		{dir: testDir_x, name: "nonexistent", want: nil},     // doesn't find other garbage
+		{dir: testDir_x, name: "x", want: nil},               // doesn't find dir
+		{dir: testDir_x, name: "y", want: testDir_y},         // finds subdir 1/2
+		{dir: testDir_x, name: "r", want: testDir_r},         // finds subdir 2/2
+		{dir: testDir_x, name: "z", want: nil},               // doesn't find nested subdir
+		{dir: testDir_x, name: "a", want: nil},               // doesn't find file
+		{dir: testDir_x, name: "s", want: nil},               // doesn't find nested file (in "r")
+		{dir: testDir_y, name: "x", want: nil},               // doesn't find parent
+		{dir: testDir_y, name: "z", want: testDir_z},         // finds single subdir
+		{dir: testDir_z, name: "", want: nil},                // has no subdirs
+		{dir: testDir_z, name: "s", want: nil},               // has no subdirs
+		{dir: testDir_r, name: "s", want: testDir_r.Dirs[0]}, // finds subdir 1/2 (empty)
+		{dir: testDir_r, name: "t", want: testDir_r.Dirs[1]}, // finds subdir 2/2 (no subdirs)
 	}
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("%v/%v", test.dir.Name, test.name), func(t *testing.T) {
@@ -84,18 +90,13 @@ func Test__safeFindFile_finds_file(t *testing.T) {
 		name string
 		want *File
 	}{
-		{dir: testDir_x, name: "x", want: nil},
-		{dir: testDir_x, name: "a", want: testDir_x.Files[0]},
-		{dir: testDir_x, name: "b", want: testDir_x.Files[1]},
-		{dir: testDir_x, name: "c", want: testDir_x.Files[2]},
-
-		{dir: testDir_y, name: "y", want: nil},
-		{dir: testDir_y, name: "r", want: testDir_y.Files[0]},
-		{dir: testDir_y, name: "s", want: testDir_y.Files[1]},
-
-		{dir: testDir_z, name: "", want: nil},
-		{dir: testDir_z, name: "a", want: testDir_z.Files[0]},
-		{dir: testDir_z, name: "b", want: testDir_z.Files[1]},
+		{dir: testDir_x, name: "", want: nil},                 // doesn't find garbage
+		{dir: testDir_x, name: "nonexistent", want: nil},      // doesn't find other garbage
+		{dir: testDir_x, name: "x", want: nil},                // doesn't find dir
+		{dir: testDir_x, name: "y", want: nil},                // doesn't find subdir
+		{dir: testDir_x, name: "a", want: testDir_x.Files[0]}, // finds file 1/3
+		{dir: testDir_x, name: "b", want: testDir_x.Files[1]}, // finds file 2/3
+		{dir: testDir_x, name: "c", want: testDir_x.Files[2]}, // finds file 3/3
 	}
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("%v/%v", test.dir.Name, test.name), func(t *testing.T) {

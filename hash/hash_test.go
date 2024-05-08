@@ -3,7 +3,6 @@ package hash
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"runtime"
 	"testing"
@@ -28,7 +27,7 @@ func Test__hash_file(t *testing.T) {
 	assert.Equal(t, uint64(644258871406045975), res)
 }
 
-// TODO Test other kinds of (broken) files.
+// TODO: Test other kinds of (broken) files.
 func Test__hash_dir_fails(t *testing.T) {
 	_, err := File("testdata")
 
@@ -50,7 +49,7 @@ func Test__hash_dir_fails(t *testing.T) {
 func Test__hash_inaccessible_file_fails(t *testing.T) {
 	// This test is basically identical to 'Test__hash_wraps_file_error' (in package 'main'),
 	// but the purpose is slightly different (as indicated by the test name).
-	f, err := ioutil.TempFile("", "")
+	f, err := os.CreateTemp("", "")
 	require.NoError(t, err)
 	filename := f.Name()
 	defer func() {

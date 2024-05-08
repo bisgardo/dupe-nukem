@@ -9,8 +9,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-// TODO Use build flags instead of checking OS on runtime?
-// TODO Should ideally return cleanup function for reverting the change?
+// TODO: Use build flags instead of checking OS on runtime?
+// TODO: Should ideally return cleanup function for reverting the change?
 
 // MakeFileInaccessible makes the provided file non-readable to the user
 // running the test.

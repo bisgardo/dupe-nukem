@@ -16,7 +16,7 @@ import (
 )
 
 func resolveReader(f *os.File) (io.Reader, error) {
-	// TODO Read magic number instead of extension.
+	// TODO: Read magic number instead of extension.
 	if strings.HasSuffix(f.Name(), ".gz") {
 		return gzip.NewReader(f)
 	}
@@ -24,7 +24,7 @@ func resolveReader(f *os.File) (io.Reader, error) {
 }
 
 func loadScanDirFile(path string) (*scan.Dir, error) {
-	// TODO Pass in 'open' function to enable tests to return error, create fake file, disallow closing, etc.
+	// TODO: Pass in 'open' function to enable tests to return error, create fake file, disallow closing, etc.
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, errors.Wrap(util.SimplifyIOError(err), "cannot open file")
