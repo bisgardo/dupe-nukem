@@ -72,7 +72,7 @@ func Test__safeFindDir_finds_subdir(t *testing.T) {
 		{dir: testDir_y, name: "x", want: nil},               // doesn't find parent
 		{dir: testDir_y, name: "z", want: testDir_z},         // finds single subdir
 		{dir: testDir_z, name: "", want: nil},                // has no subdirs
-		{dir: testDir_z, name: "", want: nil},                // has no subdirs
+		{dir: testDir_z, name: "s", want: nil},               // has no subdirs
 		{dir: testDir_r, name: "s", want: testDir_r.Dirs[0]}, // finds subdir 1/2 (empty)
 		{dir: testDir_r, name: "t", want: testDir_r.Dirs[1]}, // finds subdir 2/2 (no subdirs)
 	}
