@@ -13,7 +13,7 @@ import (
 	"github.com/bisgardo/dupe-nukem/testutil"
 )
 
-// Working dir for tests is the directory containing the file.
+// NOTE: Working dir for tests is the directory containing the file.
 
 // TODO: Figure out how to test symlinks on Windows:
 //       - Create specialized tests that need to be run manually as administrator.
