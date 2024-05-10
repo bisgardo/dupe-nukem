@@ -72,21 +72,7 @@ func Test__file_root_fails(t *testing.T) {
 	assert.EqualError(t, err, fmt.Sprintf("invalid root directory %q: not a directory", f.Name()))
 }
 
-// DISABLED on Windows and macOS (on GitHub): This test only works as expected on the Linux setup of GitHub Actions.
-// The reason is that on the other platforms, the project is checked out on a symlinked path which
-// gets resolved by dupe-nukem.
-// This causes another log entry to be emitted and also the symlinked path (which is not known in advance) to be used.
-// We cannot (or shouldn't at least) control how GitHub Actions sets up the project as that is internal
-// to their infrastructure.
-// It's also possible that we can/should avoid resolving symlinks in cases like this...
-// The fact that the test passes on Linux and Windows (tested locally) gives reasonable confidence
-// that the functionality really is correct on all platforms - the test just needs to be set up some other way.
-// But the encountered case (that inaccessible symlinked root should be skipped) should be properly tested as well!
 func Test__inaccessible_root_is_skipped(t *testing.T) {
-	//goland:noinspection GoBoolExpressions
-	if testutil.CI() == "github" && runtime.GOOS != "linux" {
-		return // skip test
-	}
 	d, err := os.MkdirTemp("", "inaccessible")
 	require.NoError(t, err)
 	defer func() {
@@ -100,11 +86,13 @@ func Test__inaccessible_root_is_skipped(t *testing.T) {
 		assert.NoError(t, err)
 	}()
 
-	buf := testutil.LogBuffer()
-	res, err := Run(d, NoSkip, nil)
+	root, err := filepath.EvalSymlinks(d) // on macOS tmp paths are symlinked
 	require.NoError(t, err)
-	assert.Equal(t, &Dir{Name: filepath.Base(d)}, res)
-	assert.Equal(t, fmt.Sprintf("skipping inaccessible directory %q\n", d), buf.String())
+	buf := testutil.LogBuffer()
+	res, err := Run(root, NoSkip, nil)
+	require.NoError(t, err)
+	assert.Equal(t, &Dir{Name: filepath.Base(root)}, res)
+	assert.Equal(t, fmt.Sprintf("skipping inaccessible directory %q\n", root), buf.String())
 }
 
 func Test__testdata_no_skip(t *testing.T) {
@@ -491,14 +479,7 @@ func Test__cache_entry_with_hash_0_is_ignored(t *testing.T) {
 	assert.Equal(t, want, res)
 }
 
-// DISABLED on Windows and macOS (on GitHub) for the same reasons as 'Test__inaccessible_root_is_skipped'.
-// TODO: Why is this test so complex? Does/should it test more than just logging?
 func Test__hash_computed_as_0_is_logged(t *testing.T) {
-	//goland:noinspection GoBoolExpressions
-	if testutil.CI() == "github" && runtime.GOOS != "linux" {
-		return // skip test
-	}
-
 	v := "77kepQFQ8Kl" // from 'https://md5hashing.net/hash/fnv1a64/0000000000000000'
 
 	d, err := os.MkdirTemp("", "hash0")
@@ -519,18 +500,22 @@ func Test__hash_computed_as_0_is_logged(t *testing.T) {
 	err = f.Close()
 	assert.NoError(t, err)
 	buf := testutil.LogBuffer()
-	res, err := Run(d, NoSkip, nil)
+	root, err := filepath.EvalSymlinks(d) // on macOS tmp paths are symlinked
+	require.NoError(t, err)
+	file, err := filepath.EvalSymlinks(f.Name())
+	require.NoError(t, err)
+	res, err := Run(root, NoSkip, nil)
 	want := &Dir{
-		Name: filepath.Base(d),
+		Name: filepath.Base(root),
 		Files: []*File{{
-			Name: filepath.Base(f.Name()),
+			Name: filepath.Base(file),
 			Size: 11,
 			Hash: 0,
 		}},
 	}
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
-	assert.Equal(t, fmt.Sprintf("info: hash of file %q evaluated to 0 - this might result in warnings which can be safely ignored\n", f.Name()), buf.String())
+	assert.Equal(t, fmt.Sprintf("info: hash of file %q evaluated to 0 - this might result in warnings which can be safely ignored\n", file), buf.String())
 }
 
 // DISABLED on Windows: Creating symlinks require elevated privileges.
