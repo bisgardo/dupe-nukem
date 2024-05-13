@@ -86,7 +86,10 @@ func Test__inaccessible_root_is_skipped(t *testing.T) {
 		assert.NoError(t, err)
 	}()
 
-	root, err := filepath.EvalSymlinks(d) // on macOS tmp paths are symlinked
+	// Resolve symlink to prevent a log entry from being emitted on macOS where tmp paths are symlinked.
+	// On GitHub Actions, this is also necessary for the Windows runner because the provided dir path
+	// 'C:\Users\RUNNER~1\AppData\Local\Temp\...' somehow resolves as a symlink to 'C:\Users\runneradmin\AppData\Local\Temp\...'.
+	root, err := filepath.EvalSymlinks(d)
 	require.NoError(t, err)
 	buf := testutil.LogBuffer()
 	res, err := Run(root, NoSkip, nil)
@@ -128,11 +131,11 @@ func Test__testdata_skip_root_fails(t *testing.T) {
 	assert.EqualError(t, err, `skipping root directory "testdata"`)
 }
 
-// DISABLED on Windows: Creating symlinks requires elevated privileges.
+// SKIPPED on Windows unless running as administrator.
 func Test__testdata_skip_symlinked_root_fails(t *testing.T) {
 	//goland:noinspection GoBoolExpressions
-	if runtime.GOOS == "windows" {
-		return // skip test
+	if runtime.GOOS == "windows" && !testutil.IsWindowsAdministrator() {
+		t.Skip("Creating symlinks on Windows requires elevated privileges.")
 	}
 	symlinkName := "test_root-symlink"
 	err := os.Symlink("testdata", symlinkName)
@@ -518,11 +521,11 @@ func Test__hash_computed_as_0_is_logged(t *testing.T) {
 	assert.Equal(t, fmt.Sprintf("info: hash of file %q evaluated to 0 - this might result in warnings which can be safely ignored\n", file), buf.String())
 }
 
-// DISABLED on Windows: Creating symlinks require elevated privileges.
+// SKIPPED on Windows unless running as administrator.
 func Test__root_symlink_is_followed_and_logged(t *testing.T) {
 	//goland:noinspection GoBoolExpressions
-	if runtime.GOOS == "windows" {
-		return // skip test
+	if runtime.GOOS == "windows" && !testutil.IsWindowsAdministrator() {
+		t.Skip("Creating symlinks on Windows requires elevated privileges.")
 	}
 	symlinkTarget := "testdata/e/f"
 	symlink := "test_root-symlink"
@@ -545,11 +548,11 @@ func Test__root_symlink_is_followed_and_logged(t *testing.T) {
 	assert.Equal(t, fmt.Sprintf("following root symlink %q to %q\n", symlink, symlinkTarget), buf.String())
 }
 
-// DISABLED on Windows: Creating symlinks require elevated privileges.
+// SKIPPED on Windows unless running as administrator.
 func Test__root_indirect_symlink_is_followed_and_logged(t *testing.T) {
 	//goland:noinspection GoBoolExpressions
-	if runtime.GOOS == "windows" {
-		return // skip test
+	if runtime.GOOS == "windows" && !testutil.IsWindowsAdministrator() {
+		t.Skip("Creating symlinks on Windows requires elevated privileges.")
 	}
 	symlinkTarget := "testdata/e/f"
 	indirectSymlink := "test_indirect-root-symlink"
@@ -577,11 +580,11 @@ func Test__root_indirect_symlink_is_followed_and_logged(t *testing.T) {
 	assert.Equal(t, fmt.Sprintf("following root symlink %q to %q\n", indirectSymlink, symlinkTarget), buf.String())
 }
 
-// DISABLED on Windows: Creating symlinks require elevated privileges.
+// SKIPPED on Windows unless running as administrator.
 func Test__internal_symlink_is_skipped_and_logged(t *testing.T) {
 	//goland:noinspection GoBoolExpressions
-	if runtime.GOOS == "windows" {
-		return // skip test
+	if runtime.GOOS == "windows" && !testutil.IsWindowsAdministrator() {
+		t.Skip("Creating symlinks on Windows requires elevated privileges.")
 	}
 	symlink := "testdata/e/f/test_internal-symlink"
 
@@ -605,11 +608,11 @@ func Test__internal_symlink_is_skipped_and_logged(t *testing.T) {
 	assert.Equal(t, fmt.Sprintf("skipping symlink %q during scan\n", symlink), buf.String())
 }
 
-// DISABLED on Windows: Creating symlinks require elevated privileges.
+// SKIPPED on Windows unless running as administrator.
 func Test__root_symlink_to_ancestor_is_followed_but_skipped_when_internal(t *testing.T) {
 	//goland:noinspection GoBoolExpressions
-	if runtime.GOOS == "windows" {
-		return // skip test
+	if runtime.GOOS == "windows" && !testutil.IsWindowsAdministrator() {
+		t.Skip("Creating symlinks on Windows requires elevated privileges.")
 	}
 	symlink := "testdata/e/f/test_ancestor-symlink" // points to "testdata/e"
 
@@ -646,4 +649,10 @@ func skip(names ...string) ShouldSkipPath {
 		}
 		return false
 	}
+}
+
+// TODO: Test test - delete.
+func TestGithub(t *testing.T) {
+	t.Fail()
+	t.Logf("CI='%v'", testutil.CI())
 }

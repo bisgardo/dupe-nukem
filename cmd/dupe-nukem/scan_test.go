@@ -181,6 +181,7 @@ func Test__Scan_wraps_invalid_dir_error(t *testing.T) {
 	require.NoError(t, err)
 	_, err = Scan(string([]byte{0}), "", "")
 	want := fmt.Sprintf(`invalid root directory "%s/\x00": invalid argument (lstat)`, dir)
+	//goland:noinspection GoBoolExpressions
 	if runtime.GOOS == "windows" {
 		// On Windows this case actually test that Scan does *not* wrap "unable to resolve absolute path" error.
 		want = `cannot resolve absolute path of "\x00": invalid argument`
