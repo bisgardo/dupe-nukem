@@ -650,9 +650,3 @@ func skip(names ...string) ShouldSkipPath {
 		return false
 	}
 }
-
-// TODO: Test test - delete.
-func TestGithub(t *testing.T) {
-	t.Fail()
-	t.Logf("CI='%v'", testutil.CI())
-}

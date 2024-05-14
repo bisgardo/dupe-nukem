@@ -11,9 +11,9 @@ import (
 // - GitHub Actions: "github"
 // - No CI: ""
 func CI() string {
-	if e, ok := os.LookupEnv("GITHUB_WORKFLOW"); ok {
-		//return "github"
-		return e // TODO: for debugging; revert
+	if _, ok := os.LookupEnv("GITHUB_WORKFLOW"); ok {
+		// For reference, the variable contains the name of the workflow.
+		return "github"
 	}
 	return ""
 }
