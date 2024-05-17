@@ -39,8 +39,9 @@ func MakeFileInaccessible(f *os.File) error {
 // MakeDirInaccessible makes the directory at the provided path
 // non-readable to the user running the test.
 // On Unix, this is done by zeroing the permission bits.
-// On Windows, this method can only be used to control the "write" flag
-// (https://golang.org/pkg/os/#Chmod), so we invoke 'icacls' to deny access.
+// On Windows, this method can only be used to control the "write" flag (https://golang.org/pkg/os/#Chmod),
+// so we invoke 'icacls' (https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/icacls)
+// instead to deny access.
 // The function is only intended to be used on temporary directories that
 // get deleted as part of cleaning up after the test.
 // Use MakeDirAccessible to make the directory deletable.

@@ -21,27 +21,22 @@ import (
 // TODO: Test logged output whenever it's relevant.
 
 func Test__empty_dir(t *testing.T) {
-	dir, err := os.MkdirTemp("", "empty")
-	require.NoError(t, err)
-	defer func() {
-		err := os.Remove(dir)
-		assert.NoError(t, err)
-	}()
+	root := t.TempDir()
 
-	want := &Dir{Name: filepath.Base(dir)}
+	want := &Dir{Name: filepath.Base(root)}
 
 	tests := []struct {
 		name       string
 		shouldSkip ShouldSkipPath
 	}{
 		{name: "without skip", shouldSkip: NoSkip},
-		{name: "skipping root", shouldSkip: skip(dir)},
+		{name: "skipping root", shouldSkip: skip(root)},
 		{name: "skipping non-existing", shouldSkip: skip("non-existing")},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			res, err := Run(dir, test.shouldSkip, nil)
+			res, err := Run(root, test.shouldSkip, nil)
 			require.NoError(t, err)
 			assert.Equal(t, want, res)
 		})
@@ -73,24 +68,20 @@ func Test__file_root_fails(t *testing.T) {
 }
 
 func Test__inaccessible_root_is_skipped(t *testing.T) {
-	d, err := os.MkdirTemp("", "inaccessible")
-	require.NoError(t, err)
-	defer func() {
-		err := os.Remove(d)
-		assert.NoError(t, err)
-	}()
-	err = testutil.MakeDirInaccessible(d)
-	require.NoError(t, err)
-	defer func() {
-		err := testutil.MakeDirAccessible(d)
-		assert.NoError(t, err)
-	}()
-
 	// Resolve symlink to prevent a log entry from being emitted on macOS where tmp paths are symlinked.
 	// On GitHub Actions, this is also necessary for the Windows runner because the provided dir path
 	// 'C:\Users\RUNNER~1\AppData\Local\Temp\...' somehow resolves as a symlink to 'C:\Users\runneradmin\AppData\Local\Temp\...'.
-	root, err := filepath.EvalSymlinks(d)
+	root, err := filepath.EvalSymlinks(t.TempDir())
 	require.NoError(t, err)
+
+	err = testutil.MakeDirInaccessible(root)
+	require.NoError(t, err)
+	defer func() {
+		// Redundant?
+		err := testutil.MakeDirAccessible(root)
+		assert.NoError(t, err)
+	}()
+
 	buf := testutil.LogBuffer()
 	res, err := Run(root, NoSkip, nil)
 	require.NoError(t, err)
@@ -342,8 +333,10 @@ func Test__inaccessible_internal_file_is_not_hashed_and_is_logged(t *testing.T) 
 	assert.Equal(t, fmt.Sprintf("error: cannot hash file %q: cannot open file: access denied\n", filepath.Clean(f.Name())), buf.String())
 }
 
-// On Windows, this test only works if the repository is stored on an NTFS drive.
+// On Windows, this test only works if the repository is stored on a filesystem
+// that supports the command 'icacls' (like NTFS).
 func Test__inaccessible_internal_dir_is_logged(t *testing.T) {
+	// Cannot use t.TempDir() because the test expects it to be created within 'testdata'.
 	d, err := os.MkdirTemp("testdata/e/f", "inaccessible")
 	require.NoError(t, err)
 	defer func() {
@@ -485,14 +478,11 @@ func Test__cache_entry_with_hash_0_is_ignored(t *testing.T) {
 func Test__hash_computed_as_0_is_logged(t *testing.T) {
 	v := "77kepQFQ8Kl" // from 'https://md5hashing.net/hash/fnv1a64/0000000000000000'
 
-	d, err := os.MkdirTemp("", "hash0")
+	// Resolving symlink for the same reason as described in a comment of 'Test__inaccessible_root_is_skipped'.
+	root, err := filepath.EvalSymlinks(t.TempDir())
 	require.NoError(t, err)
-	defer func() {
-		err := os.Remove(d)
-		assert.NoError(t, err)
-	}()
 
-	f, err := os.CreateTemp(d, "hash0")
+	f, err := os.CreateTemp(root, "hash0")
 	require.NoError(t, err)
 	defer func() {
 		err := os.Remove(f.Name())
@@ -503,22 +493,20 @@ func Test__hash_computed_as_0_is_logged(t *testing.T) {
 	err = f.Close()
 	assert.NoError(t, err)
 	buf := testutil.LogBuffer()
-	root, err := filepath.EvalSymlinks(d) // on macOS tmp paths are symlinked
 	require.NoError(t, err)
-	file, err := filepath.EvalSymlinks(f.Name())
 	require.NoError(t, err)
 	res, err := Run(root, NoSkip, nil)
 	want := &Dir{
 		Name: filepath.Base(root),
 		Files: []*File{{
-			Name: filepath.Base(file),
+			Name: filepath.Base(f.Name()),
 			Size: 11,
 			Hash: 0,
 		}},
 	}
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
-	assert.Equal(t, fmt.Sprintf("info: hash of file %q evaluated to 0 - this might result in warnings which can be safely ignored\n", file), buf.String())
+	assert.Equal(t, fmt.Sprintf("info: hash of file %q evaluated to 0 - this might result in warnings which can be safely ignored\n", f.Name()), buf.String())
 }
 
 // SKIPPED on Windows unless running as administrator.
