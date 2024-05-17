@@ -545,7 +545,7 @@ func Test__root_symlink_is_followed_and_logged(t *testing.T) {
 	res, err := Run(symlink, NoSkip, nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
-	assert.Equal(t, fmt.Sprintf("following root symlink %q to %q\n", symlink, symlinkTarget), buf.String())
+	assert.Equal(t, fmt.Sprintf("following root symlink %q to %q\n", symlink, filepath.Clean(symlinkTarget)), buf.String()) // Clean replaces '/' with '\' on Windows
 }
 
 // SKIPPED on Windows unless running as administrator.
@@ -577,7 +577,7 @@ func Test__root_indirect_symlink_is_followed_and_logged(t *testing.T) {
 	res, err := Run(indirectSymlink, NoSkip, nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
-	assert.Equal(t, fmt.Sprintf("following root symlink %q to %q\n", indirectSymlink, symlinkTarget), buf.String())
+	assert.Equal(t, fmt.Sprintf("following root symlink %q to %q\n", indirectSymlink, filepath.Clean(symlinkTarget)), buf.String()) // Clean replaces '/' with '\' on Windows
 }
 
 // SKIPPED on Windows unless running as administrator.
@@ -605,7 +605,7 @@ func Test__internal_symlink_is_skipped_and_logged(t *testing.T) {
 	res, err := Run(root, NoSkip, nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
-	assert.Equal(t, fmt.Sprintf("skipping symlink %q during scan\n", symlink), buf.String())
+	assert.Equal(t, fmt.Sprintf("skipping symlink %q during scan\n", filepath.Clean(symlink)), buf.String()) // Clean replaces '/' with '\' on Windows
 }
 
 // SKIPPED on Windows unless running as administrator.
