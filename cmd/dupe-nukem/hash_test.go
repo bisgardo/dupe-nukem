@@ -26,12 +26,12 @@ func Test__hash_file(t *testing.T) {
 
 func Test__hash_dir_fails(t *testing.T) {
 	_, err := Hash("testdata")
-	assert.EqualError(t, err, "cannot hash directory \"testdata\"")
+	assert.EqualError(t, err, `cannot hash directory "testdata"`)
 }
 
 func Test__hash_nonexisting_file_fails(t *testing.T) {
 	_, err := Hash("nonexisting/file")
-	assert.EqualError(t, err, "cannot stat \"nonexisting/file\": not found")
+	assert.EqualError(t, err, `cannot stat "nonexisting/file": not found`)
 }
 
 func Test__hash_wraps_file_error(t *testing.T) {

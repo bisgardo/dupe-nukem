@@ -129,7 +129,8 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 			return nil
 		}
 
-		// We don't get any signal that the walk has returned up the stack so have to detect it ourselves.
+		// Detect that the walk has returned up the stack as we don't get any signal about that.
+		// Checking just the length of the path only works because directories are visited before their files.
 		for head.pathLen != len(parentPath) {
 			head = head.prev
 		}
@@ -145,7 +146,7 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 			}
 		} else if !mode.IsRegular() {
 			// File is a symlink, named pipe, socket, device, etc.
-			// We start by not supporting any of that.
+			// We don't currently support any of that.
 			// IDEA: If symlink, print target (and whether it exists).
 			log.Printf("skipping %v %q during scan\n", util.FileModeName(mode), path)
 		} else if size := info.Size(); size == 0 {
