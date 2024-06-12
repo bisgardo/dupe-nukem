@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -65,6 +66,40 @@ func main() {
 			return err
 		},
 	}
+	matchCmd := &cobra.Command{
+		Use:   "match",
+		Short: "Match files in source dir against files in target dirs",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			flags := cmd.Flags()
+			// IDEA Could let the flags also accept dirs. Would do implicit scan for those.
+			sourceFile, err := flags.GetString("source")
+			if err != nil {
+				return err
+			}
+			if sourceFile == "" {
+				return errors.New("no source file provided")
+			}
+			targetFiles, err := flags.GetStringArray("target")
+			if err != nil {
+				return err
+			}
+			// Use source as singleton target if no targets are provided (to search for internal duplicates).
+			if len(targetFiles) == 0 {
+				targetFiles = []string{sourceFile}
+			}
+			res, err := Match(sourceFile, targetFiles)
+			if err != nil {
+				return err
+			}
+			bs, err := json.MarshalIndent(res, "", "  ")
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(bs))
+			return nil
+		},
+	}
+
 	hashFlags := hashCmd.Flags()
 	hashFlags.String("file", "", "file to hash")
 
@@ -73,8 +108,13 @@ func main() {
 	scanFlags.String("skip", "", "comma-separated list of directories to skip")
 	scanFlags.String("cache", "", "file from a previous call to 'scan' to use as hash cache")
 
+	matchFlags := matchCmd.Flags()
+	matchFlags.String("source", "", "scan file of the source directory")
+	matchFlags.StringArray("target", nil, "scan files of a target directory")
+
 	rootCmd.AddCommand(hashCmd)
 	rootCmd.AddCommand(scanCmd)
+	rootCmd.AddCommand(matchCmd)
 	if err := rootCmd.Execute(); err != nil {
 		// Print error with stack trace.
 		log.Fatalf("error: %+v\n", err)

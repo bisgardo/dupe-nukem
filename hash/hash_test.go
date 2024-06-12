@@ -39,7 +39,7 @@ func Test__hash_dir_fails(t *testing.T) {
 		if runtime.Version() < "go1.20" {
 			wantReason = "The handle is invalid."
 		} else {
-			// Incredible that they managed to change the message into an even less accurate one.
+			// Incredible that they managed to change the message into an even less helpful one.
 			wantReason = "Incorrect function."
 		}
 	}
