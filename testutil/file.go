@@ -9,8 +9,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-// TODO: Use build flags instead of checking OS on runtime?
-// TODO: Should ideally return cleanup function for reverting the change?
+// TODO: Consider using build flags instead of checking OS on runtime (would allow using 'golang.org/x/sys/windows').
+// TODO: Would it be more idiomatic to return a cleanup function for reverting the change rather than doing it explicitly?
 
 // MakeFileInaccessible makes the provided file non-readable to the user
 // running the test.
@@ -28,11 +28,14 @@ func MakeFileInaccessible(f *os.File) error {
 		if err != nil {
 			return err
 		}
-		// Deprecated - kept in case some box doesn't have icacls.
+		// Deprecated variant - kept here in case we ever encounter a box that's unable to use 'icacls'.
 		//cmd := exec.Command("cacls", f.Name(), "/e", "/d", u.Username)
+
 		cmd := exec.Command("icacls", f.Name(), "/deny", u.Username+":r")
-		return run(cmd)
+		return runCommand(cmd)
 	}
+
+	// Not Windows.
 	return f.Chmod(0)
 }
 
@@ -52,11 +55,14 @@ func MakeDirInaccessible(dirPath string) error {
 		if err != nil {
 			return err
 		}
-		// Deprecated - kept in case some box doesn't have icacls.
+		// Deprecated variant - kept here in case we ever encounter a box that's unable to use 'icacls'.
 		//cmd := exec.Command("cacls", dirPath, "/e", "/d", u.Username)
+
 		cmd := exec.Command("icacls", dirPath, "/deny", u.Username+":r")
-		return run(cmd)
+		return runCommand(cmd)
 	}
+
+	// Not Windows.
 	return os.Chmod(dirPath, 0)
 }
 
@@ -74,13 +80,14 @@ func MakeDirAccessible(dirPath string) error {
 		}
 		// Deprecated - kept in case some box doesn't have icacls.
 		//cmd := exec.Command("cacls", dirPath, "/e", "/g", u.Username+":f")
+
 		cmd := exec.Command("icacls", dirPath, "/grant", u.Username+":f")
-		return run(cmd)
+		return runCommand(cmd)
 	}
 	return nil
 }
 
-func run(cmd *exec.Cmd) error {
+func runCommand(cmd *exec.Cmd) error {
 	out, err := cmd.CombinedOutput()
 	return errors.Wrapf(err, string(out))
 }

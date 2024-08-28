@@ -129,8 +129,9 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 			return nil
 		}
 
-		// Detect that the walk has returned up the stack as we don't get any signal about that.
-		// Checking just the length of the path only works because directories are visited before their files.
+		// Detect that the walk has returned up the stack, as we aren't given any information about that.
+		// Checking just the length of the path works because directories are guaranteed to be visited
+		// before the files that they contain.
 		for head.pathLen != len(parentPath) {
 			head = head.prev
 		}
