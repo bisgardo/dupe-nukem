@@ -144,8 +144,8 @@ func Test__loadScanDirCacheFile_logs_file_before_and_after_loading(t *testing.T)
 	require.NoError(t, err)
 	ls := strings.Split(buf.String(), "\n")
 	assert.Len(t, ls, 3)
-	assert.Equal(t, "loading scan cache file \"testdata/cache2.json.gz\"...", ls[0])
-	assert.Regexp(t, "^scan cache loaded successfully from \"testdata/cache2.json.gz\" in [\\w.]+s$", ls[1])
+	assert.Equal(t, `loading scan cache file "testdata/cache2.json.gz"...`, ls[0])
+	assert.Regexp(t, `^scan cache loaded successfully from "testdata/cache2.json.gz" in [\w.]+s$`, ls[1])
 	assert.Empty(t, ls[2])
 }
 
@@ -156,7 +156,7 @@ func Test__loadScanDirCacheFile_logs_nonexistent_file_before_loading(t *testing.
 	require.Error(t, err)
 	ls := strings.Split(buf.String(), "\n")
 	assert.Len(t, ls, 2)
-	assert.Equal(t, "loading scan cache file \"testdata/nonexistent-cache\"...", ls[0])
+	assert.Equal(t, `loading scan cache file "testdata/nonexistent-cache"...`, ls[0])
 	assert.Empty(t, ls[1])
 }
 
@@ -180,10 +180,11 @@ func Test__Scan_wraps_invalid_dir_error(t *testing.T) {
 	dir, err := os.Getwd()
 	require.NoError(t, err)
 	_, err = Scan(string([]byte{0}), "", "")
-	want := fmt.Sprintf("invalid root directory \"%s/\\x00\": invalid argument (lstat)", dir)
+	want := fmt.Sprintf(`invalid root directory "%s/\x00": invalid argument (lstat)`, dir)
+	//goland:noinspection GoBoolExpressions
 	if runtime.GOOS == "windows" {
 		// On Windows this case actually test that Scan does *not* wrap "unable to resolve absolute path" error.
-		want = "cannot resolve absolute path of \"\\x00\": invalid argument"
+		want = `cannot resolve absolute path of "\x00": invalid argument`
 	}
 	assert.EqualError(t, err, want)
 }

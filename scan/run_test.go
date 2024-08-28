@@ -13,7 +13,7 @@ import (
 	"github.com/bisgardo/dupe-nukem/testutil"
 )
 
-// Working dir for tests is the directory containing the file.
+// NOTE: Working dir for tests is the directory containing the file.
 
 // TODO: Figure out how to test symlinks on Windows:
 //       - Create specialized tests that need to be run manually as administrator.
@@ -21,27 +21,22 @@ import (
 // TODO: Test logged output whenever it's relevant.
 
 func Test__empty_dir(t *testing.T) {
-	dir, err := os.MkdirTemp("", "empty")
-	require.NoError(t, err)
-	defer func() {
-		err := os.Remove(dir)
-		assert.NoError(t, err)
-	}()
+	root := t.TempDir()
 
-	want := &Dir{Name: filepath.Base(dir)}
+	want := &Dir{Name: filepath.Base(root)}
 
 	tests := []struct {
 		name       string
 		shouldSkip ShouldSkipPath
 	}{
 		{name: "without skip", shouldSkip: NoSkip},
-		{name: "skipping root", shouldSkip: skip(dir)},
+		{name: "skipping root", shouldSkip: skip(root)},
 		{name: "skipping non-existing", shouldSkip: skip("non-existing")},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			res, err := Run(dir, test.shouldSkip, nil)
+			res, err := Run(root, test.shouldSkip, nil)
 			require.NoError(t, err)
 			assert.Equal(t, want, res)
 		})
@@ -72,39 +67,26 @@ func Test__file_root_fails(t *testing.T) {
 	assert.EqualError(t, err, fmt.Sprintf("invalid root directory %q: not a directory", f.Name()))
 }
 
-// DISABLED on Windows and macOS (on GitHub): This test only works as expected on the Linux setup of GitHub Actions.
-// The reason is that on the other platforms, the project is checked out on a symlinked path which
-// gets resolved by dupe-nukem.
-// This causes another log entry to be emitted and also the symlinked path (which is not known in advance) to be used.
-// We cannot (or shouldn't at least) control how GitHub Actions sets up the project as that is internal
-// to their infrastructure.
-// It's also possible that we can/should avoid resolving symlinks in cases like this...
-// The fact that the test passes on Linux and Windows (tested locally) gives reasonable confidence
-// that the functionality really is correct on all platforms - the test just needs to be set up some other way.
-// But the encountered case (that inaccessible symlinked root should be skipped) should be properly tested as well!
 func Test__inaccessible_root_is_skipped(t *testing.T) {
-	//goland:noinspection GoBoolExpressions
-	if testutil.CI() == "github" && runtime.GOOS != "linux" {
-		return // skip test
-	}
-	d, err := os.MkdirTemp("", "inaccessible")
+	// Resolve symlink to prevent a log entry from being emitted on macOS where tmp paths are symlinked.
+	// On GitHub Actions, this is also necessary for the Windows runner because the provided dir path
+	// 'C:\Users\RUNNER~1\AppData\Local\Temp\...' somehow resolves as a symlink to 'C:\Users\runneradmin\AppData\Local\Temp\...'.
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
+
+	err = testutil.MakeDirInaccessible(root)
 	require.NoError(t, err)
 	defer func() {
-		err := os.Remove(d)
-		assert.NoError(t, err)
-	}()
-	err = testutil.MakeDirInaccessible(d)
-	require.NoError(t, err)
-	defer func() {
-		err := testutil.MakeDirAccessible(d)
+		// TODO: Check if this is redundant now that we're using `t.TempDir()`.
+		err := testutil.MakeDirAccessible(root)
 		assert.NoError(t, err)
 	}()
 
 	buf := testutil.LogBuffer()
-	res, err := Run(d, NoSkip, nil)
+	res, err := Run(root, NoSkip, nil)
 	require.NoError(t, err)
-	assert.Equal(t, &Dir{Name: filepath.Base(d)}, res)
-	assert.Equal(t, fmt.Sprintf("skipping inaccessible directory %q\n", d), buf.String())
+	assert.Equal(t, &Dir{Name: filepath.Base(root)}, res)
+	assert.Equal(t, fmt.Sprintf("skipping inaccessible directory %q\n", root), buf.String())
 }
 
 func Test__testdata_no_skip(t *testing.T) {
@@ -140,11 +122,11 @@ func Test__testdata_skip_root_fails(t *testing.T) {
 	assert.EqualError(t, err, `skipping root directory "testdata"`)
 }
 
-// DISABLED on Windows: Creating symlinks requires elevated privileges.
+// SKIPPED on Windows unless running as administrator.
 func Test__testdata_skip_symlinked_root_fails(t *testing.T) {
 	//goland:noinspection GoBoolExpressions
-	if runtime.GOOS == "windows" {
-		return // skip test
+	if runtime.GOOS == "windows" && !testutil.IsWindowsAdministrator() {
+		t.Skip("Creating symlinks on Windows requires elevated privileges.")
 	}
 	symlinkName := "test_root-symlink"
 	err := os.Symlink("testdata", symlinkName)
@@ -351,8 +333,10 @@ func Test__inaccessible_internal_file_is_not_hashed_and_is_logged(t *testing.T) 
 	assert.Equal(t, fmt.Sprintf("error: cannot hash file %q: cannot open file: access denied\n", filepath.Clean(f.Name())), buf.String())
 }
 
-// On Windows, this test only works if the repository is stored on an NTFS drive.
+// On Windows, this test only works if the repository is stored on a filesystem
+// that supports the command 'icacls' (such as NTFS).
 func Test__inaccessible_internal_dir_is_logged(t *testing.T) {
+	// Cannot use t.TempDir() because the test expects it to be created within 'testdata'.
 	d, err := os.MkdirTemp("testdata/e/f", "inaccessible")
 	require.NoError(t, err)
 	defer func() {
@@ -491,24 +475,14 @@ func Test__cache_entry_with_hash_0_is_ignored(t *testing.T) {
 	assert.Equal(t, want, res)
 }
 
-// DISABLED on Windows and macOS (on GitHub) for the same reasons as 'Test__inaccessible_root_is_skipped'.
-// TODO: Why is this test so complex? Does/should it test more than just logging?
 func Test__hash_computed_as_0_is_logged(t *testing.T) {
-	//goland:noinspection GoBoolExpressions
-	if testutil.CI() == "github" && runtime.GOOS != "linux" {
-		return // skip test
-	}
+	v := "77kepQFQ8Kl" // from https://md5hashing.net/hash/fnv1a64/0000000000000000
 
-	v := "77kepQFQ8Kl" // from 'https://md5hashing.net/hash/fnv1a64/0000000000000000'
-
-	d, err := os.MkdirTemp("", "hash0")
+	// Resolving symlink for the same reason as described in a comment of 'Test__inaccessible_root_is_skipped'.
+	root, err := filepath.EvalSymlinks(t.TempDir())
 	require.NoError(t, err)
-	defer func() {
-		err := os.Remove(d)
-		assert.NoError(t, err)
-	}()
 
-	f, err := os.CreateTemp(d, "hash0")
+	f, err := os.CreateTemp(root, "hash0")
 	require.NoError(t, err)
 	defer func() {
 		err := os.Remove(f.Name())
@@ -519,9 +493,10 @@ func Test__hash_computed_as_0_is_logged(t *testing.T) {
 	err = f.Close()
 	assert.NoError(t, err)
 	buf := testutil.LogBuffer()
-	res, err := Run(d, NoSkip, nil)
+	require.NoError(t, err)
+	res, err := Run(root, NoSkip, nil)
 	want := &Dir{
-		Name: filepath.Base(d),
+		Name: filepath.Base(root),
 		Files: []*File{{
 			Name: filepath.Base(f.Name()),
 			Size: 11,
@@ -533,11 +508,11 @@ func Test__hash_computed_as_0_is_logged(t *testing.T) {
 	assert.Equal(t, fmt.Sprintf("info: hash of file %q evaluated to 0 - this might result in warnings which can be safely ignored\n", f.Name()), buf.String())
 }
 
-// DISABLED on Windows: Creating symlinks require elevated privileges.
+// SKIPPED on Windows unless running as administrator.
 func Test__root_symlink_is_followed_and_logged(t *testing.T) {
 	//goland:noinspection GoBoolExpressions
-	if runtime.GOOS == "windows" {
-		return // skip test
+	if runtime.GOOS == "windows" && !testutil.IsWindowsAdministrator() {
+		t.Skip("Creating symlinks on Windows requires elevated privileges.")
 	}
 	symlinkTarget := "testdata/e/f"
 	symlink := "test_root-symlink"
@@ -557,14 +532,14 @@ func Test__root_symlink_is_followed_and_logged(t *testing.T) {
 	res, err := Run(symlink, NoSkip, nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
-	assert.Equal(t, fmt.Sprintf("following root symlink %q to %q\n", symlink, symlinkTarget), buf.String())
+	assert.Equal(t, fmt.Sprintf("following root symlink %q to %q\n", symlink, filepath.Clean(symlinkTarget)), buf.String()) // Clean replaces '/' with '\' on Windows
 }
 
-// DISABLED on Windows: Creating symlinks require elevated privileges.
+// SKIPPED on Windows unless running as administrator.
 func Test__root_indirect_symlink_is_followed_and_logged(t *testing.T) {
 	//goland:noinspection GoBoolExpressions
-	if runtime.GOOS == "windows" {
-		return // skip test
+	if runtime.GOOS == "windows" && !testutil.IsWindowsAdministrator() {
+		t.Skip("Creating symlinks on Windows requires elevated privileges.")
 	}
 	symlinkTarget := "testdata/e/f"
 	indirectSymlink := "test_indirect-root-symlink"
@@ -589,14 +564,14 @@ func Test__root_indirect_symlink_is_followed_and_logged(t *testing.T) {
 	res, err := Run(indirectSymlink, NoSkip, nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
-	assert.Equal(t, fmt.Sprintf("following root symlink %q to %q\n", indirectSymlink, symlinkTarget), buf.String())
+	assert.Equal(t, fmt.Sprintf("following root symlink %q to %q\n", indirectSymlink, filepath.Clean(symlinkTarget)), buf.String()) // Clean replaces '/' with '\' on Windows
 }
 
-// DISABLED on Windows: Creating symlinks require elevated privileges.
+// SKIPPED on Windows unless running as administrator.
 func Test__internal_symlink_is_skipped_and_logged(t *testing.T) {
 	//goland:noinspection GoBoolExpressions
-	if runtime.GOOS == "windows" {
-		return // skip test
+	if runtime.GOOS == "windows" && !testutil.IsWindowsAdministrator() {
+		t.Skip("Creating symlinks on Windows requires elevated privileges.")
 	}
 	symlink := "testdata/e/f/test_internal-symlink"
 
@@ -617,14 +592,14 @@ func Test__internal_symlink_is_skipped_and_logged(t *testing.T) {
 	res, err := Run(root, NoSkip, nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
-	assert.Equal(t, fmt.Sprintf("skipping symlink %q during scan\n", symlink), buf.String())
+	assert.Equal(t, fmt.Sprintf("skipping symlink %q during scan\n", filepath.Clean(symlink)), buf.String()) // Clean replaces '/' with '\' on Windows
 }
 
-// DISABLED on Windows: Creating symlinks require elevated privileges.
+// SKIPPED on Windows unless running as administrator.
 func Test__root_symlink_to_ancestor_is_followed_but_skipped_when_internal(t *testing.T) {
 	//goland:noinspection GoBoolExpressions
-	if runtime.GOOS == "windows" {
-		return // skip test
+	if runtime.GOOS == "windows" && !testutil.IsWindowsAdministrator() {
+		t.Skip("Creating symlinks on Windows requires elevated privileges.")
 	}
 	symlink := "testdata/e/f/test_ancestor-symlink" // points to "testdata/e"
 
