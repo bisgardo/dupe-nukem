@@ -1,13 +1,11 @@
 package testutil
 
 import (
-	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -16,15 +14,11 @@ import (
 func Test__tmp_dir_cleanup(t *testing.T) {
 	t.Run("inaccessible root directory", func(t *testing.T) {
 		var rootPath string
+		// Sanity check. Isn't actually required as TempDir failing to clean up will fail the test by itself.
 		t.Cleanup(func() {
-			info, err := os.Stat(rootPath)
-
-			spew.Dump("info:", info) // for debugging
-			fmt.Println("error:", err)
-
-			_ = err
-			//// Assertions work as expected within Cleanup.
-			//assert.ErrorIs(t, err, fs.ErrNotExist)
+			_, err := os.Stat(rootPath)
+			// Assertions work as expected within Cleanup.
+			assert.ErrorIs(t, err, fs.ErrNotExist)
 		})
 
 		rootPath = t.TempDir()
@@ -32,6 +26,7 @@ func Test__tmp_dir_cleanup(t *testing.T) {
 	})
 	t.Run("inaccessible file", func(t *testing.T) {
 		var rootPath string
+		// Sanity check. Isn't actually required as TempDir failing to clean up will fail the test by itself.
 		t.Cleanup(func() {
 			_, err := os.Stat(rootPath)
 			// Assertions work as expected within Cleanup.
