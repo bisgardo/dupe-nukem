@@ -63,6 +63,7 @@ func Test__inaccessible_root_is_skipped(t *testing.T) {
 	// Resolve symlink to prevent a log entry from being emitted on macOS where tmp paths are symlinked.
 	// On GitHub Actions, this is also necessary for the Windows runner because the provided dir path
 	// 'C:\Users\RUNNER~1\AppData\Local\Temp\...' somehow resolves as a symlink to 'C:\Users\runneradmin\AppData\Local\Temp\...'.
+	// TODO: Make a helper function for having this done automatically, always.
 	rootPath, err := filepath.EvalSymlinks(t.TempDir())
 	require.NoError(t, err)
 	err = testutil.MakeInaccessible(rootPath)
@@ -501,11 +502,11 @@ func Test__root_symlink_is_followed_and_logged(t *testing.T) {
 		symlinkName: symlink("data"),
 		"data":      symlinkedDir,
 	}
-
-	rootPath := t.TempDir()
-	err := root.writeTo(rootPath)
+	// Resolving symlink for the same reason as described in a comment of 'Test__inaccessible_root_is_skipped'.
+	rootPath, err := filepath.EvalSymlinks(t.TempDir())
 	require.NoError(t, err)
-
+	err = root.writeTo(rootPath)
+	require.NoError(t, err)
 	symlinkPath := filepath.Join(rootPath, symlinkName)
 	want := symlinkedDir.toScanDir(symlinkName)
 
@@ -535,17 +536,18 @@ func Test__root_indirect_symlink_is_followed_and_logged(t *testing.T) {
 		"g": file{},
 	}
 	symlinkName := "indirect-symlink"
-	testDir := dir{
+	root := dir{
 		symlinkName: symlink("symlink"),
 		"symlink":   symlink("data"),
 		"data":      symlinkedDir,
 	}
-
-	rootPath := t.TempDir()
-	err := testDir.writeTo(rootPath)
+	// Resolving symlink for the same reason as described in a comment of 'Test__inaccessible_root_is_skipped'.
+	rootPath, err := filepath.EvalSymlinks(t.TempDir())
 	require.NoError(t, err)
-
+	err = root.writeTo(rootPath)
+	require.NoError(t, err)
 	want := symlinkedDir.toScanDir(symlinkName)
+
 	buf := testutil.LogBuffer()
 	indirectSymlinkPath := filepath.Join(rootPath, symlinkName)
 	res, err := Run(indirectSymlinkPath, NoSkip, nil)
@@ -572,8 +574,10 @@ func Test__internal_symlink_is_skipped_and_logged(t *testing.T) {
 		"a":         file{c: "z\n"},
 		symlinkName: symlink("a"), // TODO: add test where target doesn't exist?
 	}
-	rootPath := t.TempDir()
-	err := root.writeTo(rootPath)
+	// Resolving symlink for the same reason as described in a comment of 'Test__inaccessible_root_is_skipped'.
+	rootPath, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
+	err = root.writeTo(rootPath)
 	require.NoError(t, err)
 	want := root.toScanDir(filepath.Base(rootPath))
 
