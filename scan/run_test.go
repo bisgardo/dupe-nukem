@@ -60,8 +60,12 @@ func Test__file_root_fails(t *testing.T) {
 }
 
 func Test__inaccessible_root_is_skipped(t *testing.T) {
-	rootPath := t.TempDir() // TODO: eval symlink?
-	err := testutil.MakeInaccessible(rootPath)
+	// Resolve symlink to prevent a log entry from being emitted on macOS where tmp paths are symlinked.
+	// On GitHub Actions, this is also necessary for the Windows runner because the provided dir path
+	// 'C:\Users\RUNNER~1\AppData\Local\Temp\...' somehow resolves as a symlink to 'C:\Users\runneradmin\AppData\Local\Temp\...'.
+	rootPath, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
+	err = testutil.MakeInaccessible(rootPath)
 	require.NoError(t, err)
 	want := &Dir{Name: filepath.Base(rootPath)}
 
@@ -268,8 +272,10 @@ func Test__testdata_skip_files_is_logged(t *testing.T) {
 			"g": file{},
 		},
 	}
-	rootPath := t.TempDir()
-	err := root.writeTo(rootPath)
+	// Resolving symlink for the same reason as described in a comment of 'Test__inaccessible_root_is_skipped'.
+	rootPath, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
+	err = root.writeTo(rootPath)
 	require.NoError(t, err)
 
 	buf := testutil.LogBuffer()
@@ -306,8 +312,10 @@ func Test__inaccessible_internal_file_is_not_hashed_and_is_logged(t *testing.T) 
 		"g":            file{},
 		"inaccessible": file{c: "53cR31_", inaccessible: true},
 	}
-	rootPath := t.TempDir()
-	err := root.writeTo(rootPath)
+	// Resolving symlink for the same reason as described in a comment of 'Test__inaccessible_root_is_skipped'.
+	rootPath, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
+	err = root.writeTo(rootPath)
 	require.NoError(t, err)
 	want := root.toScanDir(filepath.Base(rootPath))
 
@@ -334,8 +342,11 @@ func Test__inaccessible_internal_dir_is_logged(t *testing.T) {
 			"inaccessible": dirExt{inaccessible: true},
 		},
 	}
-	rootPath := t.TempDir()
-	err := root.writeTo(rootPath)
+	// Resolving symlink for the same reason as described in a comment of 'Test__inaccessible_root_is_skipped'.
+	rootPath, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
+	err = root.writeTo(rootPath)
+	require.NoError(t, err)
 	want := root.toScanDir(filepath.Base(rootPath))
 
 	buf := testutil.LogBuffer()
@@ -454,8 +465,10 @@ func Test__hash_computed_as_0_is_logged(t *testing.T) {
 		// Contents hash to 0 (https://md5hashing.net/hash/fnv1a64/0000000000000000).
 		"hash0": file{c: "77kepQFQ8Kl"},
 	}
-	rootPath := t.TempDir()
-	err := root.writeTo(rootPath)
+	// Resolving symlink for the same reason as described in a comment of 'Test__inaccessible_root_is_skipped'.
+	rootPath, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
+	err = root.writeTo(rootPath)
 	require.NoError(t, err)
 	want := root.toScanDir(filepath.Base(rootPath))
 

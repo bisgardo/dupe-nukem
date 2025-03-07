@@ -71,9 +71,9 @@ func (d dir) writeTo(path string) error {
 	return nil
 }
 
-func (d dir) ext() dirExt {
-	return dirExt{dir: d}
-}
+//func (d dir) ext() dirExt {
+//	return dirExt{dir: d}
+//}
 
 type dirExt struct {
 	dir          dir
