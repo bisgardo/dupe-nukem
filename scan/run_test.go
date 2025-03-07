@@ -600,10 +600,10 @@ func Test__root_symlink_to_ancestor_is_followed_but_skipped_when_internal(t *tes
 	symlinkedDir := dir{
 		"a":         file{c: "z\n"},
 		"g":         file{},
-		symlinkName: symlink(".."),
+		symlinkName: symlink(".."), // points to "e"
 	}
 	root := dir{
-		"e/f": symlinkedDir, // points to "e"
+		"e/f": symlinkedDir,
 	}
 	rootPath := t.TempDir()
 	err := root.writeTo(rootPath)

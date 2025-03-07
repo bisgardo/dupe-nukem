@@ -56,15 +56,20 @@ func (d dir) toScanDir(name string) *Dir {
 }
 
 func (d dir) writeTo(path string) error {
-	// Create full chain of directories if this is a leaf node.
-	if len(d) == 0 {
-		if err := os.MkdirAll(path, 0755); err != nil {
-			return errors.Wrapf(err, "cannot create dir on path %q", path)
-		}
+	if err := os.MkdirAll(path, 0755); err != nil {
+		return errors.Wrapf(err, "cannot create dir on path %q", path)
 	}
 	// No need for iterating in sorted order.
 	for name, n := range d {
-		if err := n.writeTo(filepath.Join(path, name)); err != nil {
+		nodePath := filepath.Join(path, name)
+		if p := filepath.Dir(nodePath); p != path {
+			// nodePath has multiple components: create intermediary directories.
+			if err := dir(nil).writeTo(p); err != nil {
+				return err
+			}
+		}
+		// Path may have arbitrary number of components.
+		if err := n.writeTo(nodePath); err != nil {
 			return err
 		}
 	}
@@ -154,10 +159,6 @@ func (f file) writeTo(path string) error {
 	if f.ts != 0 {
 		// TODO: Implement...
 		panic("custom timestamp is not yet implemented")
-	}
-	// Directories are created from leafs.
-	if err := dir(nil).writeTo(filepath.Dir(path)); err != nil {
-		return err
 	}
 	data := []byte(f.c)
 	if err := os.WriteFile(path, data, 0644); err != nil {
