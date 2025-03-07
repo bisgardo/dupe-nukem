@@ -5,8 +5,9 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"testing"
 
-	"github.com/pkg/errors"
+	"github.com/stretchr/testify/require"
 
 	"github.com/bisgardo/dupe-nukem/hash"
 	"github.com/bisgardo/dupe-nukem/testutil"
@@ -14,7 +15,7 @@ import (
 
 type node interface {
 	appendTo(parent *Dir, name string)
-	writeTo(path string) error
+	writeTo(t *testing.T, path string)
 }
 
 type dir map[string]node
@@ -55,25 +56,20 @@ func (d dir) toScanDir(name string) *Dir {
 	return res
 }
 
-func (d dir) writeTo(path string) error {
+func (d dir) writeTo(t *testing.T, path string) {
 	if err := os.MkdirAll(path, 0755); err != nil {
-		return errors.Wrapf(err, "cannot create dir on path %q", path)
+		require.NoErrorf(t, err, "cannot create dir on path %q", path)
 	}
 	// No need for iterating in sorted order.
 	for name, n := range d {
 		nodePath := filepath.Join(path, name)
 		if p := filepath.Dir(nodePath); p != path {
 			// nodePath has multiple components: create intermediary directories.
-			if err := dir(nil).writeTo(p); err != nil {
-				return err
-			}
+			dir(nil).writeTo(t, p)
 		}
 		// Path may have arbitrary number of components.
-		if err := n.writeTo(nodePath); err != nil {
-			return err
-		}
+		n.writeTo(t, nodePath)
 	}
-	return nil
 }
 
 //func (d dir) ext() dirExt {
@@ -97,16 +93,11 @@ func (d dirExt) appendTo(parent *Dir, name string) {
 	d.dir.appendTo(parent, name)
 }
 
-func (d dirExt) writeTo(path string) error {
-	if err := d.dir.writeTo(path); err != nil {
-		return err
-	}
+func (d dirExt) writeTo(t *testing.T, path string) {
+	d.dir.writeTo(t, path)
 	if d.inaccessible {
-		if err := testutil.MakeInaccessible(path); err != nil {
-			return errors.Wrapf(err, "cannot make directory %q inaccessible", path)
-		}
+		testutil.MakeInaccessibleT(t, path)
 	}
-	return nil
 }
 
 type file struct {
@@ -155,21 +146,17 @@ func (f file) toScanFile(name string) *File {
 	return NewFile(name, int64(len(data)), h)
 }
 
-func (f file) writeTo(path string) error {
+func (f file) writeTo(t *testing.T, path string) {
 	if f.ts != 0 {
 		// TODO: Implement...
 		panic("custom timestamp is not yet implemented")
 	}
 	data := []byte(f.c)
-	if err := os.WriteFile(path, data, 0644); err != nil {
-		return errors.Wrapf(err, "cannot create file %q with contents %q", path, f.c)
-	}
+	err := os.WriteFile(path, data, 0644)
+	require.NoErrorf(t, err, "cannot create file %q with contents %q", path, f.c)
 	if f.inaccessible {
-		if err := testutil.MakeInaccessible(path); err != nil {
-			return errors.Wrapf(err, "cannot make file %q inaccessible", path)
-		}
+		testutil.MakeInaccessibleT(t, path)
 	}
-	return nil
 }
 
 type symlink string // target path relative to own location
@@ -178,8 +165,9 @@ func (s symlink) appendTo(*Dir, string) {
 	// Symlinks are ignored.
 }
 
-func (s symlink) writeTo(path string) error {
-	return os.Symlink(string(s), path)
+func (s symlink) writeTo(t *testing.T, path string) {
+	err := os.Symlink(string(s), path)
+	require.NoErrorf(t, err, "cannot create symlink with value %q at path %q", s, path)
 }
 
 // Verify conformance to node interface.
@@ -187,6 +175,7 @@ var (
 	_ node = dir{}
 	_ node = dirExt{}
 	_ node = file{}
+	_ node = symlink("")
 )
 
 // TODO: Test the testers.

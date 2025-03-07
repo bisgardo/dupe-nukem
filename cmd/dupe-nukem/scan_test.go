@@ -198,11 +198,11 @@ func Test__Scan_wraps_cache_file_not_accessible_error(t *testing.T) {
 	f, err := os.CreateTemp("", "inaccessible")
 	require.NoError(t, err)
 	filename := f.Name()
-	defer func() {
+	t.Cleanup(func() {
 		err := os.Remove(filename)
 		assert.NoError(t, err)
-	}()
-	err = testutil.MakeInaccessible(filename)
+	})
+	testutil.MakeInaccessibleT(t, filename)
 	require.NoError(t, err)
 	err = f.Close()
 	assert.NoError(t, err)

@@ -28,8 +28,7 @@ func Test__tmp_dir_cleanup(t *testing.T) {
 		})
 
 		rootPath = t.TempDir()
-		err := MakeInaccessible(rootPath)
-		require.NoError(t, err)
+		MakeInaccessibleT(t, rootPath)
 	})
 	t.Run("inaccessible file", func(t *testing.T) {
 		var rootPath string
@@ -43,7 +42,6 @@ func Test__tmp_dir_cleanup(t *testing.T) {
 		filePath := filepath.Join(rootPath, "x")
 		err := os.WriteFile(filePath, []byte("blah"), 0644)
 		require.NoError(t, err)
-		err = MakeInaccessible(filePath)
-		require.NoError(t, err)
+		MakeInaccessibleT(t, filePath)
 	})
 }

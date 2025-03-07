@@ -52,12 +52,11 @@ func Test__hash_inaccessible_file_fails(t *testing.T) {
 	f, err := os.CreateTemp("", "")
 	require.NoError(t, err)
 	filename := f.Name()
-	defer func() {
+	t.Cleanup(func() {
 		err := os.Remove(filename)
 		require.NoError(t, err)
-	}()
-	err = testutil.MakeInaccessible(filename)
-	require.NoError(t, err)
+	})
+	testutil.MakeInaccessibleT(t, filename)
 	err = f.Close()
 	assert.NoError(t, err)
 	_, err = File(filename)
