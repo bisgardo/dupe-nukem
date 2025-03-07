@@ -45,7 +45,7 @@ func Test__hash_wraps_file_error(t *testing.T) {
 		err := os.Remove(filename)
 		require.NoError(t, err)
 	}()
-	err = testutil.MakeFileInaccessible(f)
+	err = testutil.MakeInaccessible(filename)
 	require.NoError(t, err)
 	err = f.Close()
 	assert.NoError(t, err)

@@ -13,13 +13,6 @@ import (
 	"github.com/bisgardo/dupe-nukem/testutil"
 )
 
-// NOTE: Working dir for tests is the directory containing the file.
-
-// TODO: Figure out how to test symlinks on Windows:
-//       - Create specialized tests that need to be run manually as administrator.
-//       - Handle/test Windows-specific features: shortcuts, junctions.
-// TODO: Test logged output whenever it's relevant.
-
 func Test__empty_dir(t *testing.T) {
 	root := t.TempDir()
 
@@ -33,7 +26,6 @@ func Test__empty_dir(t *testing.T) {
 		{name: "skipping root", shouldSkip: skip(root)},
 		{name: "skipping non-existing", shouldSkip: skip("non-existing")},
 	}
-
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			res, err := Run(root, test.shouldSkip, nil)
@@ -68,58 +60,52 @@ func Test__file_root_fails(t *testing.T) {
 }
 
 func Test__inaccessible_root_is_skipped(t *testing.T) {
-	// Resolve symlink to prevent a log entry from being emitted on macOS where tmp paths are symlinked.
-	// On GitHub Actions, this is also necessary for the Windows runner because the provided dir path
-	// 'C:\Users\RUNNER~1\AppData\Local\Temp\...' somehow resolves as a symlink to 'C:\Users\runneradmin\AppData\Local\Temp\...'.
-	root, err := filepath.EvalSymlinks(t.TempDir())
+	rootPath := t.TempDir() // TODO: eval symlink?
+	err := testutil.MakeInaccessible(rootPath)
 	require.NoError(t, err)
-
-	err = testutil.MakeDirInaccessible(root)
-	require.NoError(t, err)
-	defer func() {
-		// TODO: Check if this is redundant now that we're using `t.TempDir()`.
-		err := testutil.MakeDirAccessible(root)
-		assert.NoError(t, err)
-	}()
+	want := &Dir{Name: filepath.Base(rootPath)}
 
 	buf := testutil.LogBuffer()
-	res, err := Run(root, NoSkip, nil)
+	res, err := Run(rootPath, NoSkip, nil)
 	require.NoError(t, err)
-	assert.Equal(t, &Dir{Name: filepath.Base(root)}, res)
-	assert.Equal(t, fmt.Sprintf("skipping inaccessible directory %q\n", root), buf.String())
+	assert.Equal(t, want, res)
+	assert.Equal(t, fmt.Sprintf("skipping inaccessible directory %q\n", rootPath), buf.String())
 }
 
 func Test__testdata_no_skip(t *testing.T) {
-	root := "testdata"
-	want := &Dir{
-		Name: "testdata",
-		Dirs: []*Dir{
-			{
-				Name:  "b",
-				Files: []*File{testdata_b_d},
-			},
-			{
-				Name: "e",
-				Dirs: []*Dir{
-					{
-						Name:       "f",
-						Files:      []*File{testdata_e_f_a},
-						EmptyFiles: []string{"g"},
-					},
-				},
-			},
+	root := dir{
+		"a":   file{c: "x\n"},
+		"c":   file{c: "y\n"},
+		"b/d": file{c: "x\n"},
+		"e/f": dir{
+			"a": file{c: "z\n"},
+			"g": file{},
 		},
-		Files: []*File{testdata_a, testdata_c},
 	}
-	res, err := Run(root, NoSkip, nil)
+	rootPath := t.TempDir()
+	err := root.writeTo(rootPath)
+	require.NoError(t, err)
+	want := root.toScanDir(filepath.Base(rootPath))
+
+	res, err := Run(rootPath, NoSkip, nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
 }
 
 func Test__testdata_skip_root_fails(t *testing.T) {
-	root := "testdata"
-	_, err := Run(root, skip(root), nil)
-	assert.EqualError(t, err, `skipping root directory "testdata"`)
+	tests := []struct {
+		name     string
+		rootPath string
+	}{
+		{name: "existing", rootPath: t.TempDir()},
+		{name: "non-existing", rootPath: "non-existing"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := Run(test.rootPath, skip(filepath.Base(test.rootPath)), nil)
+			assert.EqualError(t, err, fmt.Sprintf("skipping root directory %q", test.rootPath))
+		})
+	}
 }
 
 // SKIPPED on Windows unless running as administrator.
@@ -140,25 +126,26 @@ func Test__testdata_skip_symlinked_root_fails(t *testing.T) {
 }
 
 func Test__testdata_skip_dir_without_subdirs(t *testing.T) {
-	root := "testdata"
-	want := &Dir{
-		Name: "testdata",
-		Dirs: []*Dir{
-			{
-				Name: "e",
-				Dirs: []*Dir{
-					{
-						Name:       "f",
-						Files:      []*File{testdata_e_f_a},
-						EmptyFiles: []string{"g"},
-					},
-				},
+	root := dir{
+		"a": file{c: "x\n"},
+		"c": file{c: "y\n"},
+		"b": dirExt{
+			skipped: true,
+			dir: dir{
+				"d": file{c: "x\n"},
 			},
 		},
-		Files:       []*File{testdata_a, testdata_c},
-		SkippedDirs: []string{"b"},
+		"e/f": dir{
+			"a": file{c: "z\n"},
+			"g": file{},
+		},
 	}
-	res, err := Run(root, skip("b"), nil)
+	rootPath := t.TempDir()
+	err := root.writeTo(rootPath)
+	require.NoError(t, err)
+	want := root.toScanDir(filepath.Base(rootPath))
+
+	res, err := Run(rootPath, skip("b"), nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
 }
@@ -213,175 +200,181 @@ func Test__SkipNameSet_nonempty_returns_whether_basename_matches(t *testing.T) {
 }
 
 func Test__testdata_skip_dir_with_subdirs(t *testing.T) {
-	root := "testdata"
-	want := &Dir{
-		Name: "testdata",
-		Dirs: []*Dir{
-			{
-				Name:  "b",
-				Files: []*File{testdata_b_d},
+	root := dir{
+		"a":   file{c: "x\n"},
+		"c":   file{c: "y\n"},
+		"b/d": file{c: "x\n"},
+		"e": dirExt{
+			skipped: true,
+			dir: dir{
+				"f": dir{
+					"a": file{c: "z\n", skipped: true},
+					"g": file{},
+				},
 			},
 		},
-		Files:       []*File{testdata_a, testdata_c},
-		SkippedDirs: []string{"e"},
 	}
-	res, err := Run(root, skip("e"), nil)
+	rootPath := t.TempDir()
+	err := root.writeTo(rootPath)
+	require.NoError(t, err)
+	want := root.toScanDir(filepath.Base(rootPath))
+
+	res, err := Run(rootPath, skip("e"), nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
 }
 
 func Test__testdata_skip_nonempty_file(t *testing.T) {
-	root := "testdata"
-	want := &Dir{
-		Name: "testdata",
-		Dirs: []*Dir{
-			{
-				Name:  "b",
-				Files: []*File{testdata_b_d},
-			},
-			{
-				Name: "e",
-				Dirs: []*Dir{
-					{
-						Name:         "f",
-						EmptyFiles:   []string{"g"},
-						SkippedFiles: []string{"a"},
-					},
-				},
-			},
+	root := dir{
+		"a":   file{c: "x\n", skipped: true},
+		"c":   file{c: "y\n"},
+		"b/d": file{c: "x\n"},
+		"e/f": dir{
+			"a": file{c: "z\n", skipped: true},
+			"g": file{},
 		},
-		Files:        []*File{testdata_c},
-		SkippedFiles: []string{"a"},
 	}
-	res, err := Run(root, skip("a"), nil)
+	rootPath := t.TempDir()
+	err := root.writeTo(rootPath)
+	require.NoError(t, err)
+	want := root.toScanDir(filepath.Base(rootPath))
+
+	res, err := Run(rootPath, skip("a"), nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
 }
 
 func Test__testdata_subdir_skip_empty_file(t *testing.T) {
-	root := "testdata/e/f"
-	want := &Dir{
-		Name:         "f",
-		Files:        []*File{testdata_e_f_a},
-		SkippedFiles: []string{"g"},
+	root := dir{
+		"a": file{c: "z\n"},
+		"g": file{skipped: true},
 	}
-	res, err := Run(root, skip("g"), nil)
+	rootPath := t.TempDir()
+	err := root.writeTo(rootPath)
+	require.NoError(t, err)
+	want := root.toScanDir(filepath.Base(rootPath))
+	res, err := Run(rootPath, skip("g"), nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
 }
 
 func Test__testdata_skip_files_is_logged(t *testing.T) {
-	root := "testdata"
+	root := dir{
+		"a":   file{c: "x\n"},
+		"c":   file{c: "y\n"},
+		"b/d": file{c: "x\n"},
+		"e/f": dir{
+			"a": file{c: "z\n"},
+			"g": file{},
+		},
+	}
+	rootPath := t.TempDir()
+	err := root.writeTo(rootPath)
+	require.NoError(t, err)
+
 	buf := testutil.LogBuffer()
-	_, err := Run(root, skip("a"), nil)
+	_, err = Run(rootPath, skip("a"), nil)
 	require.NoError(t, err)
 	want := fmt.Sprintf(
 		"skipping file %q based on skip list\nskipping file %q based on skip list\n",
-		filepath.Clean("testdata/a"),
-		filepath.Clean("testdata/e/f/a"),
+		filepath.Join(rootPath, "a"),
+		filepath.Join(rootPath, "e/f/a"),
 	)
 	assert.Equal(t, want, buf.String())
 }
 
 func Test__testdata_trailing_slash_gets_removed(t *testing.T) {
-	root := "testdata/e/f/"
-	want := &Dir{
-		Name:       "f",
-		Files:      []*File{testdata_e_f_a},
-		EmptyFiles: []string{"g"},
+	root := dir{
+		"a": file{c: "z\n"},
+		"g": file{},
 	}
-	res, err := Run(root, NoSkip, nil)
+	rootPath := t.TempDir()
+	err := root.writeTo(rootPath)
+	require.NoError(t, err)
+	want := root.toScanDir(filepath.Base(rootPath))
+
+	// Note added '/'.
+	res, err := Run(rootPath+"/", NoSkip, nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
 }
 
 // On Windows, this test only works if the repository is stored on an NTFS drive.
 func Test__inaccessible_internal_file_is_not_hashed_and_is_logged(t *testing.T) {
-	f, err := os.CreateTemp("testdata/e/f", "inaccessible")
-	require.NoError(t, err)
-	defer func() {
-		err := os.Remove(f.Name())
-		assert.NoError(t, err)
-	}()
-	n, err := f.WriteString("53cR31_")
-	require.NoError(t, err)
-	require.Equal(t, 7, n)
-
-	err = testutil.MakeFileInaccessible(f)
-	require.NoError(t, err)
-
-	err = f.Close()
-	assert.NoError(t, err)
-
-	root := "testdata/e/f"
-	want := &Dir{
-		Name: "f",
-		Files: []*File{
-			testdata_e_f_a,
-			{
-				Name: filepath.Base(f.Name()),
-				Size: 7,
-				Hash: 0,
-			},
-		},
-		EmptyFiles: []string{"g"},
+	root := dir{
+		"a":            file{c: "z\n"},
+		"g":            file{},
+		"inaccessible": file{c: "53cR31_", inaccessible: true},
 	}
+	rootPath := t.TempDir()
+	err := root.writeTo(rootPath)
+	require.NoError(t, err)
+	want := root.toScanDir(filepath.Base(rootPath))
+
 	buf := testutil.LogBuffer()
-	res, err := Run(root, NoSkip, nil)
+	res, err := Run(rootPath, NoSkip, nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
-	assert.Equal(t, fmt.Sprintf("error: cannot hash file %q: cannot open file: access denied\n", filepath.Clean(f.Name())), buf.String())
+	assert.Equal(t,
+		fmt.Sprintf(
+			"error: cannot hash file %q: cannot open file: access denied\n",
+			filepath.Join(rootPath, "inaccessible"),
+		),
+		buf.String(),
+	)
 }
 
 // On Windows, this test only works if the repository is stored on a filesystem
 // that supports the command 'icacls' (such as NTFS).
 func Test__inaccessible_internal_dir_is_logged(t *testing.T) {
-	// Cannot use t.TempDir() because the test expects it to be created within 'testdata'.
-	d, err := os.MkdirTemp("testdata/e/f", "inaccessible")
-	require.NoError(t, err)
-	defer func() {
-		err := os.Remove(d)
-		assert.NoError(t, err)
-	}()
-
-	err = testutil.MakeDirInaccessible(d)
-	require.NoError(t, err)
-	defer func() {
-		err := testutil.MakeDirAccessible(d)
-		assert.NoError(t, err)
-	}()
-
-	root := "testdata/e"
-	want := &Dir{
-		Name: "e",
-		Dirs: []*Dir{
-			{
-				Name:       "f",
-				Files:      []*File{testdata_e_f_a},
-				EmptyFiles: []string{"g"},
-			},
+	root := dir{
+		"f": dir{
+			"a":            file{c: "z\n"},
+			"g":            file{},
+			"inaccessible": dirExt{inaccessible: true},
 		},
 	}
+	rootPath := t.TempDir()
+	err := root.writeTo(rootPath)
+	want := root.toScanDir(filepath.Base(rootPath))
+
 	buf := testutil.LogBuffer()
-	res, err := Run(root, NoSkip, nil)
+	res, err := Run(rootPath, NoSkip, nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
-	assert.Equal(t, fmt.Sprintf("skipping inaccessible directory %q\n", filepath.Clean(d)), buf.String())
+	assert.Equal(t,
+		fmt.Sprintf(
+			"skipping inaccessible directory %q\n",
+			filepath.Join(rootPath, "f/inaccessible"),
+		),
+		buf.String(),
+	)
 }
 
 func Test__testdata_cache_with_mismatching_root_fails(t *testing.T) {
-	root := "testdata"
-	cache := &Dir{
-		Name: "not-testdata",
-	}
-	_, err := Run(root, skip("a"), cache)
-	assert.EqualError(t, err, `cache of directory "not-testdata" cannot be used with root directory "testdata"`)
+	rootPath := "some-root"
+	cache := &Dir{Name: "other-root"}
+	_, err := Run(rootPath, NoSkip, cache)
+	assert.EqualError(t, err, `cache of directory "other-root" cannot be used with root directory "some-root"`)
 }
 
 func Test__testdata_with_hashes_from_cache(t *testing.T) {
-	root := "testdata"
+	root := dir{
+		"a":   file{c: "x\n"},
+		"c":   file{c: "y\n", cachedHash: 53},
+		"b/d": file{c: "x\n"},
+		"e/f": dir{
+			"a": file{c: "z\n", cachedHash: 42},
+			"g": file{},
+		},
+	}
+	rootPath := t.TempDir()
+	err := root.writeTo(rootPath)
+	require.NoError(t, err)
+	want := root.toScanDir(filepath.Base(rootPath))
+
 	cache := &Dir{
-		Name: "testdata",
+		Name: want.Name,
 		Dirs: []*Dir{
 			{
 				Name: "e",
@@ -394,118 +387,89 @@ func Test__testdata_with_hashes_from_cache(t *testing.T) {
 					},
 				},
 				Files: []*File{
-					{Name: "d", Size: 2, Hash: 66}, // not used
+					{Name: "d", Size: 2, Hash: 69}, // not used
 				},
 			},
 		},
 		Files: []*File{
 			{Name: "c", Size: 2, Hash: 53}, // used
-			{Name: "d", Size: 2, Hash: 66}, // not used
+			{Name: "d", Size: 2, Hash: 69}, // not used
 		},
 	}
-	want := &Dir{
-		Name: "testdata",
-		Dirs: []*Dir{
-			{
-				Name:  "b",
-				Files: []*File{testdata_b_d}, // not cached
-			},
-			{
-				Name: "e",
-				Dirs: []*Dir{
-					{
-						Name: "f",
-						Files: []*File{
-							{Name: "a", Size: 2, Hash: 42}, // cached
-						},
-						EmptyFiles: []string{"g"},
-					},
-				},
-			},
-		},
-		Files: []*File{
-			testdata_a,                     // not cached
-			{Name: "c", Size: 2, Hash: 53}, // cached
-		},
-	}
-	res, err := Run(root, NoSkip, cache)
+	res, err := Run(rootPath, NoSkip, cache)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
 }
 
 func Test__testdata_subdir_cache_not_used_for_mismatching_file_size(t *testing.T) {
-	root := "testdata/b"
+	root := dir{
+		"d": file{c: "x\n"},
+	}
+	rootPath := t.TempDir()
+	err := root.writeTo(rootPath)
+	require.NoError(t, err)
+	want := root.toScanDir(filepath.Base(rootPath))
+
 	cache := &Dir{
-		Name: "b",
+		Name: want.Name,
 		Files: []*File{
 			{
 				Name: "d",
-				Size: 1,  // size of "testdata/b/d" is 2
+				Size: 1,  // size of "d" is 2
 				Hash: 21, // so the cached hash value is not read
 			},
 		},
 	}
-	want := &Dir{
-		Name:  "b",
-		Files: []*File{testdata_b_d},
-	}
-	res, err := Run(root, NoSkip, cache)
+	res, err := Run(rootPath, NoSkip, cache)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
 }
 
 func Test__cache_entry_with_hash_0_is_ignored(t *testing.T) {
-	root := "testdata/b"
+	root := dir{
+		"d": file{c: "x\n"},
+	}
+	rootPath := t.TempDir()
+	err := root.writeTo(rootPath)
+	require.NoError(t, err)
+	want := root.toScanDir(filepath.Base(rootPath))
+
 	cache := &Dir{
-		Name: "b",
+		Name: want.Name,
 		Files: []*File{
 			{
 				Name: "d",
 				Size: 2,
-				Hash: 0, // value 0 is intentionally ignored
+				Hash: 0, // value 0 is specifically ignored
 			},
 		},
 	}
-	want := &Dir{
-		Name:  "b",
-		Files: []*File{testdata_b_d},
-	}
-	res, err := Run(root, NoSkip, cache)
+	res, err := Run(rootPath, NoSkip, cache)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
 }
 
 func Test__hash_computed_as_0_is_logged(t *testing.T) {
-	v := "77kepQFQ8Kl" // from https://md5hashing.net/hash/fnv1a64/0000000000000000
-
-	// Resolving symlink for the same reason as described in a comment of 'Test__inaccessible_root_is_skipped'.
-	root, err := filepath.EvalSymlinks(t.TempDir())
-	require.NoError(t, err)
-
-	f, err := os.CreateTemp(root, "hash0")
-	require.NoError(t, err)
-	defer func() {
-		err := os.Remove(f.Name())
-		assert.NoError(t, err)
-	}()
-	_, err = f.WriteString(v)
-	require.NoError(t, err)
-	err = f.Close()
-	assert.NoError(t, err)
-	buf := testutil.LogBuffer()
-	require.NoError(t, err)
-	res, err := Run(root, NoSkip, nil)
-	want := &Dir{
-		Name: filepath.Base(root),
-		Files: []*File{{
-			Name: filepath.Base(f.Name()),
-			Size: 11,
-			Hash: 0,
-		}},
+	root := dir{
+		// Contents hash to 0 (https://md5hashing.net/hash/fnv1a64/0000000000000000).
+		"hash0": file{c: "77kepQFQ8Kl"},
 	}
+	rootPath := t.TempDir()
+	err := root.writeTo(rootPath)
+	require.NoError(t, err)
+	want := root.toScanDir(filepath.Base(rootPath))
+
+	buf := testutil.LogBuffer()
+	res, err := Run(rootPath, NoSkip, nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
-	assert.Equal(t, fmt.Sprintf("info: hash of file %q evaluated to 0 - this might result in warnings which can be safely ignored\n", f.Name()), buf.String())
+	assert.Equal(t,
+		fmt.Sprintf(
+			"info: hash of file %q evaluated to 0 - this might result in warnings which can be safely ignored\n",
+			filepath.Join(rootPath, "hash0"),
+		),
+		buf.String(),
+	)
 }
 
 // SKIPPED on Windows unless running as administrator.
@@ -514,25 +478,36 @@ func Test__root_symlink_is_followed_and_logged(t *testing.T) {
 	if runtime.GOOS == "windows" && !testutil.IsWindowsAdministrator() {
 		t.Skip("Creating symlinks on Windows requires elevated privileges.")
 	}
-	symlinkTarget := "testdata/e/f"
-	symlink := "test_root-symlink"
 
-	err := os.Symlink(symlinkTarget, symlink)
-	require.NoError(t, err)
-	defer func() {
-		err := os.Remove(symlink)
-		assert.NoError(t, err)
-	}()
-	want := &Dir{
-		Name:       symlink,
-		Files:      []*File{testdata_e_f_a},
-		EmptyFiles: []string{"g"},
+	symlinkedDir := dir{
+		"a": file{c: "z\n"},
+		"g": file{},
 	}
+	symlinkName := "symlink"
+	root := dir{
+		symlinkName: symlink("data"),
+		"data":      symlinkedDir,
+	}
+
+	rootPath := t.TempDir()
+	err := root.writeTo(rootPath)
+	require.NoError(t, err)
+
+	symlinkPath := filepath.Join(rootPath, symlinkName)
+	want := symlinkedDir.toScanDir(symlinkName)
+
 	buf := testutil.LogBuffer()
-	res, err := Run(symlink, NoSkip, nil)
+	res, err := Run(symlinkPath, NoSkip, nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
-	assert.Equal(t, fmt.Sprintf("following root symlink %q to %q\n", symlink, filepath.Clean(symlinkTarget)), buf.String()) // Clean replaces '/' with '\' on Windows
+	assert.Equal(t,
+		fmt.Sprintf(
+			"following root symlink %q to %q\n",
+			symlinkPath,
+			filepath.Join(rootPath, "data"), // Clean replaces '/' with '\' on Windows
+		),
+		buf.String(),
+	)
 }
 
 // SKIPPED on Windows unless running as administrator.
@@ -541,30 +516,36 @@ func Test__root_indirect_symlink_is_followed_and_logged(t *testing.T) {
 	if runtime.GOOS == "windows" && !testutil.IsWindowsAdministrator() {
 		t.Skip("Creating symlinks on Windows requires elevated privileges.")
 	}
-	symlinkTarget := "testdata/e/f"
-	indirectSymlink := "test_indirect-root-symlink"
-	symlink := "test-symlink"
 
-	err := os.Symlink(symlinkTarget, symlink)
-	require.NoError(t, err)
-	err = os.Symlink(symlink, indirectSymlink)
-	require.NoError(t, err)
-	defer func() {
-		err := os.Remove(indirectSymlink)
-		assert.NoError(t, err)
-		err = os.Remove(symlink)
-		assert.NoError(t, err)
-	}()
-	want := &Dir{
-		Name:       indirectSymlink,
-		Files:      []*File{testdata_e_f_a},
-		EmptyFiles: []string{"g"},
+	symlinkedDir := dir{
+		"a": file{c: "z\n"},
+		"g": file{},
 	}
+	symlinkName := "indirect-symlink"
+	testDir := dir{
+		symlinkName: symlink("symlink"),
+		"symlink":   symlink("data"),
+		"data":      symlinkedDir,
+	}
+
+	rootPath := t.TempDir()
+	err := testDir.writeTo(rootPath)
+	require.NoError(t, err)
+
+	want := symlinkedDir.toScanDir(symlinkName)
 	buf := testutil.LogBuffer()
-	res, err := Run(indirectSymlink, NoSkip, nil)
+	indirectSymlinkPath := filepath.Join(rootPath, symlinkName)
+	res, err := Run(indirectSymlinkPath, NoSkip, nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
-	assert.Equal(t, fmt.Sprintf("following root symlink %q to %q\n", indirectSymlink, filepath.Clean(symlinkTarget)), buf.String()) // Clean replaces '/' with '\' on Windows
+	assert.Equal(t,
+		fmt.Sprintf(
+			"following root symlink %q to %q\n",
+			indirectSymlinkPath,
+			filepath.Clean(filepath.Join(rootPath, "data")), // Clean replaces '/' with '\' on Windows
+		),
+		buf.String(),
+	)
 }
 
 // SKIPPED on Windows unless running as administrator.
@@ -573,26 +554,27 @@ func Test__internal_symlink_is_skipped_and_logged(t *testing.T) {
 	if runtime.GOOS == "windows" && !testutil.IsWindowsAdministrator() {
 		t.Skip("Creating symlinks on Windows requires elevated privileges.")
 	}
-	symlink := "testdata/e/f/test_internal-symlink"
-
-	err := os.Symlink("testdata", symlink)
-	require.NoError(t, err)
-	defer func() {
-		err := os.Remove(symlink)
-		assert.NoError(t, err)
-	}()
-
-	root := "testdata/e/f"
-	want := &Dir{
-		Name:       "f",
-		Files:      []*File{testdata_e_f_a}, // doesn't include the symlink as file nor the dir it points at
-		EmptyFiles: []string{"g"},
+	symlinkName := "symlink"
+	root := dir{
+		"a":         file{c: "z\n"},
+		symlinkName: symlink("a"), // TODO: add test where target doesn't exist?
 	}
+	rootPath := t.TempDir()
+	err := root.writeTo(rootPath)
+	require.NoError(t, err)
+	want := root.toScanDir(filepath.Base(rootPath))
+
 	buf := testutil.LogBuffer()
-	res, err := Run(root, NoSkip, nil)
+	res, err := Run(rootPath, NoSkip, nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
-	assert.Equal(t, fmt.Sprintf("skipping symlink %q during scan\n", filepath.Clean(symlink)), buf.String()) // Clean replaces '/' with '\' on Windows
+	assert.Equal(t,
+		fmt.Sprintf(
+			"skipping symlink %q during scan\n",
+			filepath.Join(rootPath, symlinkName),
+		),
+		buf.String(),
+	)
 }
 
 // SKIPPED on Windows unless running as administrator.
@@ -601,26 +583,21 @@ func Test__root_symlink_to_ancestor_is_followed_but_skipped_when_internal(t *tes
 	if runtime.GOOS == "windows" && !testutil.IsWindowsAdministrator() {
 		t.Skip("Creating symlinks on Windows requires elevated privileges.")
 	}
-	symlink := "testdata/e/f/test_ancestor-symlink" // points to "testdata/e"
-
-	err := os.Symlink("..", symlink)
-	require.NoError(t, err)
-	defer func() {
-		err := os.Remove(symlink)
-		assert.NoError(t, err)
-	}()
-
-	want := &Dir{
-		Name: "test_ancestor-symlink",
-		Dirs: []*Dir{
-			{
-				Name:       "f",
-				Files:      []*File{testdata_e_f_a}, // doesn't include the symlink as file nor the dir it points at
-				EmptyFiles: []string{"g"},
-			},
-		},
+	symlinkName := "internal-symlink"
+	symlinkedDir := dir{
+		"a":         file{c: "z\n"},
+		"g":         file{},
+		symlinkName: symlink(".."),
 	}
-	res, err := Run(symlink, NoSkip, nil)
+	root := dir{
+		"e/f": symlinkedDir, // points to "e"
+	}
+	rootPath := t.TempDir()
+	err := root.writeTo(rootPath)
+	require.NoError(t, err)
+	want := root.toScanDir(filepath.Base(rootPath))
+
+	res, err := Run(rootPath, NoSkip, nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
 }

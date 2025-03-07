@@ -20,6 +20,9 @@ type Dir struct {
 
 // NewDir constructs a Dir.
 func NewDir(name string) *Dir {
+	if name == "" {
+		panic("name cannot be empty")
+	}
 	return &Dir{
 		Name:  name,
 		Dirs:  nil,
@@ -73,6 +76,9 @@ type File struct {
 
 // NewFile constructs a File.
 func NewFile(name string, size int64, hash uint64) *File {
+	if name == "" {
+		panic("name cannot be empty")
+	}
 	return &File{
 		Name: name,
 		Size: size,
