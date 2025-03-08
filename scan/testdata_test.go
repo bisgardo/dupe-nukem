@@ -72,10 +72,6 @@ func (d dir) writeTo(t *testing.T, path string) {
 	}
 }
 
-//func (d dir) ext() dirExt {
-//	return dirExt{dir: d}
-//}
-
 type dirExt struct {
 	dir          dir
 	skipped      bool
@@ -178,7 +174,7 @@ var (
 	_ node = symlink("")
 )
 
-// TODO: Test the testers.
+// TODO: Test the testers (implement timestamping first).
 
 //// withSkippedNames constructs a copy of the Dir with the provided names being added to the "skipped" lists
 //// instead of the regular ones.

@@ -12,22 +12,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TODO: Consider using build flags instead of checking OS on runtime (would allow using 'golang.org/x/sys/windows').
-// TODO: Would it be more idiomatic to return a cleanup function for reverting the change rather than doing it explicitly?
+// TODO: Consider using platform-specific implementations instead of checking OS on runtime (would allow using 'golang.org/x/sys/windows').
 
-// MakeInaccessible makes the file or directory at the provided path non-readable to the user
-// running the test.
+// MakeInaccessible makes the file or directory at the provided path non-readable to the user running the test.
 // On Unix, this is done by zeroing out the permission bits.
 // On Windows, that method can only be used to control the "write" flag (https://golang.org/pkg/os/#Chmod),
 // so we invoke 'icacls' instead to deny access (https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/icacls).
-// The function is only intended to be used on temporary files that
-// get deleted as part of cleaning up after the test.
-// Files and (except on Windows) directories being inaccessible
-// don't prevent their deletion on any of the tested platforms.
+// Files and (except on Windows) directories being inaccessible don't prevent their deletion on any of the tested platforms.
 //
-// This function used to have separate variants for files and directories along with counterparts for reverting the change.
-// These were deemed unnecessary after the introduction of testing.T.TempDir() (in Go 1.15),
-// as that seems able to clean up properly without it.
+// As this function is mainly designed for use within a temporary directory created with T.TestDir,
+// the accessibility change only needs to be reverted when it prevents the file from being deleted after the test.
+// This is not a problem on Linux nor Mac, but on Windows, inaccessible directories cannot be deleted.
+// For this reason, the function returns a cleanup function for reverting the change.
 func MakeInaccessible(path string) (func() error, error) {
 	//goland:noinspection GoBoolExpressions
 	if runtime.GOOS == "windows" {
