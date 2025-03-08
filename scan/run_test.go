@@ -175,23 +175,25 @@ func Test__skip_symlinked_root_fails(t *testing.T) {
 		t.Skip("Creating symlinks on Windows requires elevated privileges.")
 	}
 	tests := []struct {
-		name     string
-		rootPath string
+		name              string
+		symlinkTargetPath string
 	}{
-		{name: "existing", rootPath: tempDir(t)},
-		{name: "non-existing", rootPath: "non-existing"},
+		{name: "existing", symlinkTargetPath: tempDir(t)},
+		{name: "non-existing", symlinkTargetPath: "non-existing"},
 	}
-	symlinkName := "test_root-symlink"
+	symlinkName := "root-symlink"
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			err := os.Symlink(test.rootPath, symlinkName)
+			rootPath := tempDir(t)
+			symlinkPath := filepath.Join(rootPath, symlinkName)
+			err := os.Symlink(test.symlinkTargetPath, symlinkPath)
 			require.NoError(t, err)
 			defer func() {
-				err := os.Remove(symlinkName)
+				err := os.Remove(symlinkPath)
 				assert.NoError(t, err)
 			}()
-			_, err = Run(symlinkName, skip(symlinkName), nil)
-			assert.EqualError(t, err, fmt.Sprintf(`skipping root directory %q`, symlinkName))
+			_, err = Run(symlinkPath, skip(symlinkName), nil)
+			assert.EqualError(t, err, fmt.Sprintf(`skipping root directory %q`, symlinkPath))
 		})
 	}
 }
@@ -321,7 +323,6 @@ func Test__inaccessible_internal_file_is_not_hashed_and_is_logged(t *testing.T) 
 		"g":            file{},
 		"inaccessible": file{c: "53cR31_", makeInaccessible: true},
 	}
-	// Resolving symlink for the same reason as described in a comment of 'Test__inaccessible_root_is_skipped'.
 	rootPath := tempDir(t)
 	root.writeTestdata(t, rootPath)
 	want := root.simulateScan(filepath.Base(rootPath))
@@ -349,7 +350,6 @@ func Test__inaccessible_internal_dir_is_logged(t *testing.T) {
 			"inaccessible": dirExt{inaccessible: true},
 		},
 	}
-	// Resolving symlink for the same reason as described in a comment of 'Test__inaccessible_root_is_skipped'.
 	rootPath := tempDir(t)
 	root.writeTestdata(t, rootPath)
 	want := root.simulateScan(filepath.Base(rootPath))
@@ -475,7 +475,6 @@ func Test__hash_computed_as_0_is_logged(t *testing.T) {
 		// Contents hash to 0 (https://md5hashing.net/hash/fnv1a64/0000000000000000).
 		"hash0": file{c: "77kepQFQ8Kl"},
 	}
-	// Resolving symlink for the same reason as described in a comment of 'Test__inaccessible_root_is_skipped'.
 	rootPath := tempDir(t)
 	root.writeTestdata(t, rootPath)
 	want := root.simulateScan(filepath.Base(rootPath))
@@ -509,7 +508,6 @@ func Test__root_symlink_is_followed_and_logged(t *testing.T) {
 		symlinkName: symlink("data"),
 		"data":      symlinkedDir,
 	}
-	// Resolving symlink for the same reason as described in a comment of 'Test__inaccessible_root_is_skipped'.
 	rootPath := tempDir(t)
 	root.writeTestdata(t, rootPath)
 	symlinkPath := filepath.Join(rootPath, symlinkName)
@@ -530,6 +528,27 @@ func Test__root_symlink_is_followed_and_logged(t *testing.T) {
 }
 
 // SKIPPED on Windows unless running as administrator.
+func Test__root_broken_symlink_fails(t *testing.T) {
+	//goland:noinspection GoBoolExpressions
+	if runtime.GOOS == "windows" && !testutil.IsWindowsAdministrator() {
+		t.Skip("Creating symlinks on Windows requires elevated privileges.")
+	}
+
+	symlinkName := "broken-root-symlink"
+	rootPath := tempDir(t)
+	symlinkPath := filepath.Join(rootPath, symlinkName)
+	err := os.Symlink("non-existing", symlinkPath)
+	require.NoError(t, err)
+	defer func() {
+		err := os.Remove(symlinkPath)
+		assert.NoError(t, err)
+	}()
+
+	_, err = Run(symlinkPath, NoSkip, nil)
+	assert.EqualError(t, err, fmt.Sprintf("invalid root directory %q: not found", symlinkPath))
+}
+
+// SKIPPED on Windows unless running as administrator.
 func Test__root_indirect_symlink_is_followed_and_logged(t *testing.T) {
 	//goland:noinspection GoBoolExpressions
 	if runtime.GOOS == "windows" && !testutil.IsWindowsAdministrator() {
@@ -546,7 +565,6 @@ func Test__root_indirect_symlink_is_followed_and_logged(t *testing.T) {
 		"symlink":   symlink("data"),
 		"data":      symlinkedDir,
 	}
-	// Resolving symlink for the same reason as described in a comment of 'Test__inaccessible_root_is_skipped'.
 	rootPath := tempDir(t)
 	root.writeTestdata(t, rootPath)
 	want := symlinkedDir.simulateScan(symlinkName)
@@ -594,7 +612,6 @@ func Test__internal_symlink_is_skipped_and_logged(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		// Resolving symlink for the same reason as described in a comment of 'Test__inaccessible_root_is_skipped'.
 		rootPath := tempDir(t)
 		test.root.writeTestdata(t, rootPath)
 		want := test.root.simulateScan(filepath.Base(rootPath))
@@ -654,8 +671,6 @@ func Test__root_symlink_to_ancestor_is_followed_but_skipped_and_logged_when_inte
 		buf.String(),
 	)
 }
-
-// TODO: Add test where the root is a broken symlink.
 
 /* UTILITIES */
 
