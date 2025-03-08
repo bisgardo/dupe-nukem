@@ -40,7 +40,7 @@ func Test__empty_dir(t *testing.T) {
 	}
 }
 
-func Test__nonexistent_dir_fails(t *testing.T) {
+func Test__nonexistent_root_fails(t *testing.T) {
 	t.Run("without trailing slash", func(t *testing.T) {
 		_, err := Run("nonexistent", NoSkip, nil)
 		require.EqualError(t, err, `invalid root directory "nonexistent": not found`)
@@ -54,21 +54,22 @@ func Test__nonexistent_dir_fails(t *testing.T) {
 func Test__file_root_fails(t *testing.T) {
 	f, err := os.CreateTemp("", "root")
 	require.NoError(t, err)
+	filename := f.Name()
 	defer func() {
-		err := os.Remove(f.Name())
+		err := os.Remove(filename)
 		assert.NoError(t, err)
 	}()
 	err = f.Close()
 	assert.NoError(t, err)
-	_, err = Run(f.Name(), NoSkip, nil)
-	assert.EqualError(t, err, fmt.Sprintf("invalid root directory %q: not a directory", f.Name()))
+	_, err = Run(filename, NoSkip, nil)
+	assert.EqualError(t, err, fmt.Sprintf("invalid root directory %q: not a directory", filename))
 }
 
 func Test__inaccessible_root_is_skipped(t *testing.T) {
 	// Resolve symlink to prevent a log entry from being emitted on macOS where tmp paths are symlinked.
 	// On GitHub Actions, this is also necessary for the Windows runner because the provided dir path
 	// 'C:\Users\RUNNER~1\AppData\Local\Temp\...' somehow resolves as a symlink to 'C:\Users\runneradmin\AppData\Local\Temp\...'.
-	// TODO: Make a helper function for having this done automatically, always.
+	// TODO: Make a helper function for automating this (always).
 	rootPath, err := filepath.EvalSymlinks(t.TempDir())
 	require.NoError(t, err)
 	testutil.MakeInaccessibleT(t, rootPath)
@@ -100,60 +101,6 @@ func Test__no_skip(t *testing.T) {
 	assert.Equal(t, want, res)
 }
 
-func Test__skip_root_fails(t *testing.T) {
-	tests := []struct {
-		name     string
-		rootPath string
-	}{
-		{name: "existing", rootPath: t.TempDir()},
-		{name: "non-existing", rootPath: "non-existing"},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			_, err := Run(test.rootPath, skip(filepath.Base(test.rootPath)), nil)
-			assert.EqualError(t, err, fmt.Sprintf("skipping root directory %q", test.rootPath))
-		})
-	}
-}
-
-// SKIPPED on Windows unless running as administrator.
-func Test__skip_symlinked_root_fails(t *testing.T) {
-	//goland:noinspection GoBoolExpressions
-	if runtime.GOOS == "windows" && !testutil.IsWindowsAdministrator() {
-		t.Skip("Creating symlinks on Windows requires elevated privileges.")
-	}
-	symlinkName := "test_root-symlink"
-	// TODO: Add variant for pointing to existing dir (like above).
-	err := os.Symlink("non-existing", symlinkName)
-	require.NoError(t, err)
-	defer func() {
-		err := os.Remove(symlinkName)
-		assert.NoError(t, err)
-	}()
-	_, err = Run(symlinkName, skip(symlinkName), nil)
-	assert.EqualError(t, err, `skipping root directory "test_root-symlink"`)
-}
-
-func Test__skip_dir_without_subdirs(t *testing.T) {
-	root := dir{
-		"a": file{c: "x\n"},
-		"c": file{c: "y\n"},
-		"b": dirExt{skipped: true},
-		"e/f": dir{
-			"a": file{c: "z\n"},
-			"g": file{},
-		},
-	}
-	rootPath := t.TempDir()
-	root.writeTestdata(t, rootPath)
-	want := root.simulateScan(filepath.Base(rootPath))
-
-	res, err := Run(rootPath, skip("b"), nil)
-	require.NoError(t, err)
-	assert.Equal(t, want, res)
-}
-
-// TODO: The following two tests look malplaced: move above or below the surrounding ones which actually can Run.
 func Test__SkipNameSet_empty_always_returns_false(t *testing.T) {
 	shouldSkip := SkipNameSet(nil)
 
@@ -203,6 +150,71 @@ func Test__SkipNameSet_nonempty_returns_whether_basename_matches(t *testing.T) {
 	}
 }
 
+func Test__skip_root_fails(t *testing.T) {
+	tests := []struct {
+		name     string
+		rootPath string
+	}{
+		{name: "existing", rootPath: t.TempDir()},
+		{name: "non-existing", rootPath: "non-existing"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := Run(test.rootPath, skip(filepath.Base(test.rootPath)), nil)
+			assert.EqualError(t, err, fmt.Sprintf("skipping root directory %q", test.rootPath))
+		})
+	}
+}
+
+// SKIPPED on Windows unless running as administrator.
+func Test__skip_symlinked_root_fails(t *testing.T) {
+	//goland:noinspection GoBoolExpressions
+	if runtime.GOOS == "windows" && !testutil.IsWindowsAdministrator() {
+		t.Skip("Creating symlinks on Windows requires elevated privileges.")
+	}
+	tests := []struct {
+		name     string
+		rootPath string
+	}{
+		{name: "existing", rootPath: t.TempDir()},
+		{name: "non-existing", rootPath: "non-existing"},
+	}
+	symlinkName := "test_root-symlink"
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := os.Symlink(test.rootPath, symlinkName)
+			require.NoError(t, err)
+			defer func() {
+				err := os.Remove(symlinkName)
+				assert.NoError(t, err)
+			}()
+			_, err = Run(symlinkName, skip(symlinkName), nil)
+			assert.EqualError(t, err, fmt.Sprintf(`skipping root directory %q`, symlinkName))
+		})
+	}
+}
+
+func Test__skip_dir_without_subdirs(t *testing.T) {
+	root := dir{
+		"a": file{c: "x\n"},
+		"c": file{c: "y\n"},
+		"b": dirExt{skipped: true},
+		"e/f": dir{
+			"a": file{c: "z\n"},
+			"g": file{},
+		},
+	}
+	rootPath := t.TempDir()
+	root.writeTestdata(t, rootPath)
+	want := root.simulateScan(filepath.Base(rootPath))
+
+	res, err := Run(rootPath, skip("b"), nil)
+	require.NoError(t, err)
+	assert.Equal(t, want, res)
+
+	// TODO: Test log output.
+}
+
 func Test__skip_dir_with_subdirs(t *testing.T) {
 	root := dir{
 		"a":   file{c: "x\n"},
@@ -225,6 +237,8 @@ func Test__skip_dir_with_subdirs(t *testing.T) {
 	res, err := Run(rootPath, skip("e"), nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
+
+	// TODO: Test log output.
 }
 
 func Test__skip_nonempty_files(t *testing.T) {
@@ -244,6 +258,8 @@ func Test__skip_nonempty_files(t *testing.T) {
 	res, err := Run(rootPath, skip("a"), nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
+
+	// TODO: Test log output.
 }
 
 func Test__skip_empty_file(t *testing.T) {
@@ -363,7 +379,7 @@ func Test__cache_with_mismatching_root_fails(t *testing.T) {
 	assert.EqualError(t, err, `cache of directory "other-root" cannot be used with root directory "some-root"`)
 }
 
-func Test__with_hashes_from_cache(t *testing.T) {
+func Test__hashes_from_cache_are_used(t *testing.T) {
 	root := dir{
 		"a":   file{c: "x\n"},
 		"c":   file{c: "y\n", hashFromCache: 53},
@@ -449,6 +465,8 @@ func Test__cache_entry_with_hash_0_is_ignored(t *testing.T) {
 	res, err := Run(rootPath, NoSkip, cache)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
+
+	// TODO: Test if's logged (it should be?).
 }
 
 func Test__hash_computed_as_0_is_logged(t *testing.T) {
@@ -558,28 +576,46 @@ func Test__internal_symlink_is_skipped_and_logged(t *testing.T) {
 	if runtime.GOOS == "windows" && !testutil.IsWindowsAdministrator() {
 		t.Skip("Creating symlinks on Windows requires elevated privileges.")
 	}
-	symlinkName := "symlink"
-	root := dir{
-		"a":         file{c: "z\n"},
-		symlinkName: symlink("a"), // TODO: add test where target doesn't exist?
-	}
-	// Resolving symlink for the same reason as described in a comment of 'Test__inaccessible_root_is_skipped'.
-	rootPath, err := filepath.EvalSymlinks(t.TempDir())
-	require.NoError(t, err)
-	root.writeTestdata(t, rootPath)
-	want := root.simulateScan(filepath.Base(rootPath))
 
-	buf := testutil.LogBuffer()
-	res, err := Run(rootPath, NoSkip, nil)
-	require.NoError(t, err)
-	assert.Equal(t, want, res)
-	assert.Equal(t,
-		fmt.Sprintf(
-			"skipping symlink %q during scan\n",
-			filepath.Join(rootPath, symlinkName),
-		),
-		buf.String(),
-	)
+	symlinkName := "symlink"
+
+	tests := []struct {
+		name string
+		root dir
+	}{
+		{
+			name: "existing target",
+			root: dir{
+				"a":         file{c: "z\n"},
+				symlinkName: symlink("a"),
+			},
+		},
+		{
+			name: "non-existing target",
+			root: dir{
+				symlinkName: symlink("x"),
+			},
+		},
+	}
+	for _, test := range tests {
+		// Resolving symlink for the same reason as described in a comment of 'Test__inaccessible_root_is_skipped'.
+		rootPath, err := filepath.EvalSymlinks(t.TempDir())
+		require.NoError(t, err)
+		test.root.writeTestdata(t, rootPath)
+		want := test.root.simulateScan(filepath.Base(rootPath))
+
+		buf := testutil.LogBuffer()
+		res, err := Run(rootPath, NoSkip, nil)
+		require.NoError(t, err)
+		assert.Equal(t, want, res)
+		assert.Equal(t,
+			fmt.Sprintf(
+				"skipping symlink %q during scan\n",
+				filepath.Join(rootPath, symlinkName),
+			),
+			buf.String(),
+		)
+	}
 }
 
 // SKIPPED on Windows unless running as administrator.
