@@ -13,19 +13,20 @@ import (
 	"github.com/bisgardo/dupe-nukem/testutil"
 )
 
+// node is a common interface for files and directories to be written to disk as testdata.
 type node interface {
-	appendTo(parent *Dir, name string)
-	writeTo(t *testing.T, path string)
+	simulateScanFromParent(parent *Dir, name string)
+	writeTestdata(t *testing.T, path string)
 }
 
 type dir map[string]node
 
-func (d dir) appendTo(parent *Dir, name string) {
-	s := d.toScanDir(name)
+func (d dir) simulateScanFromParent(parent *Dir, name string) {
+	s := d.simulateScan(name)
 	parent.appendDir(s)
 }
 
-func (d dir) toScanDir(name string) *Dir {
+func (d dir) simulateScan(name string) *Dir {
 	res := NewDir(name)
 	// Iterate nodes in sorted order to respect ordering requirements of the append functions of Dir.
 	nodePaths := make([]string, 0, len(d))
@@ -51,12 +52,12 @@ func (d dir) toScanDir(name string) *Dir {
 			res.appendDir(r)
 			res = r
 		}
-		n.appendTo(res, nodePath)
+		n.simulateScanFromParent(res, nodePath)
 	}
 	return res
 }
 
-func (d dir) writeTo(t *testing.T, path string) {
+func (d dir) writeTestdata(t *testing.T, path string) {
 	if err := os.MkdirAll(path, 0755); err != nil {
 		require.NoErrorf(t, err, "cannot create dir on path %q", path)
 	}
@@ -65,10 +66,10 @@ func (d dir) writeTo(t *testing.T, path string) {
 		nodePath := filepath.Join(path, name)
 		if p := filepath.Dir(nodePath); p != path {
 			// nodePath has multiple components: create intermediary directories.
-			dir(nil).writeTo(t, p)
+			dir(nil).writeTestdata(t, p)
 		}
 		// Path may have arbitrary number of components.
-		n.writeTo(t, nodePath)
+		n.writeTestdata(t, nodePath)
 	}
 }
 
@@ -78,7 +79,7 @@ type dirExt struct {
 	inaccessible bool
 }
 
-func (d dirExt) appendTo(parent *Dir, name string) {
+func (d dirExt) simulateScanFromParent(parent *Dir, name string) {
 	if d.inaccessible {
 		return
 	}
@@ -86,11 +87,11 @@ func (d dirExt) appendTo(parent *Dir, name string) {
 		parent.appendSkippedDir(name)
 		return
 	}
-	d.dir.appendTo(parent, name)
+	d.dir.simulateScanFromParent(parent, name)
 }
 
-func (d dirExt) writeTo(t *testing.T, path string) {
-	d.dir.writeTo(t, path)
+func (d dirExt) writeTestdata(t *testing.T, path string) {
+	d.dir.writeTestdata(t, path)
 	if d.inaccessible {
 		testutil.MakeInaccessibleT(t, path)
 	}
@@ -102,15 +103,15 @@ type file struct {
 	// The file's latest modification time (not yet implemented).
 	ts int64
 	// The file's hash as resolved from a cache file rather than being computed (if non-zero).
-	// Should not be combined with inaccessible.
-	cachedHash uint64
+	// Should not be combined with makeInaccessible.
+	hashFromCache uint64
 	// Whether the file is expected to be skipped by Run.
 	skipped bool
-	// Whether the file is to be made inaccessible (and thus expecting Run to find it so).
-	inaccessible bool
+	// Whether the file is to be made makeInaccessible (and thus expecting Run to find it so).
+	makeInaccessible bool
 }
 
-func (f file) appendTo(parent *Dir, name string) {
+func (f file) simulateScanFromParent(parent *Dir, name string) {
 	if f.skipped {
 		parent.appendSkippedFile(name)
 		return
@@ -119,30 +120,31 @@ func (f file) appendTo(parent *Dir, name string) {
 		parent.appendEmptyFile(name)
 		return
 	}
-	// Inaccessibility is handled in toScanFile by hashing to 0.
-	parent.appendFile(f.toScanFile(name))
+	// Inaccessibility is handled in simulateScan (by hashing to 0).
+	s := f.simulateScan(name)
+	parent.appendFile(s)
 }
 
-func (f file) toScanFile(name string) *File {
+func (f file) simulateScan(name string) *File {
 	if f.ts != 0 {
 		// TODO: Implement...
 		panic("custom timestamp is not yet implemented")
 	}
 	data := []byte(f.c)
-	h := f.cachedHash
-	if h == 0 && !f.inaccessible {
-		// If both cachedHash and inaccessible are set, then the cached value is used.
-		// As cachedHash isn't used to actually derive a cache
+	h := f.hashFromCache
+	if h == 0 && !f.makeInaccessible {
+		// If both hashFromCache and makeInaccessible are set, then the cached value is used.
+		// As hashFromCache isn't used to actually derive a cache
 		// (it just simulates that the file's hash originated from one),
 		// the two inputs cannot be combined in any meaningful way.
 		// And consequently there's no need for doing anything about it.
-		// TODO: Add a test where a file that is cached is now inaccessible nonetheless.
+		// TODO: Add a test where a file that is cached is now makeInaccessible nonetheless.
 		h = hash.Bytes(data)
 	}
 	return NewFile(name, int64(len(data)), h)
 }
 
-func (f file) writeTo(t *testing.T, path string) {
+func (f file) writeTestdata(t *testing.T, path string) {
 	if f.ts != 0 {
 		// TODO: Implement...
 		panic("custom timestamp is not yet implemented")
@@ -150,18 +152,18 @@ func (f file) writeTo(t *testing.T, path string) {
 	data := []byte(f.c)
 	err := os.WriteFile(path, data, 0644)
 	require.NoErrorf(t, err, "cannot create file %q with contents %q", path, f.c)
-	if f.inaccessible {
+	if f.makeInaccessible {
 		testutil.MakeInaccessibleT(t, path)
 	}
 }
 
 type symlink string // target path relative to own location
 
-func (s symlink) appendTo(*Dir, string) {
+func (s symlink) simulateScanFromParent(*Dir, string) {
 	// Symlinks are ignored.
 }
 
-func (s symlink) writeTo(t *testing.T, path string) {
+func (s symlink) writeTestdata(t *testing.T, path string) {
 	err := os.Symlink(string(s), path)
 	require.NoErrorf(t, err, "cannot create symlink with value %q at path %q", s, path)
 }
