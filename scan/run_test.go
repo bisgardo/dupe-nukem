@@ -81,7 +81,7 @@ func Test__inaccessible_root_is_skipped(t *testing.T) {
 	assert.Equal(t, fmt.Sprintf("skipping inaccessible directory %q\n", rootPath), buf.String())
 }
 
-func Test__testdata_no_skip(t *testing.T) {
+func Test__no_skip(t *testing.T) {
 	root := dir{
 		"a":   file{c: "x\n"},
 		"c":   file{c: "y\n"},
@@ -100,7 +100,7 @@ func Test__testdata_no_skip(t *testing.T) {
 	assert.Equal(t, want, res)
 }
 
-func Test__testdata_skip_root_fails(t *testing.T) {
+func Test__skip_root_fails(t *testing.T) {
 	tests := []struct {
 		name     string
 		rootPath string
@@ -117,7 +117,7 @@ func Test__testdata_skip_root_fails(t *testing.T) {
 }
 
 // SKIPPED on Windows unless running as administrator.
-func Test__testdata_skip_symlinked_root_fails(t *testing.T) {
+func Test__skip_symlinked_root_fails(t *testing.T) {
 	//goland:noinspection GoBoolExpressions
 	if runtime.GOOS == "windows" && !testutil.IsWindowsAdministrator() {
 		t.Skip("Creating symlinks on Windows requires elevated privileges.")
@@ -134,16 +134,11 @@ func Test__testdata_skip_symlinked_root_fails(t *testing.T) {
 	assert.EqualError(t, err, `skipping root directory "test_root-symlink"`)
 }
 
-func Test__testdata_skip_dir_without_subdirs(t *testing.T) {
+func Test__skip_dir_without_subdirs(t *testing.T) {
 	root := dir{
 		"a": file{c: "x\n"},
 		"c": file{c: "y\n"},
-		"b": dirExt{
-			skipped: true,
-			dir: dir{
-				"d": file{c: "x\n"},
-			},
-		},
+		"b": dirExt{skipped: true},
 		"e/f": dir{
 			"a": file{c: "z\n"},
 			"g": file{},
@@ -158,6 +153,7 @@ func Test__testdata_skip_dir_without_subdirs(t *testing.T) {
 	assert.Equal(t, want, res)
 }
 
+// TODO: The following two tests look malplaced: move above or below the surrounding ones which actually can Run.
 func Test__SkipNameSet_empty_always_returns_false(t *testing.T) {
 	shouldSkip := SkipNameSet(nil)
 
@@ -207,7 +203,7 @@ func Test__SkipNameSet_nonempty_returns_whether_basename_matches(t *testing.T) {
 	}
 }
 
-func Test__testdata_skip_dir_with_subdirs(t *testing.T) {
+func Test__skip_dir_with_subdirs(t *testing.T) {
 	root := dir{
 		"a":   file{c: "x\n"},
 		"c":   file{c: "y\n"},
@@ -231,7 +227,7 @@ func Test__testdata_skip_dir_with_subdirs(t *testing.T) {
 	assert.Equal(t, want, res)
 }
 
-func Test__testdata_skip_nonempty_files(t *testing.T) {
+func Test__skip_nonempty_files(t *testing.T) {
 	root := dir{
 		"a":   file{c: "x\n", skipped: true},
 		"c":   file{c: "y\n"},
@@ -250,7 +246,7 @@ func Test__testdata_skip_nonempty_files(t *testing.T) {
 	assert.Equal(t, want, res)
 }
 
-func Test__testdata_skip_empty_file(t *testing.T) {
+func Test__skip_empty_file(t *testing.T) {
 	root := dir{
 		"a": file{c: "z\n"},
 		"g": file{skipped: true},
@@ -263,8 +259,8 @@ func Test__testdata_skip_empty_file(t *testing.T) {
 	assert.Equal(t, want, res)
 }
 
-// TODO: Merge with test ('Test__testdata_skip_nonempty_files') that also verifies scan result.
-func Test__testdata_skipped_files_are_logged(t *testing.T) {
+// TODO: Fold into test 'Test__skip_nonempty_files' that verifies the scan result of the exact same testdata.
+func Test__skipped_files_are_logged(t *testing.T) {
 	root := dir{
 		"a":   file{c: "x\n"},
 		"c":   file{c: "y\n"},
@@ -290,7 +286,7 @@ func Test__testdata_skipped_files_are_logged(t *testing.T) {
 	assert.Equal(t, want, buf.String())
 }
 
-func Test__testdata_trailing_slash_gets_removed(t *testing.T) {
+func Test__trailing_slash_of_run_path_gets_removed(t *testing.T) {
 	root := dir{
 		"a": file{c: "z\n"},
 		"g": file{},
@@ -360,14 +356,14 @@ func Test__inaccessible_internal_dir_is_logged(t *testing.T) {
 	)
 }
 
-func Test__testdata_cache_with_mismatching_root_fails(t *testing.T) {
+func Test__cache_with_mismatching_root_fails(t *testing.T) {
 	rootPath := "some-root"
 	cache := &Dir{Name: "other-root"}
 	_, err := Run(rootPath, NoSkip, cache)
 	assert.EqualError(t, err, `cache of directory "other-root" cannot be used with root directory "some-root"`)
 }
 
-func Test__testdata_with_hashes_from_cache(t *testing.T) {
+func Test__with_hashes_from_cache(t *testing.T) {
 	root := dir{
 		"a":   file{c: "x\n"},
 		"c":   file{c: "y\n", hashFromCache: 53},
@@ -409,7 +405,7 @@ func Test__testdata_with_hashes_from_cache(t *testing.T) {
 	assert.Equal(t, want, res)
 }
 
-func Test__testdata_subdir_cache_not_used_for_mismatching_file_size(t *testing.T) {
+func Test__subdir_cache_with_mismatching_file_size_is_not_used(t *testing.T) {
 	root := dir{
 		"d": file{c: "x\n"},
 	}
