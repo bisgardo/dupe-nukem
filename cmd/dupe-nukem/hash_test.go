@@ -41,11 +41,11 @@ func Test__hash_wraps_file_error(t *testing.T) {
 	f, err := os.CreateTemp("", "")
 	require.NoError(t, err)
 	filename := f.Name()
-	defer func() {
+	t.Cleanup(func() {
 		err := os.Remove(filename)
 		require.NoError(t, err)
-	}()
-	err = testutil.MakeFileInaccessible(f)
+	})
+	testutil.MakeInaccessibleT(t, filename)
 	require.NoError(t, err)
 	err = f.Close()
 	assert.NoError(t, err)

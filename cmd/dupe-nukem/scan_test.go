@@ -197,16 +197,17 @@ func Test__Scan_wraps_cache_file_not_found_error(t *testing.T) {
 func Test__Scan_wraps_cache_file_not_accessible_error(t *testing.T) {
 	f, err := os.CreateTemp("", "inaccessible")
 	require.NoError(t, err)
-	defer func() {
-		err := os.Remove(f.Name())
+	filename := f.Name()
+	t.Cleanup(func() {
+		err := os.Remove(filename)
 		assert.NoError(t, err)
-	}()
-	err = testutil.MakeFileInaccessible(f)
+	})
+	testutil.MakeInaccessibleT(t, filename)
 	require.NoError(t, err)
 	err = f.Close()
 	assert.NoError(t, err)
-	_, err = Scan("x", "", f.Name())
-	assert.EqualError(t, err, fmt.Sprintf("cannot load scan cache file %q: cannot open file: access denied", f.Name()))
+	_, err = Scan("x", "", filename)
+	assert.EqualError(t, err, fmt.Sprintf("cannot load scan cache file %q: cannot open file: access denied", filename))
 }
 
 func Test__Scan_wraps_cache_load_error(t *testing.T) {
