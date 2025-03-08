@@ -528,6 +528,27 @@ func Test__root_symlink_is_followed_and_logged(t *testing.T) {
 }
 
 // SKIPPED on Windows unless running as administrator.
+func Test__root_broken_symlink_fails(t *testing.T) {
+	//goland:noinspection GoBoolExpressions
+	if runtime.GOOS == "windows" && !testutil.IsWindowsAdministrator() {
+		t.Skip("Creating symlinks on Windows requires elevated privileges.")
+	}
+
+	symlinkName := "broken-root-symlink"
+	rootPath := tempDir(t)
+	symlinkPath := filepath.Join(rootPath, symlinkName)
+	err := os.Symlink("non-existing", symlinkPath)
+	require.NoError(t, err)
+	defer func() {
+		err := os.Remove(symlinkPath)
+		assert.NoError(t, err)
+	}()
+
+	_, err = Run(symlinkPath, NoSkip, nil)
+	assert.EqualError(t, err, fmt.Sprintf("invalid root directory %q: not found", symlinkPath))
+}
+
+// SKIPPED on Windows unless running as administrator.
 func Test__root_indirect_symlink_is_followed_and_logged(t *testing.T) {
 	//goland:noinspection GoBoolExpressions
 	if runtime.GOOS == "windows" && !testutil.IsWindowsAdministrator() {
@@ -650,8 +671,6 @@ func Test__root_symlink_to_ancestor_is_followed_but_skipped_and_logged_when_inte
 		buf.String(),
 	)
 }
-
-// TODO: Add test where the root is a broken symlink.
 
 /* UTILITIES */
 
