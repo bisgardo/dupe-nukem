@@ -13,6 +13,11 @@ import (
 	"github.com/bisgardo/dupe-nukem/testutil"
 )
 
+// TODO: Revise data setup of all tests using the new system (construct more targeted setups)
+//       rather than just keep reconstructing the old testdata contents.
+
+// TODO: Figure out how to test Windows-specific features (shortcuts, junctions).
+
 func Test__empty_dir(t *testing.T) {
 	root := t.TempDir()
 
@@ -118,7 +123,8 @@ func Test__testdata_skip_symlinked_root_fails(t *testing.T) {
 		t.Skip("Creating symlinks on Windows requires elevated privileges.")
 	}
 	symlinkName := "test_root-symlink"
-	err := os.Symlink("testdata", symlinkName)
+	// TODO: Add variant for pointing to existing dir (like above).
+	err := os.Symlink("non-existing", symlinkName)
 	require.NoError(t, err)
 	defer func() {
 		err := os.Remove(symlinkName)
@@ -210,7 +216,7 @@ func Test__testdata_skip_dir_with_subdirs(t *testing.T) {
 			skipped: true,
 			dir: dir{
 				"f": dir{
-					"a": file{c: "z\n", skipped: true},
+					"a": file{c: "z\n"},
 					"g": file{},
 				},
 			},
@@ -225,7 +231,7 @@ func Test__testdata_skip_dir_with_subdirs(t *testing.T) {
 	assert.Equal(t, want, res)
 }
 
-func Test__testdata_skip_nonempty_file(t *testing.T) {
+func Test__testdata_skip_nonempty_files(t *testing.T) {
 	root := dir{
 		"a":   file{c: "x\n", skipped: true},
 		"c":   file{c: "y\n"},
@@ -244,7 +250,7 @@ func Test__testdata_skip_nonempty_file(t *testing.T) {
 	assert.Equal(t, want, res)
 }
 
-func Test__testdata_subdir_skip_empty_file(t *testing.T) {
+func Test__testdata_skip_empty_file(t *testing.T) {
 	root := dir{
 		"a": file{c: "z\n"},
 		"g": file{skipped: true},
@@ -257,7 +263,8 @@ func Test__testdata_subdir_skip_empty_file(t *testing.T) {
 	assert.Equal(t, want, res)
 }
 
-func Test__testdata_skip_files_is_logged(t *testing.T) {
+// TODO: Merge with test ('Test__testdata_skip_nonempty_files') that also verifies scan result.
+func Test__testdata_skipped_files_are_logged(t *testing.T) {
 	root := dir{
 		"a":   file{c: "x\n"},
 		"c":   file{c: "y\n"},
@@ -415,8 +422,8 @@ func Test__testdata_subdir_cache_not_used_for_mismatching_file_size(t *testing.T
 		Files: []*File{
 			{
 				Name: "d",
-				Size: 1,  // size of "d" is 2
-				Hash: 21, // so the cached hash value is not read
+				Size: 69, // size of "d" is 2,
+				Hash: 21, // so the cached hash value is not used
 			},
 		},
 	}
@@ -543,7 +550,7 @@ func Test__root_indirect_symlink_is_followed_and_logged(t *testing.T) {
 		fmt.Sprintf(
 			"following root symlink %q to %q\n",
 			indirectSymlinkPath,
-			filepath.Clean(filepath.Join(rootPath, "data")), // Clean replaces '/' with '\' on Windows
+			filepath.Join(rootPath, "data"),
 		),
 		buf.String(),
 	)
@@ -598,9 +605,11 @@ func Test__root_symlink_to_ancestor_is_followed_but_skipped_when_internal(t *tes
 	root.writeTo(t, rootPath)
 	want := root.toScanDir(filepath.Base(rootPath))
 
-	res, err := Run(rootPath, NoSkip, nil)
+	res, err := Run(filepath.Join(rootPath, "e/f", symlinkName), NoSkip, nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
+
+	// TODO: Test log output.
 }
 
 /* UTILITIES */
