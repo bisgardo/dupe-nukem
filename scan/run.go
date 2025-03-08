@@ -156,8 +156,11 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 			// IDEA: Parallelize hash computation (via work queue for example).
 			// IDEA: Consider adding option to hash a limited number of bytes only
 			//       (the reason being that if two files differ, the first 1MB or so probably differ too).
-			h := hashFromCache(head.cacheDir, name, size)
+			h, hit := hashFromCache(head.cacheDir, name, size)
 			if h == 0 {
+				if hit {
+					log.Printf("warning: cached hash value 0 of file %q ignored\n", path)
+				}
 				h, err = hash.File(path)
 				if err != nil {
 					// Currently report error but keep going.
@@ -174,18 +177,19 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 	return rootDir, errors.Wrapf(err, "cannot scan root directory %q", root) // cannot test
 }
 
-// hashFromCache looks up the content hash of the given file in the given cache dir.
-// A cache miss is represented by the value 0.
-// If the hash is cached with value 0, this is assumed to be a mistake (caused by 0 being the default value of uint64)
-// and considered a cache miss:
+// hashFromCache looks up the hash of the contents of the provided file in the provided cache dir.
+// The boolean return value indicates whether the hash was found in the cache or not.
+// A cache miss will always return hash with value 0.
+// A cached hash value of 0 is assumed to be a mistake (caused by 0 being the default value of uint64),
+// and will cause a warning to be logged from the caller (which knows the full path):
 // There's intentionally no way to cache the hash if it happens to be actually 0.
 // This is deemed acceptable as this is expected to practically never happen.
 // If the cached file size doesn't match the expected one, the cache is considered missed as well.
 // TODO: Also check timestamp.
-func hashFromCache(cacheDir *Dir, fileName string, fileSize int64) uint64 {
+func hashFromCache(cacheDir *Dir, fileName string, fileSize int64) (uint64, bool) {
 	f := safeFindFile(cacheDir, fileName)
 	if f != nil && f.Size == fileSize {
-		return f.Hash
+		return f.Hash, true
 	}
-	return 0
+	return 0, false
 }
