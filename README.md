@@ -74,7 +74,7 @@ either for testing or extracting the binary for use outside of Docker.
 dupe-nukem scan --dir <dir> [--skip <expr>] [--cache <file>]
 ```
 
-Builds structure of `<dir>` and dumps it, along with all hashes, in JSON.
+Builds structure of directory `<dir>` and dumps it, along with all sizes, modification times, and hashes (in JSON).
 
 A skip expression `<expr>` may be used to make the command skip
 certain files and directories like '.git', '.stack-work', 'vendor', 'node_modules', '.DS_Store', etc.

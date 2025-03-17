@@ -170,7 +170,7 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 					log.Printf("info: hash of file %q evaluated to 0 - this might result in warnings which can be safely ignored\n", path)
 				}
 			}
-			head.curDir.appendFile(NewFile(name, size, h)) // Walk visits in lexical order
+			head.curDir.appendFile(NewFile(name, size, info.ModTime().Unix(), h)) // Walk visits in lexical order
 		}
 		return nil
 	})

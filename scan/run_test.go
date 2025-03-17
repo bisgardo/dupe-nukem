@@ -96,7 +96,7 @@ func Test__no_skip(t *testing.T) {
 	}
 	rootPath := tempDir(t)
 	root.writeTestdata(t, rootPath)
-	want := root.simulateScan(filepath.Base(rootPath))
+	want := root.simulateScan(rootPath)
 
 	res, err := Run(rootPath, NoSkip, nil)
 	require.NoError(t, err)
@@ -210,7 +210,7 @@ func Test__skip_dir_without_subdirs_is_logged(t *testing.T) {
 	}
 	rootPath := tempDir(t)
 	root.writeTestdata(t, rootPath)
-	want := root.simulateScan(filepath.Base(rootPath))
+	want := root.simulateScan(rootPath)
 
 	buf := testutil.LogBuffer()
 	res, err := Run(rootPath, skip("b"), nil)
@@ -242,7 +242,7 @@ func Test__skip_dir_with_subdirs_is_logged(t *testing.T) {
 	}
 	rootPath := tempDir(t)
 	root.writeTestdata(t, rootPath)
-	want := root.simulateScan(filepath.Base(rootPath))
+	want := root.simulateScan(rootPath)
 
 	buf := testutil.LogBuffer()
 	res, err := Run(rootPath, skip("e"), nil)
@@ -269,7 +269,7 @@ func Test__skip_nonempty_files_is_logged(t *testing.T) {
 	}
 	rootPath := tempDir(t)
 	root.writeTestdata(t, rootPath)
-	want := root.simulateScan(filepath.Base(rootPath))
+	want := root.simulateScan(rootPath)
 
 	buf := testutil.LogBuffer()
 	res, err := Run(rootPath, skip("a"), nil)
@@ -295,7 +295,7 @@ func Test__skip_empty_file(t *testing.T) {
 	}
 	rootPath := tempDir(t)
 	root.writeTestdata(t, rootPath)
-	want := root.simulateScan(filepath.Base(rootPath))
+	want := root.simulateScan(rootPath)
 	res, err := Run(rootPath, skip("g"), nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
@@ -308,7 +308,7 @@ func Test__trailing_slash_of_run_path_gets_removed(t *testing.T) {
 	}
 	rootPath := tempDir(t)
 	root.writeTestdata(t, rootPath)
-	want := root.simulateScan(filepath.Base(rootPath))
+	want := root.simulateScan(rootPath)
 
 	// Note added '/'.
 	res, err := Run(rootPath+"/", NoSkip, nil)
@@ -325,7 +325,7 @@ func Test__inaccessible_internal_file_is_not_hashed_and_is_logged(t *testing.T) 
 	}
 	rootPath := tempDir(t)
 	root.writeTestdata(t, rootPath)
-	want := root.simulateScan(filepath.Base(rootPath))
+	want := root.simulateScan(rootPath)
 
 	buf := testutil.LogBuffer()
 	res, err := Run(rootPath, NoSkip, nil)
@@ -352,7 +352,7 @@ func Test__inaccessible_internal_dir_is_logged(t *testing.T) {
 	}
 	rootPath := tempDir(t)
 	root.writeTestdata(t, rootPath)
-	want := root.simulateScan(filepath.Base(rootPath))
+	want := root.simulateScan(rootPath)
 
 	buf := testutil.LogBuffer()
 	res, err := Run(rootPath, NoSkip, nil)
@@ -386,7 +386,7 @@ func Test__hashes_from_cache_are_used(t *testing.T) {
 	}
 	rootPath := tempDir(t)
 	root.writeTestdata(t, rootPath)
-	want := root.simulateScan(filepath.Base(rootPath))
+	want := root.simulateScan(rootPath)
 
 	cache := &Dir{
 		Name: want.Name,
@@ -422,7 +422,7 @@ func Test__subdir_cache_with_mismatching_file_size_is_not_used(t *testing.T) {
 	}
 	rootPath := tempDir(t)
 	root.writeTestdata(t, rootPath)
-	want := root.simulateScan(filepath.Base(rootPath))
+	want := root.simulateScan(rootPath)
 
 	cache := &Dir{
 		Name: want.Name,
@@ -445,7 +445,7 @@ func Test__cache_entry_with_hash_0_is_ignored_and_logged(t *testing.T) {
 	}
 	rootPath := tempDir(t)
 	root.writeTestdata(t, rootPath)
-	want := root.simulateScan(filepath.Base(rootPath))
+	want := root.simulateScan(rootPath)
 
 	cache := &Dir{
 		Name: want.Name,
@@ -477,7 +477,7 @@ func Test__hash_computed_as_0_is_logged(t *testing.T) {
 	}
 	rootPath := tempDir(t)
 	root.writeTestdata(t, rootPath)
-	want := root.simulateScan(filepath.Base(rootPath))
+	want := root.simulateScan(rootPath)
 
 	buf := testutil.LogBuffer()
 	res, err := Run(rootPath, NoSkip, nil)
@@ -510,17 +510,17 @@ func Test__root_symlink_is_followed_and_logged(t *testing.T) {
 	}
 	rootPath := tempDir(t)
 	root.writeTestdata(t, rootPath)
-	symlinkPath := filepath.Join(rootPath, symlinkName)
-	want := symlinkedDir.simulateScan(symlinkName)
+	rootSymlinkPath := filepath.Join(rootPath, symlinkName)
+	want := symlinkedDir.simulateScan(rootSymlinkPath)
 
 	buf := testutil.LogBuffer()
-	res, err := Run(symlinkPath, NoSkip, nil)
+	res, err := Run(rootSymlinkPath, NoSkip, nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
 	assert.Equal(t,
 		fmt.Sprintf(
 			lines("following root symlink %q to %q"),
-			symlinkPath,
+			rootSymlinkPath,
 			filepath.Join(rootPath, "data"),
 		),
 		buf.String(),
@@ -567,17 +567,17 @@ func Test__root_indirect_symlink_is_followed_and_logged(t *testing.T) {
 	}
 	rootPath := tempDir(t)
 	root.writeTestdata(t, rootPath)
-	want := symlinkedDir.simulateScan(symlinkName)
+	rootSymlinkPath := filepath.Join(rootPath, symlinkName)
+	want := symlinkedDir.simulateScan(rootSymlinkPath)
 
 	buf := testutil.LogBuffer()
-	indirectSymlinkPath := filepath.Join(rootPath, symlinkName)
-	res, err := Run(indirectSymlinkPath, NoSkip, nil)
+	res, err := Run(rootSymlinkPath, NoSkip, nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
 	assert.Equal(t,
 		fmt.Sprintf(
 			lines("following root symlink %q to %q"),
-			indirectSymlinkPath,
+			rootSymlinkPath,
 			filepath.Join(rootPath, "data"),
 		),
 		buf.String(),
@@ -614,7 +614,7 @@ func Test__internal_symlink_is_skipped_and_logged(t *testing.T) {
 	for _, test := range tests {
 		rootPath := tempDir(t)
 		test.root.writeTestdata(t, rootPath)
-		want := test.root.simulateScan(filepath.Base(rootPath))
+		want := test.root.simulateScan(rootPath)
 
 		buf := testutil.LogBuffer()
 		res, err := Run(rootPath, NoSkip, nil)
@@ -648,9 +648,10 @@ func Test__root_symlink_to_ancestor_is_followed_but_skipped_and_logged_when_inte
 	}
 	rootPath := tempDir(t)
 	root.writeTestdata(t, rootPath)
+	rootTargetPath := filepath.Join(rootPath, symlinkTargetName)
 	want := &Dir{
 		Name: symlinkName,
-		Dirs: []*Dir{symlinkedDir.simulateScan(symlinkTargetName)},
+		Dirs: []*Dir{symlinkedDir.simulateScan(rootTargetPath)},
 	}
 
 	buf := testutil.LogBuffer()
