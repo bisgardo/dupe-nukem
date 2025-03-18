@@ -167,13 +167,13 @@ func Test__loadScanDirCacheFile_wraps_invalid_cache_error(t *testing.T) {
 		err := os.Remove(f.Name())
 		assert.NoError(t, err)
 	}()
-	_, err = f.WriteString(`{"name":"x","empty_files":["b","a"]}`)
+	_, err = f.WriteString(`{"name":""}`)
 	require.NoError(t, err)
 	err = f.Close()
 	assert.NoError(t, err)
 
 	_, err = loadScanDirCacheFile(f.Name())
-	assert.EqualError(t, err, `invalid cache contents: list of empty files in directory "x" is not sorted: "a" on index 1 should come before "b" on index 0`)
+	assert.EqualError(t, err, `invalid cache contents: directory name is empty`)
 }
 
 func Test__Scan_wraps_invalid_dir_error(t *testing.T) {
@@ -227,7 +227,7 @@ func Test__Scan_wraps_cache_load_error(t *testing.T) {
 	assert.EqualError(t, err, fmt.Sprintf("cannot load scan cache file %q: cannot decode file as JSON: unexpected EOF", f.Name()))
 }
 
-func Test__checkCache_rejects_unsorted_lists(t *testing.T) {
+func Test__checkCache_rejects_unsorted_lists_for_nonempty_items(t *testing.T) {
 	testdata := func() *scan.Dir {
 		return &scan.Dir{
 			Name: "x",
@@ -251,11 +251,11 @@ func Test__checkCache_rejects_unsorted_lists(t *testing.T) {
 		err := checkCache(testdata())
 		assert.NoError(t, err)
 	})
-	t.Run("invalid order of empty files", func(t *testing.T) {
+	t.Run("invalid order of empty files is accepted", func(t *testing.T) {
 		d := testdata()
 		d.EmptyFiles[0], d.EmptyFiles[1] = d.EmptyFiles[1], d.EmptyFiles[0]
 		err := checkCache(d)
-		assert.EqualError(t, err, `list of empty files in directory "x" is not sorted: "c" on index 1 should come before "d" on index 0`)
+		assert.NoError(t, err)
 	})
 	t.Run("invalid order of non-empty files", func(t *testing.T) {
 		d := testdata()
@@ -269,12 +269,12 @@ func Test__checkCache_rejects_unsorted_lists(t *testing.T) {
 		err := checkCache(d)
 		assert.EqualError(t, err, `list of subdirectories of "x" is not sorted: "y" on index 1 should come before "z" on index 0`)
 	})
-	t.Run("invalid order of nested empty files", func(t *testing.T) {
+	t.Run("invalid order of nested empty files is accepted", func(t *testing.T) {
 		d := testdata()
 		d0 := d.Dirs[0]
 		d0.EmptyFiles[1], d0.EmptyFiles[2] = d0.EmptyFiles[2], d0.EmptyFiles[1]
 		err := checkCache(d)
-		assert.EqualError(t, err, `in subdirectory "y" on index 0: list of empty files in directory "y" is not sorted: "d" on index 2 should come before "e" on index 1`)
+		assert.NoError(t, err)
 	})
 	t.Run("invalid order of nested files", func(t *testing.T) {
 		d := testdata()
@@ -308,12 +308,23 @@ func Test__checkCache_rejects_nonempty_file_with_empty_name(t *testing.T) {
 	assert.EqualError(t, err, `name of non-empty file on index 0 is empty`)
 }
 
-func Test__checkCache_rejects_empty_file_with_empty_name(t *testing.T) {
-	err := checkCache(&scan.Dir{
-		Name:       "x",
-		EmptyFiles: []string{""},
+func Test__checkCache_rejects_dir_with_empty_name(t *testing.T) {
+	t.Run("root directory with empty name", func(t *testing.T) {
+		testdata := &scan.Dir{Name: ""}
+		err := checkCache(testdata)
+		assert.EqualError(t, err, `directory name is empty`)
 	})
-	assert.EqualError(t, err, `name of empty file on index 0 is empty`)
+	t.Run("nested directory name with empty name", func(t *testing.T) {
+		testdata := &scan.Dir{
+			Name: "x",
+			Dirs: []*scan.Dir{
+				{Name: "y"},
+				{Name: "z", Dirs: []*scan.Dir{{Name: ""}}},
+			},
+		}
+		err := checkCache(testdata)
+		assert.EqualError(t, err, `in subdirectory "z" on index 1: in subdirectory "" on index 0: directory name is empty`)
+	})
 }
 
 func Test__checkCache_logs_warning_on_hash_0(t *testing.T) {
@@ -330,37 +341,31 @@ func Test__checkCache_logs_warning_on_hash_0(t *testing.T) {
 // TODO: Add test that demonstrates that the cache is loaded/used by letting the cache data *not* match the actual files.
 
 func Test__scan_testdata(t *testing.T) {
-	root := "testdata"
+	mt := func(path string) int64 {
+		// Load actual mod time of file.
+		info, err := os.Lstat(path)
+		require.NoError(t, err)
+		return info.ModTime().Unix()
+	}
 	want := &scan.Dir{
 		Name: "testdata",
 		Files: []*scan.File{
-			{Name: "cache1.json", Size: 232, Hash: 17698409774061682325},
-			{Name: "cache2.json.gz", Size: 34, Hash: 11617732806245318878},
-			{Name: "skipnames", Size: 7, Hash: 10951817445047336725},
+			{Name: "cache1.json", Size: 232, Hash: 17698409774061682325, ModTime: mt("./testdata/cache1.json")},
+			{Name: "cache2.json.gz", Size: 34, Hash: 11617732806245318878, ModTime: mt("./testdata/cache2.json.gz")},
+			{Name: "skipnames", Size: 7, Hash: 10951817445047336725, ModTime: mt("./testdata/skipnames")},
 		},
 	}
-	res, err := Scan(root, "", "")
-	require.NoError(t, err)
-	assert.Equal(t, want, res)
-}
 
-func Test__scan_testdata_with_trailing_slash(t *testing.T) {
-	root := "testdata/"
-	want := &scan.Dir{
-		Name: "testdata",
-		Files: []*scan.File{
-			{Name: "cache1.json", Size: 232, Hash: 17698409774061682325},
-			{Name: "cache2.json.gz", Size: 34, Hash: 11617732806245318878},
-			{Name: "skipnames", Size: 7, Hash: 10951817445047336725},
-		},
+	roots := []string{"testdata", "testdata/", "./testdata", "./testdata/"}
+	for _, root := range roots {
+		res, err := Scan(root, "", "")
+		require.NoError(t, err)
+		assert.Equal(t, want, res)
 	}
-	res, err := Scan(root, "", "")
-	require.NoError(t, err)
-	assert.Equal(t, want, res)
 }
 
 func Test__scan_logs_absolute_path_of_relative_dir(t *testing.T) {
-	dir := "./testdata"
+	dir := "testdata"
 	absDir, err := filepath.Abs(dir)
 	require.NoError(t, err)
 	buf := testutil.LogBuffer()
@@ -370,7 +375,7 @@ func Test__scan_logs_absolute_path_of_relative_dir(t *testing.T) {
 }
 
 func Test__scan_does_not_log_absolute_dir_path(t *testing.T) {
-	absDir, err := filepath.Abs("./testdata")
+	absDir, err := filepath.Abs("testdata")
 	require.NoError(t, err)
 	buf := testutil.LogBuffer()
 	_, err = Scan(absDir, "", "")
