@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -338,21 +339,13 @@ func Test__checkCache_logs_warning_on_hash_0(t *testing.T) {
 	assert.Equal(t, "warning: file \"a\" is cached with hash 0 - this hash will be ignored\n", buf.String())
 }
 
-// TODO: Add test that demonstrates that the cache is loaded/used by letting the cache data *not* match the actual files.
-
 func Test__scan_testdata(t *testing.T) {
-	mt := func(path string) int64 {
-		// Load actual mod time of file.
-		info, err := os.Lstat(path)
-		require.NoError(t, err)
-		return info.ModTime().Unix()
-	}
 	want := &scan.Dir{
 		Name: "testdata",
 		Files: []*scan.File{
-			{Name: "cache1.json", Size: 232, Hash: 17698409774061682325, ModTime: mt("./testdata/cache1.json")},
-			{Name: "cache2.json.gz", Size: 34, Hash: 11617732806245318878, ModTime: mt("./testdata/cache2.json.gz")},
-			{Name: "skipnames", Size: 7, Hash: 10951817445047336725, ModTime: mt("./testdata/skipnames")},
+			{Name: "cache1.json", Size: 232, Hash: 17698409774061682325, ModTime: modTime(t, "./testdata/cache1.json")},
+			{Name: "cache2.json.gz", Size: 34, Hash: 11617732806245318878, ModTime: modTime(t, "./testdata/cache2.json.gz")},
+			{Name: "skipnames", Size: 7, Hash: 10951817445047336725, ModTime: modTime(t, "./testdata/skipnames")},
 		},
 	}
 
@@ -381,4 +374,53 @@ func Test__scan_does_not_log_absolute_dir_path(t *testing.T) {
 	_, err = Scan(absDir, "", "")
 	require.NoError(t, err)
 	assert.Empty(t, buf.String())
+}
+
+//goland:noinspection GoSnakeCaseUsage
+func Test__scan_testdata_uses_provided_cache(t *testing.T) {
+	modTime_cache1 := modTime(t, "./testdata/cache1.json")
+	modTime_cache2 := modTime(t, "./testdata/cache2.json.gz")
+	modTime_skipnames := modTime(t, "./testdata/skipnames")
+
+	want := &scan.Dir{
+		Name: "testdata",
+		Files: []*scan.File{
+			{Name: "cache1.json", Size: 232, Hash: 69, ModTime: modTime_cache1},                     // wrong hash loaded from cache
+			{Name: "cache2.json.gz", Size: 34, Hash: 11617732806245318878, ModTime: modTime_cache2}, // computed as cache didn't match
+			{Name: "skipnames", Size: 7, Hash: 10951817445047336725, ModTime: modTime_skipnames},    // computed as cache didn't match
+		},
+	}
+
+	// Setup cache and write it to tmp file.
+	cache := &scan.Dir{
+		Name: "testdata",
+		Files: []*scan.File{
+			{Name: "cache1.json", Size: 232, Hash: 69, ModTime: modTime_cache1},   // correct size and mod time
+			{Name: "cache2.json.gz", Size: 69, Hash: 69, ModTime: modTime_cache2}, // incorrect size
+			{Name: "skipnames", Size: 7, Hash: 69, ModTime: 23},                   // incorrect mod time
+		},
+	}
+	cachePath, err := os.CreateTemp("", "cache")
+	require.NoError(t, err)
+	defer func() {
+		err := os.Remove(cachePath.Name())
+		assert.NoError(t, err)
+	}()
+	cacheBytes, err := json.MarshalIndent(cache, "", "  ")
+	require.NoError(t, err)
+	_, err = cachePath.Write(cacheBytes)
+	require.NoError(t, err)
+
+	res, err := Scan("testdata", "", cachePath.Name())
+	require.NoError(t, err)
+	assert.Equal(t, want, res)
+}
+
+// UTILITIES
+
+func modTime(t *testing.T, path string) int64 {
+	// Load actual mod time of file.
+	info, err := os.Lstat(path)
+	require.NoError(t, err)
+	return info.ModTime().Unix()
 }
