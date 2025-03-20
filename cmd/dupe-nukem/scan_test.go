@@ -16,6 +16,8 @@ import (
 	"github.com/bisgardo/dupe-nukem/testutil"
 )
 
+// TODO: Ensure that all temporary files are properly closed (and replace cleanup defers with t.Cleanup).
+
 func Test__parseSkipNames_empty_returns_nil(t *testing.T) {
 	input := ""
 	res, err := parseSkipNames(input)
@@ -410,6 +412,8 @@ func Test__scan_testdata_uses_provided_cache(t *testing.T) {
 	require.NoError(t, err)
 	_, err = cachePath.Write(cacheBytes)
 	require.NoError(t, err)
+	err = cachePath.Close()
+	assert.NoError(t, err)
 
 	res, err := Scan("testdata", "", cachePath.Name())
 	require.NoError(t, err)
