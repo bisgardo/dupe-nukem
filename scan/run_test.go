@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -375,19 +376,24 @@ func Test__cache_with_mismatching_root_fails(t *testing.T) {
 }
 
 func Test__hashes_from_cache_are_used(t *testing.T) {
+	ts, err := time.Parse(time.Layout, time.Layout)
+	require.NoError(t, err)
+
 	root := dir{
-		"a":   file{c: "x\n"},
-		"c":   file{c: "y\n", hashFromCache: 53},
-		"b/d": file{c: "x\n"},
+		"a":   file{c: "x\n", ts: ts},
+		"c":   file{c: "y\n", ts: ts, hashFromCache: 53},
+		"b/d": file{c: "x\n", ts: ts},
 		"e/f": dir{
-			"a": file{c: "z\n", hashFromCache: 42},
+			"a": file{c: "z\n", ts: ts, hashFromCache: 42},
 			"g": file{},
 		},
+		"h": file{c: "q\n", ts: ts},
 	}
 	rootPath := tempDir(t)
 	root.writeTestdata(t, rootPath)
 	want := root.simulateScan(rootPath)
 
+	tsUnix := ts.Unix()
 	cache := &Dir{
 		Name: want.Name,
 		Dirs: []*Dir{
@@ -397,18 +403,21 @@ func Test__hashes_from_cache_are_used(t *testing.T) {
 					{
 						Name: "f",
 						Files: []*File{
-							{Name: "a", Size: 2, Hash: 42}, // used
+							{Name: "a", Size: 2, ModTime: tsUnix, Hash: 42}, // used
+							{Name: "g", Size: 0, ModTime: tsUnix, Hash: 42}, // not used: size and time match, but file is empty
 						},
 					},
 				},
 				Files: []*File{
-					{Name: "d", Size: 2, Hash: 69}, // not used
+					{Name: "d", Size: 2, ModTime: tsUnix, Hash: 69}, // not used: file doesn't exist in testdata (but "b/d" does)
 				},
 			},
 		},
 		Files: []*File{
-			{Name: "c", Size: 2, Hash: 53}, // used
-			{Name: "d", Size: 2, Hash: 69}, // not used
+			// no entry for "a"
+			{Name: "b", Size: 1, ModTime: tsUnix, Hash: 69}, // not used: "b" is a dir in testdata
+			{Name: "c", Size: 2, ModTime: tsUnix, Hash: 53}, // used
+			{Name: "d", Size: 2, Hash: 69},                  // not used: no such file in testdata
 		},
 	}
 	res, err := Run(rootPath, NoSkip, cache)
@@ -416,9 +425,12 @@ func Test__hashes_from_cache_are_used(t *testing.T) {
 	assert.Equal(t, want, res)
 }
 
-func Test__subdir_cache_with_mismatching_file_size_is_not_used(t *testing.T) {
+func Test__cache_with_mismatching_file_size_is_not_used(t *testing.T) {
+	ts, err := time.Parse(time.Layout, time.Layout)
+	require.NoError(t, err)
+
 	root := dir{
-		"d": file{c: "x\n"},
+		"d": file{c: "x\n", ts: ts},
 	}
 	rootPath := tempDir(t)
 	root.writeTestdata(t, rootPath)
@@ -428,9 +440,37 @@ func Test__subdir_cache_with_mismatching_file_size_is_not_used(t *testing.T) {
 		Name: want.Name,
 		Files: []*File{
 			{
-				Name: "d",
-				Size: 69, // size of "d" is 2,
-				Hash: 21, // so the cached hash value is not used
+				Name:    "d",
+				Size:    69,        // size of "d" is 2,
+				ModTime: ts.Unix(), // so even with correct mod time,
+				Hash:    21,        // the cached hash value is not used
+			},
+		},
+	}
+	res, err := Run(rootPath, NoSkip, cache)
+	require.NoError(t, err)
+	assert.Equal(t, want, res)
+}
+
+func Test__cache_with_mismatching_file_file_mod_time_is_not_used(t *testing.T) {
+	ts, err := time.Parse(time.Layout, time.Layout)
+	require.NoError(t, err)
+
+	root := dir{
+		"d": file{c: "x\n", ts: ts},
+	}
+	rootPath := tempDir(t)
+	root.writeTestdata(t, rootPath)
+	want := root.simulateScan(rootPath)
+
+	cache := &Dir{
+		Name: want.Name,
+		Files: []*File{
+			{
+				Name:    "d",
+				Size:    2,             // size is correct,
+				ModTime: ts.Unix() + 1, // but mod time isn't,
+				Hash:    21,            // so the cached hash value is not used
 			},
 		},
 	}
@@ -440,8 +480,11 @@ func Test__subdir_cache_with_mismatching_file_size_is_not_used(t *testing.T) {
 }
 
 func Test__cache_entry_with_hash_0_is_ignored_and_logged(t *testing.T) {
+	ts, err := time.Parse(time.Layout, time.Layout)
+	require.NoError(t, err)
+
 	root := dir{
-		"d": file{c: "x\n"},
+		"d": file{c: "x\n", ts: ts},
 	}
 	rootPath := tempDir(t)
 	root.writeTestdata(t, rootPath)
@@ -451,9 +494,10 @@ func Test__cache_entry_with_hash_0_is_ignored_and_logged(t *testing.T) {
 		Name: want.Name,
 		Files: []*File{
 			{
-				Name: "d",
-				Size: 2,
-				Hash: 0, // value 0 is specifically ignored
+				Name:    "d",
+				Size:    2,         // size is correct,
+				ModTime: ts.Unix(), // time is correct,
+				Hash:    0,         // but value 0 is explicitly ignored
 			},
 		},
 	}
@@ -485,7 +529,7 @@ func Test__hash_computed_as_0_is_logged(t *testing.T) {
 	assert.Equal(t, want, res)
 	assert.Equal(t,
 		fmt.Sprintf(
-			lines("info: hash of file %q evaluated to 0 - this might result in warnings which can be safely ignored"),
+			lines("info: hash of file %q evaluated to 0 - this might result in warnings (which can be safely ignored) if the output is used as cache in future scans"),
 			filepath.Join(rootPath, "hash0"),
 		),
 		buf.String(),

@@ -156,7 +156,13 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 			// IDEA: Parallelize hash computation (via work queue for example).
 			// IDEA: Consider adding option to hash a limited number of bytes only
 			//       (the reason being that if two files differ, the first 1MB or so probably differ too).
-			h, hit := hashFromCache(head.cacheDir, name, size)
+			h, hit := hashFromCache(head.cacheDir, name, size, info.ModTime().Unix())
+			// If the cache contains the actual hash value 0, we assume that it's a mistake
+			// caused by unintended zero-initialization somewhere and treat it as a cache miss as a safety precaution.
+			// A warning to let the user know that the cache contains this value.
+			// The fact that a file with hash 0 cannot be cached is deemed acceptable,
+			// as this is expected to practically never happen for real data.
+			// But even if it did, the only drawback is that the file's hash will get redundantly recomputed.
 			if h == 0 {
 				if hit {
 					log.Printf("warning: cached hash value 0 of file %q ignored\n", path)
@@ -166,8 +172,7 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 					// Currently report error but keep going.
 					log.Printf("error: cannot hash file %q: %v\n", path, err)
 				} else if h == 0 {
-					// TODO: What warnings? And why?
-					log.Printf("info: hash of file %q evaluated to 0 - this might result in warnings which can be safely ignored\n", path)
+					log.Printf("info: hash of file %q evaluated to 0 - this might result in warnings (which can be safely ignored) if the output is used as cache in future scans\n", path)
 				}
 			}
 			head.curDir.appendFile(NewFile(name, size, info.ModTime().Unix(), h)) // Walk visits in lexical order
@@ -178,17 +183,12 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 }
 
 // hashFromCache looks up the hash of the contents of the provided file in the provided cache dir.
+// If the cached file size or modification time don't match that of the file being looked up, the cache is considered missed.
+// A cache miss will always return hash value 0.
 // The boolean return value indicates whether the hash was found in the cache or not.
-// A cache miss will always return hash with value 0.
-// A cached hash value of 0 is assumed to be a mistake (caused by 0 being the default value of uint64),
-// and will cause a warning to be logged from the caller (which knows the full path):
-// There's intentionally no way to cache the hash if it happens to be actually 0.
-// This is deemed acceptable as this is expected to practically never happen.
-// If the cached file size doesn't match the expected one, the cache is considered missed as well.
-// TODO: Also check timestamp.
-func hashFromCache(cacheDir *Dir, fileName string, fileSize int64) (uint64, bool) {
+func hashFromCache(cacheDir *Dir, fileName string, fileSize int64, modTimeUnix int64) (uint64, bool) {
 	f := safeFindFile(cacheDir, fileName)
-	if f != nil && f.Size == fileSize {
+	if f != nil && f.Size == fileSize && f.ModTime == modTimeUnix {
 		return f.Hash, true
 	}
 	return 0, false
