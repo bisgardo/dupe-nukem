@@ -54,17 +54,9 @@ func Test__nonexistent_root_fails(t *testing.T) {
 }
 
 func Test__file_root_fails(t *testing.T) {
-	f, err := os.CreateTemp("", "root")
-	require.NoError(t, err)
-	filename := f.Name()
-	defer func() {
-		err := os.Remove(filename)
-		assert.NoError(t, err)
-	}()
-	err = f.Close()
-	assert.NoError(t, err)
-	_, err = Run(filename, NoSkip, nil)
-	assert.EqualError(t, err, fmt.Sprintf("invalid root directory %q: not a directory", filename))
+	path := testutil.TempFile(t, "")
+	_, err := Run(path, NoSkip, nil)
+	assert.EqualError(t, err, fmt.Sprintf("invalid root directory %q: not a directory", path))
 }
 
 func Test__inaccessible_root_is_skipped_and_logged(t *testing.T) {
@@ -189,10 +181,10 @@ func Test__skip_symlinked_root_fails(t *testing.T) {
 			symlinkPath := filepath.Join(rootPath, symlinkName)
 			err := os.Symlink(test.symlinkTargetPath, symlinkPath)
 			require.NoError(t, err)
-			defer func() {
+			t.Cleanup(func() {
 				err := os.Remove(symlinkPath)
 				assert.NoError(t, err)
-			}()
+			})
 			_, err = Run(symlinkPath, skip(symlinkName), nil)
 			assert.EqualError(t, err, fmt.Sprintf(`skipping root directory %q`, symlinkPath))
 		})
@@ -583,10 +575,10 @@ func Test__root_broken_symlink_fails(t *testing.T) {
 	symlinkPath := filepath.Join(rootPath, symlinkName)
 	err := os.Symlink("non-existing", symlinkPath)
 	require.NoError(t, err)
-	defer func() {
+	t.Cleanup(func() {
 		err := os.Remove(symlinkPath)
 		assert.NoError(t, err)
-	}()
+	})
 
 	_, err = Run(symlinkPath, NoSkip, nil)
 	assert.EqualError(t, err, fmt.Sprintf("invalid root directory %q: not found", symlinkPath))

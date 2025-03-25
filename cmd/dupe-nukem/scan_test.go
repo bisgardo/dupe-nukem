@@ -16,8 +16,6 @@ import (
 	"github.com/bisgardo/dupe-nukem/testutil"
 )
 
-// TODO: Ensure that all temporary files are properly closed (and replace cleanup defers with t.Cleanup).
-
 func Test__parseSkipNames_empty_returns_nil(t *testing.T) {
 	input := ""
 	res, err := parseSkipNames(input)
@@ -42,21 +40,10 @@ func Test__parseSkipNames_with_at_prefix_splits_file_on_newline(t *testing.T) {
 }
 
 func Test__parseSkipNames_file_with_length_255_is_allowed(t *testing.T) {
-	f, err := os.CreateTemp("", "allowed-skipnames")
-	require.NoError(t, err)
-	defer func() {
-		err := os.Remove(f.Name())
-		assert.NoError(t, err)
-	}()
-	line := strings.Repeat("x", maxSkipNameFileLineLen-1)
-	n, err := f.WriteString(line)
-	require.NoError(t, err)
-	require.Equal(t, maxSkipNameFileLineLen-1, n)
-	err = f.Close()
-	assert.NoError(t, err)
-
-	input := fmt.Sprintf("@%v", f.Name())
-	want := []string{line}
+	expr := strings.Repeat("x", maxSkipNameFileLineLen-1)
+	path := testutil.TempFile(t, expr)
+	input := fmt.Sprintf("@%v", path)
+	want := []string{expr}
 	res, err := parseSkipNames(input)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
@@ -67,39 +54,19 @@ func Test__parseSkipNames_file_with_length_255_is_allowed(t *testing.T) {
 // in the valid cases.
 
 func Test__loadShouldSkip_file_with_length_256_fails(t *testing.T) {
-	f, err := os.CreateTemp("", "long-skipnames")
-	require.NoError(t, err)
-	defer func() {
-		err := os.Remove(f.Name())
-		assert.NoError(t, err)
-	}()
-	n, err := f.WriteString(strings.Repeat("x", maxSkipNameFileLineLen) + "\n") // let the 256'th character be a newline
-	require.NoError(t, err)
-	require.Equal(t, maxSkipNameFileLineLen+1, n)
-	err = f.Close()
-	assert.NoError(t, err)
-
-	input := fmt.Sprintf("@%v", f.Name())
-	_, err = loadShouldSkip(input)
-	assert.EqualError(t, err, fmt.Sprintf("cannot read skip names from file %q: line 1 is longer than the max allowed length of 256 characters", f.Name()))
+	expr := strings.Repeat("x", maxSkipNameFileLineLen) + "\n" // let the 256'th character be a newline
+	path := testutil.TempFile(t, expr)
+	input := fmt.Sprintf("@%v", path)
+	_, err := loadShouldSkip(input)
+	assert.EqualError(t, err, fmt.Sprintf("cannot read skip names from file %q: line 1 is longer than the max allowed length of 256 characters", path))
 }
 
 func Test__loadShouldSkip_file_with_invalid_line_fails(t *testing.T) {
-	f, err := os.CreateTemp("", "invalid-skipnames")
-	require.NoError(t, err)
-	defer func() {
-		err := os.Remove(f.Name())
-		assert.NoError(t, err)
-	}()
-	n, err := f.WriteString("with/slash")
-	require.NoError(t, err)
-	require.Equal(t, 10, n)
-	err = f.Close()
-	assert.NoError(t, err)
-
-	input := fmt.Sprintf("@%v", f.Name())
-	_, err = loadShouldSkip(input)
-	assert.EqualError(t, err, `invalid skip name "with/slash": has invalid character '/'`)
+	expr := "with/slash"
+	path := testutil.TempFile(t, expr)
+	input := fmt.Sprintf("@%v", path)
+	_, err := loadShouldSkip(input)
+	assert.EqualError(t, err, fmt.Sprintf(`invalid skip name %q: invalid character '/'`, expr))
 }
 
 func Test__loadShouldSkip_invalid_names_fail(t *testing.T) {
@@ -107,12 +74,12 @@ func Test__loadShouldSkip_invalid_names_fail(t *testing.T) {
 		names   string
 		wantErr string
 	}{
-		{names: " x", wantErr: `invalid skip name " x": has surrounding space`},
-		{names: "x ", wantErr: `invalid skip name "x ": has surrounding space`},
+		{names: " x", wantErr: `invalid skip name " x": surrounding space`},
+		{names: "x ", wantErr: `invalid skip name "x ": surrounding space`},
 		{names: ".", wantErr: `invalid skip name ".": current directory`},
 		{names: "..", wantErr: `invalid skip name "..": parent directory`},
-		{names: "/", wantErr: `invalid skip name "/": has invalid character '/'`},
-		{names: "x,/y", wantErr: `invalid skip name "/y": has invalid character '/'`},
+		{names: "/", wantErr: `invalid skip name "/": invalid character '/'`},
+		{names: "x,/y", wantErr: `invalid skip name "/y": invalid character '/'`},
 		{names: ",", wantErr: `invalid skip name "": empty`},
 	}
 
@@ -131,7 +98,7 @@ func Test__Scan_wraps_skip_file_not_found_error(t *testing.T) {
 
 func Test__Scan_wraps_parse_error_of_skip_names(t *testing.T) {
 	_, err := Scan("x", "valid, it's not", "")
-	assert.EqualError(t, err, `cannot process skip dirs expression "valid, it's not": invalid skip name " it's not": has surrounding space`)
+	assert.EqualError(t, err, `cannot process skip dirs expression "valid, it's not": invalid skip name " it's not": surrounding space`)
 }
 
 func Test__loadCacheDir_empty_loads_nil(t *testing.T) {
@@ -164,19 +131,9 @@ func Test__loadScanDirCacheFile_logs_nonexistent_file_before_loading(t *testing.
 }
 
 func Test__loadScanDirCacheFile_wraps_invalid_cache_error(t *testing.T) {
-	f, err := os.CreateTemp("", "invalid")
-	require.NoError(t, err)
-	defer func() {
-		err := os.Remove(f.Name())
-		assert.NoError(t, err)
-	}()
-	_, err = f.WriteString(`{"name":""}`)
-	require.NoError(t, err)
-	err = f.Close()
-	assert.NoError(t, err)
-
-	_, err = loadScanDirCacheFile(f.Name())
-	assert.EqualError(t, err, `invalid cache contents: directory name is empty`)
+	path := testutil.TempFile(t, `{"name":""}`)
+	_, err := loadScanDirCacheFile(path)
+	assert.EqualError(t, err, `invalid contents: directory name is empty`)
 }
 
 func Test__Scan_wraps_invalid_dir_error(t *testing.T) {
@@ -186,7 +143,7 @@ func Test__Scan_wraps_invalid_dir_error(t *testing.T) {
 	want := fmt.Sprintf(`invalid root directory "%s/\x00": invalid argument (lstat)`, dir)
 	//goland:noinspection GoBoolExpressions
 	if runtime.GOOS == "windows" {
-		// On Windows this case actually test that Scan does *not* wrap "unable to resolve absolute path" error.
+		// On Windows this case actually tests that Scan does *not* wrap "unable to resolve absolute path" error.
 		want = `cannot resolve absolute path of "\x00": invalid argument`
 	}
 	assert.EqualError(t, err, want)
@@ -198,36 +155,16 @@ func Test__Scan_wraps_cache_file_not_found_error(t *testing.T) {
 }
 
 func Test__Scan_wraps_cache_file_not_accessible_error(t *testing.T) {
-	f, err := os.CreateTemp("", "inaccessible")
-	require.NoError(t, err)
-	filename := f.Name()
-	t.Cleanup(func() {
-		err := os.Remove(filename)
-		assert.NoError(t, err)
-	})
-	testutil.MakeInaccessibleT(t, filename)
-	require.NoError(t, err)
-	err = f.Close()
-	assert.NoError(t, err)
-	_, err = Scan("x", "", filename)
-	assert.EqualError(t, err, fmt.Sprintf("cannot load scan cache file %q: cannot open file: access denied", filename))
+	path := testutil.TempFile(t, "")
+	testutil.MakeInaccessibleT(t, path)
+	_, err := Scan("x", "", path)
+	assert.EqualError(t, err, fmt.Sprintf("cannot load scan cache file %q: cannot open file: access denied", path))
 }
 
 func Test__Scan_wraps_cache_load_error(t *testing.T) {
-	f, err := os.CreateTemp("", "malformed")
-	require.NoError(t, err)
-	defer func() {
-		err := os.Remove(f.Name())
-		assert.NoError(t, err)
-	}()
-	n, err := f.WriteString("{")
-	require.NoError(t, err)
-	require.Equal(t, 1, n)
-	err = f.Close()
-	assert.NoError(t, err)
-
-	_, err = Scan("x", "", f.Name())
-	assert.EqualError(t, err, fmt.Sprintf("cannot load scan cache file %q: cannot decode file as JSON: unexpected EOF", f.Name()))
+	path := testutil.TempFile(t, "{")
+	_, err := Scan("x", "", path)
+	assert.EqualError(t, err, fmt.Sprintf("cannot load scan cache file %q: cannot decode file as JSON: unexpected EOF", path))
 }
 
 func Test__checkCache_rejects_unsorted_lists_for_nonempty_items(t *testing.T) {
@@ -402,20 +339,11 @@ func Test__scan_testdata_uses_provided_cache(t *testing.T) {
 			{Name: "skipnames", Size: 7, Hash: 69, ModTime: 23},                   // incorrect mod time
 		},
 	}
-	cachePath, err := os.CreateTemp("", "cache")
-	require.NoError(t, err)
-	defer func() {
-		err := os.Remove(cachePath.Name())
-		assert.NoError(t, err)
-	}()
 	cacheBytes, err := json.MarshalIndent(cache, "", "  ")
 	require.NoError(t, err)
-	_, err = cachePath.Write(cacheBytes)
-	require.NoError(t, err)
-	err = cachePath.Close()
-	assert.NoError(t, err)
+	cachePath := testutil.TempFile(t, string(cacheBytes))
 
-	res, err := Scan("testdata", "", cachePath.Name())
+	res, err := Scan("testdata", "", cachePath)
 	require.NoError(t, err)
 	assert.Equal(t, want, res)
 }

@@ -19,6 +19,10 @@ import (
 // As the file is read line by line, this is the maximum allowed line length.
 const maxSkipNameFileLineLen = 256
 
+// invalidSkipNameChars is a sequence of the Unicode code points that a valid skipname is not allowed to contain.
+// Currently only the character '/' is prohibited.
+const invalidSkipNameChars = "/"
+
 // Scan parses the skip expression and cache path passed from the command line
 // and then runs scan.Run with the resulting values.
 func Scan(dir, skipExpr, cachePath string) (*scan.Dir, error) {
@@ -78,7 +82,7 @@ func parseSkipNameFile(path string) ([]string, error) {
 	}
 	defer func() {
 		if err := f.Close(); err != nil {
-			log.Printf("error: cannot close skip name file %q: %v\n", path, err) // cannot test
+			log.Printf("error: closing skip name file %q failed: %v\n", path, err) // cannot test
 		}
 	}()
 	r := bufio.NewReaderSize(f, maxSkipNameFileLineLen)
@@ -104,7 +108,7 @@ func parseSkipNameFile(path string) ([]string, error) {
 
 func validateSkipName(name string) error {
 	if strings.TrimSpace(name) != name {
-		return fmt.Errorf("has surrounding space")
+		return fmt.Errorf("surrounding space")
 	}
 	switch name {
 	case "":
@@ -114,8 +118,8 @@ func validateSkipName(name string) error {
 	case "..":
 		return fmt.Errorf("parent directory")
 	}
-	if i := strings.IndexAny(name, "/"); i != -1 {
-		return fmt.Errorf("has invalid character '%c'", name[i])
+	if i := strings.IndexAny(name, invalidSkipNameChars); i != -1 {
+		return fmt.Errorf("invalid character '%c'", name[i])
 	}
 	return nil
 }
@@ -130,9 +134,11 @@ func loadScanDirCacheFile(path string) (*scan.Dir, error) {
 	if err != nil {
 		return nil, err
 	}
-	// TODO: Unless it's too expensive, just sort lists instead of only validating?
+	// Could just sort lists instead of (only) validating,
+	// but it appears to be a needless complication for something that should never happen.
+	// So if it does, it probably indicates a problem that's worth alarming the user about.
 	if err := checkCache(scanDir); err != nil {
-		return nil, errors.Wrap(err, "invalid cache contents")
+		return nil, errors.Wrap(err, "invalid contents") // caller wraps path
 	}
 	log.Printf("scan cache loaded successfully from %q in %v\n", path, timeSince(start))
 	return scanDir, nil
