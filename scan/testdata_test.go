@@ -1,7 +1,6 @@
 package scan
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -9,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/bisgardo/dupe-nukem/hash"
@@ -18,9 +18,7 @@ import (
 // node is a common interface for files and directories to be written to disk as testdata.
 type node interface {
 	// simulateScanFromParent adds the "scan" result of the node to the Dir representing the parent node.
-	// Because the implementation file might stat the actual file on disk (when no modification time has been specified),
-	// writeTestdata should be called before this method (unless the equivalent test data already exists on the provided path).
-	simulateScanFromParent(parent *Dir, parentPath, name string)
+	simulateScanFromParent(parent *Dir, name string)
 
 	// writeTestdata writes the directory structure rooted at the node to the provided path on disk.
 	writeTestdata(t *testing.T, path string)
@@ -28,12 +26,12 @@ type node interface {
 
 type dir map[string]node
 
-func (d dir) simulateScanFromParent(parent *Dir, parentPath, name string) {
-	s := d.simulateScanAux(parentPath, name)
+func (d dir) simulateScanFromParent(parent *Dir, name string) {
+	s := d.simulateScan(name)
 	parent.appendDir(s)
 }
 
-func (d dir) simulateScanAux(parentPath, name string) *Dir {
+func (d dir) simulateScan(name string) *Dir {
 	res := NewDir(name)
 	// Iterate nodes in sorted order to respect ordering requirements of the append functions of Dir.
 	nodePaths := make([]string, 0, len(d))
@@ -44,7 +42,6 @@ func (d dir) simulateScanAux(parentPath, name string) *Dir {
 	for _, nodePath := range nodePaths {
 		res := res // prevent overwriting for future iterations
 		n := d[nodePath]
-		path := filepath.Join(parentPath, name)
 		for {
 			// Handle name being a path.
 			slashIdx := strings.IndexRune(nodePath, '/')
@@ -54,20 +51,15 @@ func (d dir) simulateScanAux(parentPath, name string) *Dir {
 			}
 			dirName := nodePath[0:slashIdx]  // extract dir name
 			nodePath = nodePath[slashIdx+1:] // pop dir name
-			path = filepath.Join(path, dirName)
 			// TODO: Use existing dir if it's already there?
 			//       Probably better to reject...
 			r := NewDir(dirName)
 			res.appendDir(r)
 			res = r
 		}
-		n.simulateScanFromParent(res, path, nodePath)
+		n.simulateScanFromParent(res, nodePath)
 	}
 	return res
-}
-
-func (d dir) simulateScan(path string) *Dir {
-	return d.simulateScanAux(filepath.Split(path))
 }
 
 func (d dir) writeTestdata(t *testing.T, path string) {
@@ -92,7 +84,7 @@ type dirExt struct {
 	inaccessible bool
 }
 
-func (d dirExt) simulateScanFromParent(parent *Dir, parentPath, name string) {
+func (d dirExt) simulateScanFromParent(parent *Dir, name string) {
 	if d.inaccessible {
 		return
 	}
@@ -100,7 +92,7 @@ func (d dirExt) simulateScanFromParent(parent *Dir, parentPath, name string) {
 		parent.appendSkippedDir(name)
 		return
 	}
-	d.dir.simulateScanFromParent(parent, parentPath, name)
+	d.dir.simulateScanFromParent(parent, name)
 }
 
 func (d dirExt) writeTestdata(t *testing.T, path string) {
@@ -124,7 +116,7 @@ type file struct {
 	makeInaccessible bool
 }
 
-func (f file) simulateScanFromParent(parent *Dir, parentPath, name string) {
+func (f file) simulateScanFromParent(parent *Dir, name string) {
 	if f.skipped {
 		parent.appendSkippedFile(name)
 		return
@@ -134,11 +126,11 @@ func (f file) simulateScanFromParent(parent *Dir, parentPath, name string) {
 		return
 	}
 	// Inaccessibility is handled in simulateScan (by hashing to 0).
-	s := f.simulateScan(parentPath, name)
+	s := f.simulateScan(name)
 	parent.appendFile(s)
 }
 
-func (f file) simulateScan(parentPath, name string) *File {
+func (f file) simulateScan(name string) *File {
 	data := []byte(f.c)
 	h := f.hashFromCache
 	if h == 0 && !f.makeInaccessible {
@@ -150,17 +142,11 @@ func (f file) simulateScan(parentPath, name string) *File {
 		// TODO: Add a test where a file that is cached is now makeInaccessible nonetheless.
 		h = hash.Bytes(data)
 	}
-	modTime := f.ts
-	if modTime.IsZero() {
-		// Timestamp is zero: read it from file (and panic if it isn't there - could just log??).
-		path := filepath.Join(parentPath, name)
-		info, err := os.Lstat(path)
-		if err != nil {
-			panic(fmt.Errorf("cannot stat file %q: %w", path, err))
-		}
-		modTime = info.ModTime()
+	var unixTime int64
+	if !f.ts.IsZero() {
+		unixTime = f.ts.Unix()
 	}
-	return NewFile(name, int64(len(data)), modTime.Unix(), h)
+	return NewFile(name, int64(len(data)), unixTime, h)
 }
 
 func (f file) writeTestdata(t *testing.T, path string) {
@@ -178,7 +164,7 @@ func (f file) writeTestdata(t *testing.T, path string) {
 
 type symlink string // target path relative to own location
 
-func (s symlink) simulateScanFromParent(*Dir, string, string) {
+func (s symlink) simulateScanFromParent(*Dir, string) {
 	// Symlinks are ignored.
 }
 
@@ -196,6 +182,39 @@ var (
 )
 
 // TODO: Test the testers (implement timestamping first).
+
+// assertEqual asserts that this Dir equals the provided expectation.
+// The assertion works like assert.Equal with the special rule that mod times are assumed equal if the expected one is zero.
+// This exception exists because we don't want to explicitly set the mod times of all generated test files,
+// in which case they default to the time that the test is run.
+// The solution of patching the expectation with the current time didn't work well and was replaced with this one.
+func (d *Dir) assertEqual(t *testing.T, expected *Dir) {
+	assert.Equal(t, d.Name, expected.Name)
+	assert.Equal(t, expected.EmptyFiles, d.EmptyFiles)
+	assert.Equal(t, expected.SkippedFiles, d.SkippedFiles)
+	assert.Equal(t, expected.SkippedDirs, d.SkippedDirs)
+
+	dirCount := len(expected.Dirs)
+	fileCount := len(expected.Files)
+	assert.Len(t, d.Dirs, dirCount)
+	assert.Len(t, d.Files, fileCount)
+	// Avoid recursing if assertions already failed.
+	for i := 0; i < dirCount && !t.Failed(); i++ {
+		d.Dirs[i].assertEqual(t, expected.Dirs[i])
+	}
+	for i := 0; i < fileCount && !t.Failed(); i++ {
+		d.Files[i].assertEqual(t, expected.Files[i])
+	}
+}
+
+func (f *File) assertEqual(t *testing.T, expected *File) {
+	assert.Equal(t, expected.Name, f.Name)
+	assert.Equal(t, expected.Size, f.Size)
+	if expected.ModTime != 0 {
+		assert.Equal(t, expected.ModTime, f.ModTime)
+	}
+	assert.Equal(t, expected.Hash, f.Hash)
+}
 
 //// withSkippedNames constructs a copy of the Dir with the provided names being added to the "skipped" lists
 //// instead of the regular ones.
