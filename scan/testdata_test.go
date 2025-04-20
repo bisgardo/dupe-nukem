@@ -3,11 +3,13 @@ package scan
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -63,7 +65,7 @@ func (d dir) simulateScan(name string) *Dir {
 }
 
 func (d dir) writeTestdata(t *testing.T, path string) {
-	if err := os.MkdirAll(path, 0755); err != nil {
+	if err := os.MkdirAll(path, 0700); err != nil {
 		require.NoErrorf(t, err, "cannot create dir on path %q", path)
 	}
 	// No need for iterating in sorted order.
@@ -151,7 +153,7 @@ func (f file) simulateScan(name string) *File {
 
 func (f file) writeTestdata(t *testing.T, path string) {
 	data := []byte(f.c)
-	err := os.WriteFile(path, data, 0644)
+	err := os.WriteFile(path, data, 0600)
 	require.NoErrorf(t, err, "cannot create file %q with contents %q", path, f.c)
 	if !f.ts.IsZero() {
 		err := os.Chtimes(path, time.Time{}, f.ts)
@@ -181,7 +183,194 @@ var (
 	_ node = symlink("")
 )
 
-// TODO: Test the testers (implement timestamping first).
+func Test_node(t *testing.T) {
+	ts, err := time.Parse(time.Layout, time.Layout)
+	require.NoError(t, err)
+	// assert.Equal doesn't compare times correctly unless they're in the same time zone.
+	ts = ts.Local()
+
+	makeRoot := func() dir {
+		return dir{
+			"a":   file{},
+			"b/d": file{c: "x\n", ts: ts},
+			"c":   file{c: "y\n", hashFromCache: 53},
+			"d":   dirExt{skipped: true},
+			"e/f": dir{
+				"a": file{c: "z\n", ts: ts, hashFromCache: 42},
+				"g": file{makeInaccessible: true},
+				"h": file{c: "h\n", ts: ts, makeInaccessible: true},
+			},
+			"h": file{c: "q", skipped: true},
+			"x": dir{},
+		}
+	}
+
+	t.Run("writeTestdata", func(t *testing.T) {
+		root := makeRoot()
+		before := time.Now()
+		rootPath := tempDir(t)
+		root.writeTestdata(t, rootPath)
+		after := time.Now()
+
+		// Assert that root wasn't modified.
+		require.Equal(t, makeRoot(), root)
+
+		infos, err := readFileInfos(rootPath, []string{"e/f/g", "e/f/h"})
+		require.NoError(t, err)
+
+		want := map[string]fileInfo{
+			"a":     {Name: "a", Mode: 0600},
+			"b":     {Name: "b", Mode: os.ModeDir | 0700},
+			"c":     {Name: "c", Contents: "y\n", Mode: 0600},
+			"b/d":   {Name: "d", Contents: "x\n", Mode: 0600, ModTime: ts},
+			"d":     {Name: "d", Mode: os.ModeDir | 0700},
+			"e":     {Name: "e", Mode: os.ModeDir | 0700},
+			"e/f":   {Name: "f", Mode: os.ModeDir | 0700},
+			"e/f/a": {Name: "a", Contents: "z\n", Mode: 0600, ModTime: ts},
+			"e/f/g": {Name: "g", Contents: "", Mode: 0},              // cannot read contents of inaccessible file
+			"e/f/h": {Name: "h", Contents: "", Mode: 0, ModTime: ts}, // cannot read contents of inaccessible file
+			"h":     {Name: "h", Contents: "q", Mode: 0600},
+			"x":     {Name: "x", Mode: os.ModeDir | 0700},
+		}
+
+		require.Len(t, infos, len(want))
+
+		for path, info := range infos {
+			wantInfo, ok := want[filepath.ToSlash(path)] // Windows...
+			require.True(t, ok)
+			if wantInfo.ModTime.IsZero() {
+				mt := info.ModTime
+				// It appears that we cannot trust the computer to follow the laws of physics below second accuracy.
+				assert.True(t, before.Add(-time.Second).Before(mt))
+				assert.True(t, after.Add(time.Second).After(mt))
+				wantInfo.ModTime = mt
+			}
+			// Windows...
+			if runtime.GOOS == "windows" {
+				if wantInfo.Mode.IsDir() {
+					wantInfo.Mode |= 0777
+				} else {
+					wantInfo.Mode |= 0666
+				}
+			}
+			assert.Equal(t, wantInfo, info)
+		}
+	})
+
+	t.Run("simulateScan", func(t *testing.T) {
+		root := makeRoot()
+		s := root.simulateScan("root")
+
+		// Assert that root wasn't modified.
+		require.Equal(t, makeRoot(), root)
+
+		want := &Dir{
+			Name: "root",
+			Dirs: []*Dir{
+				{
+					Name: "b",
+					Files: []*File{
+						{
+							Name:    "d",
+							Size:    2,
+							ModTime: ts.Unix(),
+							Hash:    644258871406045975, // actual hash
+						},
+					},
+				},
+				{
+					Name: "e",
+					Dirs: []*Dir{
+						{
+							Name: "f",
+							Files: []*File{
+								{
+									Name:    "a",
+									Size:    2,
+									ModTime: ts.Unix(),
+									Hash:    42, // "cached"
+								},
+								{
+									Name:    "h",
+									Size:    2,
+									ModTime: ts.Unix(),
+									Hash:    0, // cannot hash inaccessible file
+								},
+							},
+							EmptyFiles: []string{"g"},
+						},
+					},
+				},
+				{
+					Name: "x",
+				},
+			},
+			Files: []*File{
+				{
+					Name: "c",
+					Size: 2,
+					Hash: 53, // "cached"
+				},
+			},
+			EmptyFiles:   []string{"a"},
+			SkippedFiles: []string{"h"},
+			SkippedDirs:  []string{"d"},
+		}
+		s.assertEqual(t, want)
+	})
+}
+
+// TODO: Add test where inaccessible dir has contents.
+// TODO: Add test where different keys have overlapping paths.
+
+type fileInfo struct {
+	Name     string
+	Contents string
+	Mode     os.FileMode
+	ModTime  time.Time
+}
+
+func readFileInfos(rootPath string, inaccessiblePaths []string) (map[string]fileInfo, error) {
+	inaccessiblePathsSet := make(map[string]struct{})
+	for _, p := range inaccessiblePaths {
+		// Running path through clean because Windows.
+		inaccessiblePathsSet[filepath.Clean(p)] = struct{}{}
+	}
+
+	res := make(map[string]fileInfo)
+	err := filepath.Walk(rootPath, func(absPath string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if absPath != rootPath {
+			relPath, err := filepath.Rel(rootPath, absPath)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+
+			var contents string
+			if _, skip := inaccessiblePathsSet[relPath]; !skip && !info.IsDir() {
+				bs, err := os.ReadFile(absPath)
+				if err != nil {
+					return errors.WithStack(err)
+				}
+				if int64(len(bs)) != info.Size() {
+					panic("unexpected file size")
+				}
+				contents = string(bs)
+			}
+
+			res[relPath] = fileInfo{
+				Name:     info.Name(),
+				Contents: contents,
+				Mode:     info.Mode(),
+				ModTime:  info.ModTime(),
+			}
+		}
+		return nil
+	})
+	return res, err
+}
 
 // assertEqual asserts that this Dir equals the provided expectation.
 // The assertion works like assert.Equal with the special rule that mod times are assumed equal if the expected one is zero.

@@ -157,8 +157,9 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 			// IDEA: Consider adding option to hash a limited number of bytes only
 			//       (the reason being that if two files differ, the first 1MB or so probably differ too).
 			h, hit := hashFromCache(head.cacheDir, name, size, info.ModTime().Unix())
-			// If the cache contains the actual hash value 0, we assume that it's a mistake
-			// caused by unintended zero-initialization somewhere and treat it as a cache miss as a safety precaution.
+			// If the cache contains the actual hash value 0,
+			// we assume that it's either caused by the file being inaccessible
+			// or by a mistake resulting in unintended zero-initialization somewhere.
 			// A warning to let the user know that the cache contains this value.
 			// The fact that a file with hash 0 cannot be cached is deemed acceptable,
 			// as this is expected to practically never happen for real data.
@@ -169,7 +170,7 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 				}
 				h, err = hash.File(path)
 				if err != nil {
-					// Currently report error but keep going.
+					// Currently report error but keep going (i.e. include the file with empty hash).
 					log.Printf("error: cannot hash file %q: %v\n", path, err)
 				} else if h == 0 {
 					log.Printf("info: hash of file %q evaluated to 0 - this might result in warnings (which can be safely ignored) if the output is used as cache in future scans\n", path)
