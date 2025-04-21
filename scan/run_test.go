@@ -367,6 +367,21 @@ func Test__inaccessible_internal_dir_is_logged(t *testing.T) {
 	)
 }
 
+func Test__inaccessible_internal_empty_file_is_not_logged(t *testing.T) {
+	root := dir{
+		"a":                  file{c: "x"},
+		"inaccessible+empty": file{makeInaccessible: true},
+	}
+	rootPath := tempDir(t)
+	root.writeTestdata(t, rootPath)
+	want := root.simulateScan(filepath.Base(rootPath))
+	buf := testutil.LogBuffer()
+	res, err := Run(rootPath, NoSkip, nil)
+	require.NoError(t, err)
+	assert.Equal(t, want, res)
+	assert.Empty(t, buf.String())
+}
+
 func Test__cache_with_mismatching_root_fails(t *testing.T) {
 	rootPath := "some-root"
 	cache := &Dir{Name: "other-root"}
