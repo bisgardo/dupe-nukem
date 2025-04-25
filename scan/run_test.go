@@ -339,7 +339,7 @@ func Test__inaccessible_internal_dir_is_logged(t *testing.T) {
 		"f": dir{
 			"a":            file{c: "z\n"},
 			"g":            file{},
-			"inaccessible": dirExt{inaccessible: true},
+			"inaccessible": dirExt{makeInaccessible: true},
 		},
 	}
 	rootPath := tempDir(t)
