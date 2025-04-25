@@ -1,6 +1,8 @@
 package scan
 
 import (
+	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -17,7 +19,7 @@ import (
 	"github.com/bisgardo/dupe-nukem/testutil"
 )
 
-// node is a common interface for files and directories to be written to disk as testdata.
+// node is an interface for building test data for Run.
 type node interface {
 	// simulateScanFromParent adds the "scan" result of the node to the Dir representing the parent node.
 	simulateScanFromParent(parent *Dir, name string)
@@ -26,6 +28,9 @@ type node interface {
 	writeTestdata(t *testing.T, path string)
 }
 
+// dir is a directory node, implemented as a mapping to entry nodes by relative path.
+// That is, the keys may contain '/' characters to implicitly define nested dir nodes.
+// Different keys must not define any subdirectory more than once (i.e. paths must not overlap).
 type dir map[string]node
 
 func (d dir) simulateScanFromParent(parent *Dir, name string) {
@@ -45,7 +50,7 @@ func (d dir) simulateScan(name string) *Dir {
 		res := res // prevent overwriting for future iterations
 		n := d[nodePath]
 		for {
-			// Handle name being a path.
+			// Handle name being a (Unix) path.
 			slashIdx := strings.IndexRune(nodePath, '/')
 			if slashIdx == -1 {
 				// nodePath is no longer a path, just a name.
@@ -53,8 +58,13 @@ func (d dir) simulateScan(name string) *Dir {
 			}
 			dirName := nodePath[0:slashIdx]  // extract dir name
 			nodePath = nodePath[slashIdx+1:] // pop dir name
-			// TODO: Use existing dir if it's already there?
-			//       Probably better to reject...
+
+			// Reject duplicated dir.
+			// Note that we only have to check nested paths (e.g. "x/y") because the key sorting above ensures
+			// that any non-nested case (e.g. "x") is always processed first.
+			if safeFindDir(res, dirName) != nil {
+				panic(fmt.Errorf("duplicate dir %q", dirName))
+			}
 			r := NewDir(dirName)
 			res.appendDir(r)
 			res = r
@@ -65,7 +75,7 @@ func (d dir) simulateScan(name string) *Dir {
 }
 
 func (d dir) writeTestdata(t *testing.T, path string) {
-	if err := os.MkdirAll(path, 0700); err != nil {
+	if err := os.MkdirAll(path, 0700); err != nil { // permissions chosen to be unaffected by umask
 		require.NoErrorf(t, err, "cannot create dir on path %q", path)
 	}
 	// No need for iterating in sorted order.
@@ -80,6 +90,8 @@ func (d dir) writeTestdata(t *testing.T, path string) {
 	}
 }
 
+// dirExt is an extension of dir that adds the ability
+// to expect the directory to be skipped or made inaccessible.
 type dirExt struct {
 	dir          dir
 	skipped      bool
@@ -104,18 +116,19 @@ func (d dirExt) writeTestdata(t *testing.T, path string) {
 	}
 }
 
+// file is a file node.
 type file struct {
 	// The file's contents as a string.
 	c string
 	// The file's latest modification time (with second accuracy).
 	ts time.Time
 	// The file's hash as resolved from a cache file rather than being computed (if non-zero).
-	// Should not be combined with makeInaccessible.
+	// Should not be combined with inaccessible.
 	hashFromCache uint64
 	// Whether the file is expected to be skipped by Run.
 	skipped bool
-	// Whether the file is to be made makeInaccessible (and thus expecting Run to find it so).
-	makeInaccessible bool
+	// Whether the file is to be made inaccessible (and thus expecting Run to find it so).
+	inaccessible bool
 }
 
 func (f file) simulateScanFromParent(parent *Dir, name string) {
@@ -128,6 +141,8 @@ func (f file) simulateScanFromParent(parent *Dir, name string) {
 		return
 	}
 	// Inaccessibility is handled in simulateScan (by hashing to 0).
+	// We don't have to check whether the file is already there,
+	// as that cannot be expressed without duplicating dir (which is already checked).
 	s := f.simulateScan(name)
 	parent.appendFile(s)
 }
@@ -135,13 +150,13 @@ func (f file) simulateScanFromParent(parent *Dir, name string) {
 func (f file) simulateScan(name string) *File {
 	data := []byte(f.c)
 	h := f.hashFromCache
-	if h == 0 && !f.makeInaccessible {
-		// If both hashFromCache and makeInaccessible are set, then the cached value is used.
+	if h == 0 && !f.inaccessible {
+		// If both hashFromCache and inaccessible are set, then the cached value is used.
 		// As hashFromCache isn't used to actually derive a cache
 		// (it just simulates that the file's hash originated from one),
 		// the two inputs cannot be combined in any meaningful way.
 		// And consequently there's no need for doing anything about it.
-		// TODO: Add a test where a file that is cached is now makeInaccessible nonetheless.
+		// TODO: Add a test where a file that is cached is now inaccessible nonetheless.
 		h = hash.Bytes(data)
 	}
 	var unixTime int64
@@ -153,13 +168,13 @@ func (f file) simulateScan(name string) *File {
 
 func (f file) writeTestdata(t *testing.T, path string) {
 	data := []byte(f.c)
-	err := os.WriteFile(path, data, 0600)
+	err := os.WriteFile(path, data, 0600) // permissions chosen to be unaffected by umask
 	require.NoErrorf(t, err, "cannot create file %q with contents %q", path, f.c)
 	if !f.ts.IsZero() {
 		err := os.Chtimes(path, time.Time{}, f.ts)
 		require.NoErrorf(t, err, "cannot update modification time of file %q", path)
 	}
-	if f.makeInaccessible {
+	if f.inaccessible {
 		testutil.MakeInaccessibleT(t, path)
 	}
 }
@@ -183,11 +198,10 @@ var (
 	_ node = symlink("")
 )
 
-func Test_node(t *testing.T) {
+func Test__node(t *testing.T) {
 	ts, err := time.Parse(time.Layout, time.Layout)
 	require.NoError(t, err)
-	// assert.Equal doesn't compare times correctly unless they're in the same time zone.
-	ts = ts.Local()
+	ts = ts.Local() // assert.Equal only deems times equal if they're in the same time zone
 
 	makeRoot := func() dir {
 		return dir{
@@ -197,64 +211,47 @@ func Test_node(t *testing.T) {
 			"d":   dirExt{skipped: true},
 			"e/f": dir{
 				"a": file{c: "z\n", ts: ts, hashFromCache: 42},
-				"g": file{makeInaccessible: true},
-				"h": file{c: "h\n", ts: ts, makeInaccessible: true},
+				"g": file{inaccessible: true},
+				"h": file{c: "h\n", ts: ts, inaccessible: true},
 			},
 			"h": file{c: "q", skipped: true},
 			"x": dir{},
+			"y": dirExt{inaccessible: true, dir: dir{"z": file{c: "zzz"}}},
 		}
 	}
 
 	t.Run("writeTestdata", func(t *testing.T) {
+		// Extend time backwards by 1s to accommodate for the fact that the FS appears to be lazy around updating time.
+		before := time.Now().Add(-1 * time.Second)
 		root := makeRoot()
-		before := time.Now()
 		rootPath := tempDir(t)
 		root.writeTestdata(t, rootPath)
 		after := time.Now()
 
-		// Assert that root wasn't modified.
+		// Check that root wasn't modified.
 		require.Equal(t, makeRoot(), root)
 
-		infos, err := readFileInfos(rootPath, []string{"e/f/g", "e/f/h"})
+		p := filepath.FromSlash // because Windows...
+		infos, err := readInfoTree(rootPath, []string{p("e/f/g"), p("e/f/h"), p("y")})
 		require.NoError(t, err)
 
 		want := map[string]fileInfo{
-			"a":     {Name: "a", Mode: 0600},
-			"b":     {Name: "b", Mode: os.ModeDir | 0700},
-			"c":     {Name: "c", Contents: "y\n", Mode: 0600},
-			"b/d":   {Name: "d", Contents: "x\n", Mode: 0600, ModTime: ts},
-			"d":     {Name: "d", Mode: os.ModeDir | 0700},
-			"e":     {Name: "e", Mode: os.ModeDir | 0700},
-			"e/f":   {Name: "f", Mode: os.ModeDir | 0700},
-			"e/f/a": {Name: "a", Contents: "z\n", Mode: 0600, ModTime: ts},
-			"e/f/g": {Name: "g", Contents: "", Mode: 0},              // cannot read contents of inaccessible file
-			"e/f/h": {Name: "h", Contents: "", Mode: 0, ModTime: ts}, // cannot read contents of inaccessible file
-			"h":     {Name: "h", Contents: "q", Mode: 0600},
-			"x":     {Name: "x", Mode: os.ModeDir | 0700},
+			p("a"):     {Name: "a", Mode: 0600},
+			p("b"):     {Name: "b", Mode: os.ModeDir | 0700},
+			p("c"):     {Name: "c", Contents: "y\n", Mode: 0600},
+			p("b/d"):   {Name: "d", Contents: "x\n", Mode: 0600, ModTime: ts},
+			p("d"):     {Name: "d", Mode: os.ModeDir | 0700},
+			p("e"):     {Name: "e", Mode: os.ModeDir | 0700},
+			p("e/f"):   {Name: "f", Mode: os.ModeDir | 0700},
+			p("e/f/a"): {Name: "a", Contents: "z\n", Mode: 0600, ModTime: ts},
+			p("e/f/g"): {Name: "g", Contents: "", Mode: 0},              // cannot read contents of inaccessible file
+			p("e/f/h"): {Name: "h", Contents: "", Mode: 0, ModTime: ts}, // cannot read contents of inaccessible file
+			p("h"):     {Name: "h", Contents: "q", Mode: 0600},
+			p("x"):     {Name: "x", Mode: os.ModeDir | 0700},
+			p("y"):     {Name: "y", Mode: os.ModeDir}, // not seeing contained file "z" (it is there, but we'd have to be root to see it)
 		}
 
-		require.Len(t, infos, len(want))
-
-		for path, info := range infos {
-			wantInfo, ok := want[filepath.ToSlash(path)] // Windows...
-			require.True(t, ok)
-			if wantInfo.ModTime.IsZero() {
-				mt := info.ModTime
-				// It appears that we cannot trust the computer to follow the laws of physics below second accuracy.
-				assert.True(t, before.Add(-time.Second).Before(mt))
-				assert.True(t, after.Add(time.Second).After(mt))
-				wantInfo.ModTime = mt
-			}
-			// Windows...
-			if runtime.GOOS == "windows" {
-				if wantInfo.Mode.IsDir() {
-					wantInfo.Mode |= 0777
-				} else {
-					wantInfo.Mode |= 0666
-				}
-			}
-			assert.Equal(t, wantInfo, info)
-		}
+		assertCompatibleInfos(t, want, infos, before, after)
 	})
 
 	t.Run("simulateScan", func(t *testing.T) {
@@ -270,12 +267,7 @@ func Test_node(t *testing.T) {
 				{
 					Name: "b",
 					Files: []*File{
-						{
-							Name:    "d",
-							Size:    2,
-							ModTime: ts.Unix(),
-							Hash:    644258871406045975, // actual hash
-						},
+						{Name: "d", Size: 2, ModTime: ts.Unix(), Hash: 644258871406045975}, // actual hash
 					},
 				},
 				{
@@ -284,18 +276,8 @@ func Test_node(t *testing.T) {
 						{
 							Name: "f",
 							Files: []*File{
-								{
-									Name:    "a",
-									Size:    2,
-									ModTime: ts.Unix(),
-									Hash:    42, // "cached"
-								},
-								{
-									Name:    "h",
-									Size:    2,
-									ModTime: ts.Unix(),
-									Hash:    0, // cannot hash inaccessible file
-								},
+								{Name: "a", Size: 2, ModTime: ts.Unix(), Hash: 42}, // cached
+								{Name: "h", Size: 2, ModTime: ts.Unix(), Hash: 0},  // cannot hash inaccessible file
 							},
 							EmptyFiles: []string{"g"},
 						},
@@ -306,11 +288,7 @@ func Test_node(t *testing.T) {
 				},
 			},
 			Files: []*File{
-				{
-					Name: "c",
-					Size: 2,
-					Hash: 53, // "cached"
-				},
+				{Name: "c", Size: 2, Hash: 53}, // cached + no mod time
 			},
 			EmptyFiles:   []string{"a"},
 			SkippedFiles: []string{"h"},
@@ -320,8 +298,91 @@ func Test_node(t *testing.T) {
 	})
 }
 
-// TODO: Add test where inaccessible dir has contents.
-// TODO: Add test where different keys have overlapping paths.
+func Test__node_with_overlapping_dirs(t *testing.T) {
+	root := dir{
+		"a/b": file{c: "ab"},
+		"a/c": file{c: "ac"},
+	}
+	t.Run("writeTestdata", func(t *testing.T) {
+		before := time.Now().Add(-1 * time.Second) // see comment in Test__node
+		rootPath := tempDir(t)
+		root.writeTestdata(t, rootPath)
+		after := time.Now()
+
+		p := filepath.FromSlash // because Windows...
+		infos, err := readInfoTree(rootPath, nil)
+		require.NoError(t, err)
+
+		want := map[string]fileInfo{
+			p("a"):   {Name: "a", Mode: os.ModeDir | 0700},
+			p("a/b"): {Name: "b", Contents: "ab", Mode: 0600},
+			p("a/c"): {Name: "c", Contents: "ac", Mode: 0600},
+		}
+
+		assertCompatibleInfos(t, want, infos, before, after)
+	})
+
+	t.Run("simulateScan", func(t *testing.T) {
+		assert.PanicsWithError(t, "duplicate dir \"a\"", func() {
+			root.simulateScan("root")
+		})
+	})
+}
+
+func Test__node_with_overlapping_files(t *testing.T) {
+	root := dir{
+		"a":   dir{"b": file{c: "x"}},
+		"a/b": file{c: "y"},
+	}
+	t.Run("writeTestdata", func(t *testing.T) {
+		before := time.Now().Add(-1 * time.Second) // see comment in Test__node
+		rootPath := tempDir(t)
+		root.writeTestdata(t, rootPath)
+		after := time.Now()
+
+		p := filepath.FromSlash // because Windows...
+		infos, err := readInfoTree(rootPath, nil)
+		require.NoError(t, err)
+
+		// The file is just overwritten...
+		want := map[string]fileInfo{
+			p("a"):   {Name: "a", Mode: os.ModeDir | 0700},
+			p("a/b"): {Name: "b", Contents: "y", Mode: 0600},
+		}
+
+		assertCompatibleInfos(t, want, infos, before, after)
+	})
+
+	t.Run("simulateScan", func(t *testing.T) {
+		// Duplicate file implies duplicate dir.
+		assert.PanicsWithError(t, "duplicate dir \"a\"", func() {
+			root.simulateScan("root")
+		})
+	})
+}
+
+func assertCompatibleInfos(t *testing.T, want, infos map[string]fileInfo, before, after time.Time) {
+	require.Len(t, infos, len(want))
+	for path, info := range infos {
+		wantInfo, ok := want[path]
+		require.True(t, ok)
+		if wantInfo.ModTime.IsZero() {
+			mt := info.ModTime
+			assert.True(t, before.Before(mt))
+			assert.True(t, after.After(mt))
+			wantInfo.ModTime = mt
+		}
+		// Windows...
+		if runtime.GOOS == "windows" {
+			if wantInfo.Mode.IsDir() {
+				wantInfo.Mode |= 0777
+			} else {
+				wantInfo.Mode |= 0666
+			}
+		}
+		assert.Equal(t, wantInfo, info)
+	}
+}
 
 type fileInfo struct {
 	Name     string
@@ -330,47 +391,59 @@ type fileInfo struct {
 	ModTime  time.Time
 }
 
-func readFileInfos(rootPath string, inaccessiblePaths []string) (map[string]fileInfo, error) {
+func readInfoTree(rootPath string, inaccessiblePaths []string) (map[string]fileInfo, error) {
 	inaccessiblePathsSet := make(map[string]struct{})
 	for _, p := range inaccessiblePaths {
-		// Running path through clean because Windows.
-		inaccessiblePathsSet[filepath.Clean(p)] = struct{}{}
+		inaccessiblePathsSet[p] = struct{}{}
 	}
-
 	res := make(map[string]fileInfo)
 	err := filepath.Walk(rootPath, func(absPath string, info os.FileInfo, err error) error {
+		if err != nil && !errors.Is(err, fs.ErrPermission) || absPath == rootPath {
+			return err
+		}
+		relPath, err := filepath.Rel(rootPath, absPath)
 		if err != nil {
 			return err
 		}
-		if absPath != rootPath {
-			relPath, err := filepath.Rel(rootPath, absPath)
-			if err != nil {
-				return errors.WithStack(err)
-			}
-
-			var contents string
-			if _, skip := inaccessiblePathsSet[relPath]; !skip && !info.IsDir() {
-				bs, err := os.ReadFile(absPath)
-				if err != nil {
-					return errors.WithStack(err)
-				}
-				if int64(len(bs)) != info.Size() {
-					panic("unexpected file size")
-				}
-				contents = string(bs)
-			}
-
-			res[relPath] = fileInfo{
-				Name:     info.Name(),
-				Contents: contents,
-				Mode:     info.Mode(),
-				ModTime:  info.ModTime(),
-			}
+		_, expectInaccessible := inaccessiblePathsSet[relPath]
+		contents, err := readPath(absPath, info, expectInaccessible)
+		if err != nil {
+			return err
+		}
+		res[relPath] = fileInfo{
+			Name:     info.Name(),
+			Contents: contents,
+			Mode:     info.Mode(),
+			ModTime:  info.ModTime(),
 		}
 		return nil
 	})
 	return res, err
 }
+
+func readPath(path string, info os.FileInfo, expectInaccessible bool) (string, error) {
+	if expectInaccessible {
+		var expectedMode os.FileMode
+		if info.IsDir() {
+			expectedMode = os.ModeDir
+		}
+		if info.Mode() != expectedMode {
+			return "", errors.Errorf("expected path %q to be inaccessible", path)
+		}
+	} else if !info.IsDir() {
+		bs, err := os.ReadFile(path)
+		if err != nil {
+			return "", err
+		}
+		if int64(len(bs)) != info.Size() {
+			panic("unexpected file size") // sanity check, should never happen
+		}
+		return string(bs), nil
+	}
+	return "", nil
+}
+
+// TODO: Should name 'assertCompatible'?
 
 // assertEqual asserts that this Dir equals the provided expectation.
 // The assertion works like assert.Equal with the special rule that mod times are assumed equal if the expected one is zero.

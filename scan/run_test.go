@@ -313,7 +313,7 @@ func Test__inaccessible_internal_file_is_not_hashed_and_is_logged(t *testing.T) 
 	root := dir{
 		"a":            file{c: "z\n"},
 		"g":            file{},
-		"inaccessible": file{c: "53cR31_", makeInaccessible: true},
+		"inaccessible": file{c: "53cR31_", inaccessible: true},
 	}
 	rootPath := tempDir(t)
 	root.writeTestdata(t, rootPath)
