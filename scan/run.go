@@ -16,7 +16,7 @@ import (
 // should be skipped when walking a file tree.
 type ShouldSkipPath func(dir, name string) bool
 
-// NoSkip always returns false.
+// NoSkip doesn't skip any files.
 func NoSkip(string, string) bool {
 	return false
 }
