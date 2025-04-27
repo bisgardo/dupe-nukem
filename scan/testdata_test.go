@@ -168,7 +168,12 @@ func (f file) simulateScan(name string) *File {
 
 func (f file) writeTestdata(t *testing.T, path string) {
 	data := []byte(f.c)
-	err := os.WriteFile(path, data, 0600) // permissions chosen to be unaffected by umask
+	_, err := os.Stat(path)
+	if !errors.Is(err, os.ErrNotExist) {
+		panic(fmt.Errorf("duplicate file %q", filepath.Base(path)))
+	}
+	require.ErrorIs(t, err, os.ErrNotExist)
+	err = os.WriteFile(path, data, 0600) // permissions chosen to be unaffected by umask
 	require.NoErrorf(t, err, "cannot create file %q with contents %q", path, f.c)
 	if !f.ts.IsZero() {
 		err := os.Chtimes(path, time.Time{}, f.ts)
@@ -335,22 +340,10 @@ func Test__node_with_overlapping_files(t *testing.T) {
 		"a/b": file{c: "y"},
 	}
 	t.Run("writeTestdata", func(t *testing.T) {
-		before := time.Now().Add(-1 * time.Second) // see comment in Test__node
 		rootPath := tempDir(t)
-		root.writeTestdata(t, rootPath)
-		after := time.Now()
-
-		p := filepath.FromSlash // because Windows...
-		infos, err := readInfoTree(rootPath, nil)
-		require.NoError(t, err)
-
-		// The file is just overwritten...
-		want := map[string]fileInfo{
-			p("a"):   {Name: "a", Mode: os.ModeDir | 0700},
-			p("a/b"): {Name: "b", Contents: "y", Mode: 0600},
-		}
-
-		assertCompatibleInfos(t, want, infos, before, after)
+		assert.PanicsWithError(t, "duplicate file \"b\"", func() {
+			root.writeTestdata(t, rootPath)
+		})
 	})
 
 	t.Run("simulateScan", func(t *testing.T) {
