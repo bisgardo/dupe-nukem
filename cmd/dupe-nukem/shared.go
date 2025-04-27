@@ -31,7 +31,7 @@ func loadScanDirFile(path string) (*scan.Dir, error) {
 	}
 	defer func() {
 		if err := f.Close(); err != nil {
-			log.Printf("error closing scan file %q: %v\n", path, err) // cannot test
+			log.Printf("error: closing scan file %q failed: %v\n", path, err) // cannot test
 		}
 	}()
 	r, err := resolveReader(f)

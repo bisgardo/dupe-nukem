@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"testing"
 
 	"github.com/bisgardo/dupe-nukem/testutil"
@@ -38,17 +37,8 @@ func Test__hash_wraps_file_error(t *testing.T) {
 	// This test is basically identical to 'Test__hash_inaccessible_file_fails' (in package 'hash'),
 	// but, as indicated by the test name, the purpose is slightly different:
 	// Hashing an inaccessible file just happens to be the easiest way to trigger an error.
-	f, err := os.CreateTemp("", "")
-	require.NoError(t, err)
-	filename := f.Name()
-	t.Cleanup(func() {
-		err := os.Remove(filename)
-		require.NoError(t, err)
-	})
-	testutil.MakeInaccessibleT(t, filename)
-	require.NoError(t, err)
-	err = f.Close()
-	assert.NoError(t, err)
-	_, err = Hash(filename)
-	assert.EqualError(t, err, fmt.Sprintf("cannot hash file %q: cannot open file: access denied", filename))
+	path := testutil.TempFile(t, "")
+	testutil.MakeInaccessibleT(t, path)
+	_, err := Hash(path)
+	assert.EqualError(t, err, fmt.Sprintf("cannot hash file %q: cannot open file: access denied", path))
 }

@@ -3,7 +3,6 @@ package hash
 import (
 	"bytes"
 	"fmt"
-	"os"
 	"runtime"
 	"testing"
 
@@ -49,16 +48,8 @@ func Test__hash_dir_fails(t *testing.T) {
 func Test__hash_inaccessible_file_fails(t *testing.T) {
 	// This test is basically identical to 'Test__hash_wraps_file_error' (in package 'main'),
 	// but the purpose is slightly different (as indicated by the test name).
-	f, err := os.CreateTemp("", "")
-	require.NoError(t, err)
-	filename := f.Name()
-	t.Cleanup(func() {
-		err := os.Remove(filename)
-		require.NoError(t, err)
-	})
-	testutil.MakeInaccessibleT(t, filename)
-	err = f.Close()
-	assert.NoError(t, err)
-	_, err = File(filename)
+	path := testutil.TempFile(t, "")
+	testutil.MakeInaccessibleT(t, path)
+	_, err := File(path)
 	assert.EqualError(t, err, "cannot open file: access denied")
 }

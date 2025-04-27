@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,7 +37,7 @@ func Test__empty_dir(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			res, err := Run(rootDir, test.shouldSkip, nil)
 			require.NoError(t, err)
-			assert.Equal(t, want, res)
+			res.assertEqual(t, want)
 		})
 	}
 }
@@ -53,17 +54,9 @@ func Test__nonexistent_root_fails(t *testing.T) {
 }
 
 func Test__file_root_fails(t *testing.T) {
-	f, err := os.CreateTemp("", "root")
-	require.NoError(t, err)
-	filename := f.Name()
-	defer func() {
-		err := os.Remove(filename)
-		assert.NoError(t, err)
-	}()
-	err = f.Close()
-	assert.NoError(t, err)
-	_, err = Run(filename, NoSkip, nil)
-	assert.EqualError(t, err, fmt.Sprintf("invalid root directory %q: not a directory", filename))
+	path := testutil.TempFile(t, "")
+	_, err := Run(path, NoSkip, nil)
+	assert.EqualError(t, err, fmt.Sprintf("invalid root directory %q: not a directory", path))
 }
 
 func Test__inaccessible_root_is_skipped_and_logged(t *testing.T) {
@@ -74,7 +67,7 @@ func Test__inaccessible_root_is_skipped_and_logged(t *testing.T) {
 	buf := testutil.LogBuffer()
 	res, err := Run(rootPath, NoSkip, nil)
 	require.NoError(t, err)
-	assert.Equal(t, want, res)
+	res.assertEqual(t, want)
 	assert.Equal(t,
 		fmt.Sprintf(
 			lines("skipping inaccessible directory %q"),
@@ -100,7 +93,7 @@ func Test__no_skip(t *testing.T) {
 
 	res, err := Run(rootPath, NoSkip, nil)
 	require.NoError(t, err)
-	assert.Equal(t, want, res)
+	res.assertEqual(t, want)
 }
 
 func Test__SkipNameSet_empty_always_returns_false(t *testing.T) {
@@ -188,10 +181,10 @@ func Test__skip_symlinked_root_fails(t *testing.T) {
 			symlinkPath := filepath.Join(rootPath, symlinkName)
 			err := os.Symlink(test.symlinkTargetPath, symlinkPath)
 			require.NoError(t, err)
-			defer func() {
+			t.Cleanup(func() {
 				err := os.Remove(symlinkPath)
 				assert.NoError(t, err)
-			}()
+			})
 			_, err = Run(symlinkPath, skip(symlinkName), nil)
 			assert.EqualError(t, err, fmt.Sprintf(`skipping root directory %q`, symlinkPath))
 		})
@@ -215,7 +208,7 @@ func Test__skip_dir_without_subdirs_is_logged(t *testing.T) {
 	buf := testutil.LogBuffer()
 	res, err := Run(rootPath, skip("b"), nil)
 	require.NoError(t, err)
-	assert.Equal(t, want, res)
+	res.assertEqual(t, want)
 	assert.Equal(t,
 		fmt.Sprintf(
 			lines("skipping directory %q based on skip list"),
@@ -247,7 +240,7 @@ func Test__skip_dir_with_subdirs_is_logged(t *testing.T) {
 	buf := testutil.LogBuffer()
 	res, err := Run(rootPath, skip("e"), nil)
 	require.NoError(t, err)
-	assert.Equal(t, want, res)
+	res.assertEqual(t, want)
 	assert.Equal(t,
 		fmt.Sprintf(
 			lines("skipping directory %q based on skip list"),
@@ -274,7 +267,7 @@ func Test__skip_nonempty_files_is_logged(t *testing.T) {
 	buf := testutil.LogBuffer()
 	res, err := Run(rootPath, skip("a"), nil)
 	require.NoError(t, err)
-	assert.Equal(t, want, res)
+	res.assertEqual(t, want)
 	assert.Equal(t,
 		fmt.Sprintf(
 			lines(
@@ -298,7 +291,7 @@ func Test__skip_empty_file(t *testing.T) {
 	want := root.simulateScan(filepath.Base(rootPath))
 	res, err := Run(rootPath, skip("g"), nil)
 	require.NoError(t, err)
-	assert.Equal(t, want, res)
+	res.assertEqual(t, want)
 }
 
 func Test__trailing_slash_of_run_path_gets_removed(t *testing.T) {
@@ -310,10 +303,9 @@ func Test__trailing_slash_of_run_path_gets_removed(t *testing.T) {
 	root.writeTestdata(t, rootPath)
 	want := root.simulateScan(filepath.Base(rootPath))
 
-	// Note added '/'.
-	res, err := Run(rootPath+"/", NoSkip, nil)
+	res, err := Run(rootPath+"/", NoSkip, nil) // note added '/'
 	require.NoError(t, err)
-	assert.Equal(t, want, res)
+	res.assertEqual(t, want)
 }
 
 // On Windows, this test only works if the repository is stored on an NTFS drive.
@@ -321,7 +313,7 @@ func Test__inaccessible_internal_file_is_not_hashed_and_is_logged(t *testing.T) 
 	root := dir{
 		"a":            file{c: "z\n"},
 		"g":            file{},
-		"inaccessible": file{c: "53cR31_", makeInaccessible: true},
+		"inaccessible": file{c: "53cR31_", inaccessible: true},
 	}
 	rootPath := tempDir(t)
 	root.writeTestdata(t, rootPath)
@@ -330,7 +322,7 @@ func Test__inaccessible_internal_file_is_not_hashed_and_is_logged(t *testing.T) 
 	buf := testutil.LogBuffer()
 	res, err := Run(rootPath, NoSkip, nil)
 	require.NoError(t, err)
-	assert.Equal(t, want, res)
+	res.assertEqual(t, want)
 	assert.Equal(t,
 		fmt.Sprintf(
 			lines("error: cannot hash file %q: cannot open file: access denied"),
@@ -357,7 +349,7 @@ func Test__inaccessible_internal_dir_is_logged(t *testing.T) {
 	buf := testutil.LogBuffer()
 	res, err := Run(rootPath, NoSkip, nil)
 	require.NoError(t, err)
-	assert.Equal(t, want, res)
+	res.assertEqual(t, want)
 	assert.Equal(t,
 		fmt.Sprintf(
 			lines("skipping inaccessible directory %q"),
@@ -390,19 +382,24 @@ func Test__cache_with_mismatching_root_fails(t *testing.T) {
 }
 
 func Test__hashes_from_cache_are_used(t *testing.T) {
+	ts, err := time.Parse(time.Layout, time.Layout)
+	require.NoError(t, err)
+
 	root := dir{
-		"a":   file{c: "x\n"},
-		"c":   file{c: "y\n", hashFromCache: 53},
-		"b/d": file{c: "x\n"},
+		"a":   file{c: "x\n", ts: ts},
+		"c":   file{c: "y\n", ts: ts, hashFromCache: 53},
+		"b/d": file{c: "x\n", ts: ts},
 		"e/f": dir{
-			"a": file{c: "z\n", hashFromCache: 42},
+			"a": file{c: "z\n", ts: ts, hashFromCache: 42},
 			"g": file{},
 		},
+		"h": file{c: "q\n", ts: ts},
 	}
 	rootPath := tempDir(t)
 	root.writeTestdata(t, rootPath)
 	want := root.simulateScan(filepath.Base(rootPath))
 
+	tsUnix := ts.Unix()
 	cache := &Dir{
 		Name: want.Name,
 		Dirs: []*Dir{
@@ -412,28 +409,34 @@ func Test__hashes_from_cache_are_used(t *testing.T) {
 					{
 						Name: "f",
 						Files: []*File{
-							{Name: "a", Size: 2, Hash: 42}, // used
+							{Name: "a", Size: 2, ModTime: tsUnix, Hash: 42}, // used
+							{Name: "g", Size: 0, ModTime: tsUnix, Hash: 42}, // not used: size and time match, but file is empty
 						},
 					},
 				},
 				Files: []*File{
-					{Name: "d", Size: 2, Hash: 69}, // not used
+					{Name: "d", Size: 2, ModTime: tsUnix, Hash: 69}, // not used: file doesn't exist in testdata (but "b/d" does)
 				},
 			},
 		},
 		Files: []*File{
-			{Name: "c", Size: 2, Hash: 53}, // used
-			{Name: "d", Size: 2, Hash: 69}, // not used
+			// no entry for "a"
+			{Name: "b", Size: 1, ModTime: tsUnix, Hash: 69}, // not used: "b" is a dir in testdata
+			{Name: "c", Size: 2, ModTime: tsUnix, Hash: 53}, // used
+			{Name: "d", Size: 2, Hash: 69},                  // not used: no such file in testdata
 		},
 	}
 	res, err := Run(rootPath, NoSkip, cache)
 	require.NoError(t, err)
-	assert.Equal(t, want, res)
+	res.assertEqual(t, want)
 }
 
-func Test__subdir_cache_with_mismatching_file_size_is_not_used(t *testing.T) {
+func Test__cache_with_mismatching_file_size_is_not_used(t *testing.T) {
+	ts, err := time.Parse(time.Layout, time.Layout)
+	require.NoError(t, err)
+
 	root := dir{
-		"d": file{c: "x\n"},
+		"d": file{c: "x\n", ts: ts},
 	}
 	rootPath := tempDir(t)
 	root.writeTestdata(t, rootPath)
@@ -443,20 +446,24 @@ func Test__subdir_cache_with_mismatching_file_size_is_not_used(t *testing.T) {
 		Name: want.Name,
 		Files: []*File{
 			{
-				Name: "d",
-				Size: 69, // size of "d" is 2,
-				Hash: 21, // so the cached hash value is not used
+				Name:    "d",
+				Size:    69,        // size of "d" is 2,
+				ModTime: ts.Unix(), // so even with correct mod time,
+				Hash:    21,        // the cached hash value is not used
 			},
 		},
 	}
 	res, err := Run(rootPath, NoSkip, cache)
 	require.NoError(t, err)
-	assert.Equal(t, want, res)
+	res.assertEqual(t, want)
 }
 
-func Test__cache_entry_with_hash_0_is_ignored_and_logged(t *testing.T) {
+func Test__cache_with_mismatching_file_file_mod_time_is_not_used(t *testing.T) {
+	ts, err := time.Parse(time.Layout, time.Layout)
+	require.NoError(t, err)
+
 	root := dir{
-		"d": file{c: "x\n"},
+		"d": file{c: "x\n", ts: ts},
 	}
 	rootPath := tempDir(t)
 	root.writeTestdata(t, rootPath)
@@ -466,16 +473,44 @@ func Test__cache_entry_with_hash_0_is_ignored_and_logged(t *testing.T) {
 		Name: want.Name,
 		Files: []*File{
 			{
-				Name: "d",
-				Size: 2,
-				Hash: 0, // value 0 is specifically ignored
+				Name:    "d",
+				Size:    2,             // size is correct,
+				ModTime: ts.Unix() + 1, // but mod time isn't,
+				Hash:    21,            // so the cached hash value is not used
+			},
+		},
+	}
+	res, err := Run(rootPath, NoSkip, cache)
+	require.NoError(t, err)
+	res.assertEqual(t, want)
+}
+
+func Test__cache_entry_with_hash_0_is_ignored_and_logged(t *testing.T) {
+	ts, err := time.Parse(time.Layout, time.Layout)
+	require.NoError(t, err)
+
+	root := dir{
+		"d": file{c: "x\n", ts: ts},
+	}
+	rootPath := tempDir(t)
+	root.writeTestdata(t, rootPath)
+	want := root.simulateScan(filepath.Base(rootPath))
+
+	cache := &Dir{
+		Name: want.Name,
+		Files: []*File{
+			{
+				Name:    "d",
+				Size:    2,         // size is correct,
+				ModTime: ts.Unix(), // time is correct,
+				Hash:    0,         // but value 0 is explicitly ignored
 			},
 		},
 	}
 	buf := testutil.LogBuffer()
 	res, err := Run(rootPath, NoSkip, cache)
 	require.NoError(t, err)
-	assert.Equal(t, want, res)
+	res.assertEqual(t, want)
 	assert.Equal(t,
 		fmt.Sprintf(
 			lines("warning: cached hash value 0 of file %q ignored"),
@@ -497,10 +532,10 @@ func Test__hash_computed_as_0_is_logged(t *testing.T) {
 	buf := testutil.LogBuffer()
 	res, err := Run(rootPath, NoSkip, nil)
 	require.NoError(t, err)
-	assert.Equal(t, want, res)
+	res.assertEqual(t, want)
 	assert.Equal(t,
 		fmt.Sprintf(
-			lines("info: hash of file %q evaluated to 0 - this might result in warnings which can be safely ignored"),
+			lines("info: hash of file %q evaluated to 0 - this might result in warnings (which can be safely ignored) if the output is used as cache in future scans"),
 			filepath.Join(rootPath, "hash0"),
 		),
 		buf.String(),
@@ -525,17 +560,17 @@ func Test__root_symlink_is_followed_and_logged(t *testing.T) {
 	}
 	rootPath := tempDir(t)
 	root.writeTestdata(t, rootPath)
-	symlinkPath := filepath.Join(rootPath, symlinkName)
+	rootSymlinkPath := filepath.Join(rootPath, symlinkName)
 	want := symlinkedDir.simulateScan(symlinkName)
 
 	buf := testutil.LogBuffer()
-	res, err := Run(symlinkPath, NoSkip, nil)
+	res, err := Run(rootSymlinkPath, NoSkip, nil)
 	require.NoError(t, err)
-	assert.Equal(t, want, res)
+	res.assertEqual(t, want)
 	assert.Equal(t,
 		fmt.Sprintf(
 			lines("following root symlink %q to %q"),
-			symlinkPath,
+			rootSymlinkPath,
 			filepath.Join(rootPath, "data"),
 		),
 		buf.String(),
@@ -554,10 +589,10 @@ func Test__root_broken_symlink_fails(t *testing.T) {
 	symlinkPath := filepath.Join(rootPath, symlinkName)
 	err := os.Symlink("non-existing", symlinkPath)
 	require.NoError(t, err)
-	defer func() {
+	t.Cleanup(func() {
 		err := os.Remove(symlinkPath)
 		assert.NoError(t, err)
-	}()
+	})
 
 	_, err = Run(symlinkPath, NoSkip, nil)
 	assert.EqualError(t, err, fmt.Sprintf("invalid root directory %q: not found", symlinkPath))
@@ -582,17 +617,17 @@ func Test__root_indirect_symlink_is_followed_and_logged(t *testing.T) {
 	}
 	rootPath := tempDir(t)
 	root.writeTestdata(t, rootPath)
+	rootSymlinkPath := filepath.Join(rootPath, symlinkName)
 	want := symlinkedDir.simulateScan(symlinkName)
 
 	buf := testutil.LogBuffer()
-	indirectSymlinkPath := filepath.Join(rootPath, symlinkName)
-	res, err := Run(indirectSymlinkPath, NoSkip, nil)
+	res, err := Run(rootSymlinkPath, NoSkip, nil)
 	require.NoError(t, err)
-	assert.Equal(t, want, res)
+	res.assertEqual(t, want)
 	assert.Equal(t,
 		fmt.Sprintf(
 			lines("following root symlink %q to %q"),
-			indirectSymlinkPath,
+			rootSymlinkPath,
 			filepath.Join(rootPath, "data"),
 		),
 		buf.String(),
@@ -634,7 +669,7 @@ func Test__internal_symlink_is_skipped_and_logged(t *testing.T) {
 		buf := testutil.LogBuffer()
 		res, err := Run(rootPath, NoSkip, nil)
 		require.NoError(t, err)
-		assert.Equal(t, want, res)
+		res.assertEqual(t, want)
 		assert.Equal(t,
 			fmt.Sprintf(
 				lines("skipping symlink %q during scan"),
@@ -672,7 +707,7 @@ func Test__root_symlink_to_ancestor_is_followed_but_skipped_and_logged_when_inte
 	rootSymlinkPath := filepath.Join(rootPath, symlinkTargetName, symlinkName)
 	res, err := Run(rootSymlinkPath, NoSkip, nil)
 	require.NoError(t, err)
-	assert.Equal(t, want, res)
+	res.assertEqual(t, want)
 	assert.Equal(t,
 		fmt.Sprintf(
 			lines(

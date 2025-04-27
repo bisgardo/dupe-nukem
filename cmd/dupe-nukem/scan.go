@@ -19,6 +19,10 @@ import (
 // As the file is read line by line, this is the maximum allowed line length.
 const maxSkipNameFileLineLen = 256
 
+// invalidSkipNameChars is a sequence of the Unicode code points that a valid skipname is not allowed to contain.
+// Currently only the character '/' is prohibited.
+const invalidSkipNameChars = "/"
+
 // Scan parses the skip expression and cache path passed from the command line
 // and then runs scan.Run with the resulting values.
 func Scan(dir, skipExpr, cachePath string) (*scan.Dir, error) {
@@ -78,7 +82,7 @@ func parseSkipNameFile(path string) ([]string, error) {
 	}
 	defer func() {
 		if err := f.Close(); err != nil {
-			log.Printf("error: cannot close skip name file %q: %v\n", path, err) // cannot test
+			log.Printf("error: closing skip name file %q failed: %v\n", path, err) // cannot test
 		}
 	}()
 	r := bufio.NewReaderSize(f, maxSkipNameFileLineLen)
@@ -104,7 +108,7 @@ func parseSkipNameFile(path string) ([]string, error) {
 
 func validateSkipName(name string) error {
 	if strings.TrimSpace(name) != name {
-		return fmt.Errorf("has surrounding space")
+		return fmt.Errorf("surrounding space")
 	}
 	switch name {
 	case "":
@@ -114,8 +118,8 @@ func validateSkipName(name string) error {
 	case "..":
 		return fmt.Errorf("parent directory")
 	}
-	if i := strings.IndexAny(name, "/"); i != -1 {
-		return fmt.Errorf("has invalid character '%c'", name[i])
+	if i := strings.IndexAny(name, invalidSkipNameChars); i != -1 {
+		return fmt.Errorf("invalid character '%c'", name[i])
 	}
 	return nil
 }
@@ -130,19 +134,26 @@ func loadScanDirCacheFile(path string) (*scan.Dir, error) {
 	if err != nil {
 		return nil, err
 	}
-	// TODO: Unless it's too expensive, just sort lists instead of only validating?
+	// Could just sort lists instead of (only) validating,
+	// but it appears to be a needless complication for something that should never happen.
+	// So if it does, it probably indicates a problem that's worth alarming the user about.
 	if err := checkCache(scanDir); err != nil {
-		return nil, errors.Wrap(err, "invalid cache contents")
+		return nil, errors.Wrap(err, "invalid contents") // caller wraps path
 	}
 	log.Printf("scan cache loaded successfully from %q in %v\n", path, timeSince(start))
 	return scanDir, nil
 }
 
 func checkCache(dir *scan.Dir) error {
+	// Require non-empty name and non-zero size.
+	if dir.Name == "" {
+		return fmt.Errorf("directory name is empty")
+	}
+
 	// Check subdirs.
 	var ld *scan.Dir
 	for i, d := range dir.Dirs {
-		// Check that list is sorted.
+		// Require lexical order.
 		if ld != nil && ld.Name > d.Name {
 			return fmt.Errorf("list of subdirectories of %q is not sorted: %q on index %d should come before %q on index %d", dir.Name, d.Name, i, ld.Name, i-1)
 		}
@@ -153,43 +164,27 @@ func checkCache(dir *scan.Dir) error {
 			return errors.Wrapf(err, "in subdirectory %q on index %d", d.Name, i)
 		}
 	}
-	// Check non-empty files.
+	// Check non-empty files (empty files/dirs aren't used for caching).
 	var lf *scan.File
 	for i, f := range dir.Files {
-		// Check that list is sorted.
+		// Require lexical order.
 		if lf != nil && lf.Name > f.Name {
 			return fmt.Errorf("list of non-empty files in directory %q is not sorted: %q on index %d should come before %q on index %d", dir.Name, f.Name, i, lf.Name, i-1)
 		}
 		lf = f
 
-		// Check that name is non-empty.
+		// Require non-empty name and non-zero size.
 		if f.Name == "" {
 			return fmt.Errorf("name of non-empty file on index %d is empty", i)
 		}
-
-		// Check that size is non-zero.
 		if f.Size == 0 {
 			return fmt.Errorf("non-empty file %q on index %d has size 0", f.Name, i)
 		}
-
-		// Check if hash is zero.
+		// Log warning if hash is zero.
 		if f.Hash == 0 {
 			log.Printf("warning: file %q is cached with hash 0 - this hash will be ignored\n", f.Name)
 		}
-	}
-	// Check empty files.
-	var lef string
-	for i, ef := range dir.EmptyFiles {
-		// Check that list is sorted.
-		if lef > ef {
-			return fmt.Errorf("list of empty files in directory %q is not sorted: %q on index %d should come before %q on index %d", dir.Name, ef, i, lef, i-1)
-		}
-		lef = ef
-
-		// Check that name is non-empty.
-		if ef == "" {
-			return fmt.Errorf("name of empty file on index %d is empty", i)
-		}
+		// Timestamps are used by the cache, but any value is valid, so there's nothing to check.
 	}
 	return nil
 }

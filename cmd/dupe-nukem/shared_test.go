@@ -4,26 +4,24 @@ import (
 	"os"
 	"testing"
 
-	"github.com/bisgardo/dupe-nukem/scan"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/bisgardo/dupe-nukem/scan"
+	"github.com/bisgardo/dupe-nukem/testutil"
 )
 
 func Test__resolveReader_rejects_invalid_compressed_scan_file(t *testing.T) {
-	f, err := os.CreateTemp("", "invalid-*.gz") // the '*' is swapped out for gibberish instead of it being appended after the '.gz'
+	path := testutil.TempFileByPattern(t,
+		"invalid-*.gz", // the '*' is swapped out for gibberish instead of it being appended after the '.gz'
+		"totally legit compression",
+	)
+	f, err := os.Open(path)
 	require.NoError(t, err)
 	defer func() {
 		err := f.Close()
 		assert.NoError(t, err)
-		err = os.Remove(f.Name())
-		assert.NoError(t, err)
 	}()
-	_, err = f.WriteString("totally legit compression")
-	require.NoError(t, err)
-	_, err = f.Seek(0, 0)
-	require.NoError(t, err)
-
 	_, err = resolveReader(f)
 	assert.EqualError(t, err, "gzip: invalid header")
 }
@@ -59,15 +57,10 @@ func Test__loadScanDirFile_loads_compressed_scan_file(t *testing.T) {
 }
 
 func Test__loadScanDirFile_wraps_scan_file_error(t *testing.T) {
-	f, err := os.CreateTemp("", "invalid-*.gz") // the '*' is swapped out for gibberish instead of it being appended after the '.gz'
-	require.NoError(t, err)
-	defer func() {
-		err := f.Close()
-		assert.NoError(t, err)
-		err = os.Remove(f.Name())
-		assert.NoError(t, err)
-	}()
-
-	_, err = loadScanDirFile(f.Name())
+	path := testutil.TempFileByPattern(t,
+		"invalid-*.gz", // the '*' is swapped out for gibberish instead of it being appended after the '.gz'
+		"",
+	)
+	_, err := loadScanDirFile(path)
 	assert.EqualError(t, err, "cannot resolve file reader: EOF")
 }

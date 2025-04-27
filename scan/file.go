@@ -67,22 +67,24 @@ func (d *Dir) appendSkippedDir(dirName string) {
 
 // TODO: Add function for validating (or ensuring?) that the lists are indeed ordered correctly.
 
-// File represents a file as a name, size, and fnv hash.
+// File represents a file as a name, size, modification time, and fnv hash.
 type File struct {
-	Name string `json:"name"`
-	Size int64  `json:"size"`
-	Hash uint64 `json:"hash,omitempty"`
+	Name    string `json:"name"`
+	Size    int64  `json:"size"`
+	ModTime int64  `json:"ts"`
+	Hash    uint64 `json:"hash"`
 }
 
 // NewFile constructs a File.
-func NewFile(name string, size int64, hash uint64) *File {
+func NewFile(name string, size int64, modTime int64, hash uint64) *File {
 	if name == "" {
 		panic("file name cannot be empty")
 	}
 	return &File{
-		Name: name,
-		Size: size,
-		Hash: hash,
+		Name:    name,
+		Size:    size,
+		ModTime: modTime,
+		Hash:    hash,
 	}
 }
 
