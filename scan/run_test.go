@@ -485,6 +485,34 @@ func Test__cache_with_mismatching_file_mod_time_is_not_used(t *testing.T) {
 	res.assertEqual(t, want)
 }
 
+func Test__hash_of_inaccessible_file_is_used(t *testing.T) {
+	ts, err := time.Parse(time.Layout, time.Layout)
+	require.NoError(t, err)
+
+	root := dir{
+		"a": file{c: "x", ts: ts, inaccessible: true, hashFromCache: 42},
+	}
+
+	rootPath := tempDir(t)
+	root.writeTestdata(t, rootPath)
+	want := root.simulateScan(filepath.Base(rootPath))
+
+	cache := &Dir{
+		Name: want.Name,
+		Files: []*File{
+			{
+				Name:    "a",
+				Size:    1,
+				ModTime: ts.Unix(),
+				Hash:    42,
+			},
+		},
+	}
+	res, err := Run(rootPath, NoSkip, cache)
+	require.NoError(t, err)
+	res.assertEqual(t, want)
+}
+
 func Test__cache_entry_with_hash_0_is_ignored_and_logged(t *testing.T) {
 	ts, err := time.Parse(time.Layout, time.Layout)
 	require.NoError(t, err)

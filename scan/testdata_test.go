@@ -152,11 +152,8 @@ func (f file) simulateScan(name string) *File {
 	h := f.hashFromCache
 	if h == 0 && !f.inaccessible {
 		// If both hashFromCache and inaccessible are set, then the cached value is used.
-		// As hashFromCache isn't used to actually derive a cache
-		// (it just simulates that the file's hash originated from one),
-		// the two inputs cannot be combined in any meaningful way.
-		// And consequently there's no need for doing anything about it.
-		// TODO: Add a test where a file that is cached is now inaccessible nonetheless.
+		// This represents the situation that the file has become inaccessible since the run that produced the cache:
+		// As the hash is cached, we make no attempts of opening the file, and thus don't notice that it's inaccessible.
 		h = hash.Bytes(data)
 	}
 	var unixTime int64
