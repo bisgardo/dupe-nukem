@@ -168,7 +168,12 @@ func (f file) simulateScan(name string) *File {
 
 func (f file) writeTestdata(t *testing.T, path string) {
 	data := []byte(f.c)
-	err := os.WriteFile(path, data, 0600) // permissions chosen to be unaffected by umask
+	_, err := os.Stat(path)
+	if !errors.Is(err, os.ErrNotExist) {
+		panic(fmt.Errorf("duplicate file %q", filepath.Base(path)))
+	}
+	require.ErrorIs(t, err, os.ErrNotExist)
+	err = os.WriteFile(path, data, 0600) // permissions chosen to be unaffected by umask
 	require.NoErrorf(t, err, "cannot create file %q with contents %q", path, f.c)
 	if !f.ts.IsZero() {
 		err := os.Chtimes(path, time.Time{}, f.ts)
@@ -221,8 +226,7 @@ func Test__node(t *testing.T) {
 	}
 
 	t.Run("writeTestdata", func(t *testing.T) {
-		// Extend time backwards by 1s to accommodate for the fact that the FS appears to be lazy around updating time.
-		before := time.Now().Add(-1 * time.Second)
+		before := time.Now()
 		root := makeRoot()
 		rootPath := tempDir(t)
 		root.writeTestdata(t, rootPath)
@@ -304,7 +308,7 @@ func Test__node_with_overlapping_dirs(t *testing.T) {
 		"a/c": file{c: "ac"},
 	}
 	t.Run("writeTestdata", func(t *testing.T) {
-		before := time.Now().Add(-1 * time.Second) // see comment in Test__node
+		before := time.Now()
 		rootPath := tempDir(t)
 		root.writeTestdata(t, rootPath)
 		after := time.Now()
@@ -335,22 +339,10 @@ func Test__node_with_overlapping_files(t *testing.T) {
 		"a/b": file{c: "y"},
 	}
 	t.Run("writeTestdata", func(t *testing.T) {
-		before := time.Now().Add(-1 * time.Second) // see comment in Test__node
 		rootPath := tempDir(t)
-		root.writeTestdata(t, rootPath)
-		after := time.Now()
-
-		p := filepath.FromSlash // because Windows...
-		infos, err := readInfoTree(rootPath, nil)
-		require.NoError(t, err)
-
-		// The file is just overwritten...
-		want := map[string]fileInfo{
-			p("a"):   {Name: "a", Mode: os.ModeDir | 0700},
-			p("a/b"): {Name: "b", Contents: "y", Mode: 0600},
-		}
-
-		assertCompatibleInfos(t, want, infos, before, after)
+		assert.PanicsWithError(t, "duplicate file \"b\"", func() {
+			root.writeTestdata(t, rootPath)
+		})
 	})
 
 	t.Run("simulateScan", func(t *testing.T) {
@@ -362,6 +354,10 @@ func Test__node_with_overlapping_files(t *testing.T) {
 }
 
 func assertCompatibleInfos(t *testing.T, want, infos map[string]fileInfo, before, after time.Time) {
+	// Extend time by 1s in both directions as some file systems appear use inexact timing.
+	before = before.Add(-1 * time.Second)
+	after = after.Add(1 * time.Second)
+
 	require.Len(t, infos, len(want))
 	for path, info := range infos {
 		wantInfo, ok := want[path]
@@ -423,12 +419,9 @@ func readInfoTree(rootPath string, inaccessiblePaths []string) (map[string]fileI
 
 func readPath(path string, info os.FileInfo, expectInaccessible bool) (string, error) {
 	if expectInaccessible {
-		var expectedMode os.FileMode
-		if info.IsDir() {
-			expectedMode = os.ModeDir
-		}
-		if info.Mode() != expectedMode {
-			return "", errors.Errorf("expected path %q to be inaccessible", path)
+		_, err := os.Open(path)
+		if !errors.Is(err, os.ErrPermission) {
+			return "", errors.Wrapf(err, "expected path %q to exist but be inaccessible", path)
 		}
 	} else if !info.IsDir() {
 		bs, err := os.ReadFile(path)

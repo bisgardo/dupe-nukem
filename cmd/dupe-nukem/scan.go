@@ -145,7 +145,7 @@ func loadScanDirCacheFile(path string) (*scan.Dir, error) {
 }
 
 func checkCache(dir *scan.Dir) error {
-	// Require non-empty name and non-zero size.
+	// Require non-empty name.
 	if dir.Name == "" {
 		return fmt.Errorf("directory name is empty")
 	}
