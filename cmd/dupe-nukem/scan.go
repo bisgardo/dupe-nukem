@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -20,8 +21,13 @@ import (
 const maxSkipNameFileLineLen = 256
 
 // invalidSkipNameChars is a sequence of the Unicode code points that a valid skipname is not allowed to contain.
-// Currently only the character '/' is prohibited.
-const invalidSkipNameChars = "/"
+// The characters are deemed invalid to avoid giving the impression that the expression supports nesting or regex.
+var invalidSkipNameChars = map[rune]struct{}{'/': {}, '*': {}, '?': {}}
+
+func init() {
+	// Ensure that path separator is included on systems where it isn't '/' (i.e. Windows).
+	invalidSkipNameChars[filepath.Separator] = struct{}{}
+}
 
 // Scan parses the skip expression and cache path passed from the command line
 // and then runs scan.Run with the resulting values.
@@ -118,8 +124,10 @@ func validateSkipName(name string) error {
 	case "..":
 		return fmt.Errorf("parent directory")
 	}
-	if i := strings.IndexAny(name, invalidSkipNameChars); i != -1 {
-		return fmt.Errorf("invalid character '%c'", name[i])
+	for i, c := range name {
+		if _, ok := invalidSkipNameChars[c]; ok {
+			return fmt.Errorf("invalid character '%c'", name[i])
+		}
 	}
 	return nil
 }
