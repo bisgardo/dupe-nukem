@@ -309,6 +309,7 @@ func Test__trailing_slash_of_run_path_gets_removed(t *testing.T) {
 }
 
 // On Windows, this test only works if the repository is stored on an NTFS drive.
+// TODO: Detect and skip based on the above (something like testutil.UsesInaccessible(t) - which we can then assert against).
 func Test__inaccessible_internal_file_is_not_hashed_and_is_logged(t *testing.T) {
 	root := dir{
 		"a":            file{c: "z\n"},

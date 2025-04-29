@@ -91,6 +91,17 @@ func Test__loadShouldSkip_invalid_names_fail(t *testing.T) {
 	}
 }
 
+func Test__backslash_is_invalid_in_skip_name_on_windows_only(t *testing.T) {
+	_, containsBackslash := invalidSkipNameChars['\\']
+	assert.Equal(t, runtime.GOOS == "windows", containsBackslash)
+	assert.Contains(t, invalidSkipNameChars, '/') // '/' is invalid on all systems
+}
+
+func Test__regex_characters_are_invalid_in_skip_name(t *testing.T) {
+	assert.Contains(t, invalidSkipNameChars, '*')
+	assert.Contains(t, invalidSkipNameChars, '?')
+}
+
 func Test__Scan_wraps_skip_file_not_found_error(t *testing.T) {
 	_, err := Scan("x", "@missing", "")
 	assert.EqualError(t, err, `cannot process skip dirs expression "@missing": cannot read skip names from file "missing": cannot open file: not found`)
