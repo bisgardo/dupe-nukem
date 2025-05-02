@@ -54,7 +54,7 @@ func Test__nonexistent_root_fails(t *testing.T) {
 }
 
 func Test__file_root_fails(t *testing.T) {
-	path := testutil.TempFile(t, "")
+	path := testutil.TempStringFile(t, "")
 	_, err := Run(path, NoSkip, nil)
 	assert.EqualError(t, err, fmt.Sprintf("invalid root directory %q: not a directory", path))
 }
