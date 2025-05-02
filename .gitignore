@@ -1,2 +1,5 @@
+.*
+!*ignore
+!.gitattributes
 /dupe-nukem
 *.json

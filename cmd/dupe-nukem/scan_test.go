@@ -179,7 +179,7 @@ func Test__Scan_wraps_cache_load_error(t *testing.T) {
 }
 
 func Test__checkCache_rejects_unsorted_lists_for_nonempty_items(t *testing.T) {
-	testdata := func() *scan.Dir {
+	makeTestdata := func() *scan.Dir {
 		return &scan.Dir{
 			Name: "x",
 			Dirs: []*scan.Dir{
@@ -199,43 +199,43 @@ func Test__checkCache_rejects_unsorted_lists_for_nonempty_items(t *testing.T) {
 	}
 
 	t.Run("correctly ordered", func(t *testing.T) {
-		err := checkCache(testdata())
+		err := checkCache(makeTestdata())
 		assert.NoError(t, err)
 	})
 	t.Run("invalid order of empty files is accepted", func(t *testing.T) {
-		d := testdata()
+		d := makeTestdata()
 		d.EmptyFiles[0], d.EmptyFiles[1] = d.EmptyFiles[1], d.EmptyFiles[0]
 		err := checkCache(d)
 		assert.NoError(t, err)
 	})
 	t.Run("invalid order of non-empty files", func(t *testing.T) {
-		d := testdata()
+		d := makeTestdata()
 		d.Files[1], d.Files[2] = d.Files[2], d.Files[1]
 		err := checkCache(d)
 		assert.EqualError(t, err, `list of non-empty files in directory "x" is not sorted: "b" on index 2 should come before "c" on index 1`)
 	})
 	t.Run("invalid order of subdirs", func(t *testing.T) {
-		d := testdata()
+		d := makeTestdata()
 		d.Dirs[0], d.Dirs[1] = d.Dirs[1], d.Dirs[0]
 		err := checkCache(d)
 		assert.EqualError(t, err, `list of subdirectories of "x" is not sorted: "y" on index 1 should come before "z" on index 0`)
 	})
 	t.Run("invalid order of nested empty files is accepted", func(t *testing.T) {
-		d := testdata()
+		d := makeTestdata()
 		d0 := d.Dirs[0]
 		d0.EmptyFiles[1], d0.EmptyFiles[2] = d0.EmptyFiles[2], d0.EmptyFiles[1]
 		err := checkCache(d)
 		assert.NoError(t, err)
 	})
 	t.Run("invalid order of nested files", func(t *testing.T) {
-		d := testdata()
+		d := makeTestdata()
 		d0 := d.Dirs[0]
 		d0.Files[0], d0.Files[1] = d0.Files[1], d0.Files[0]
 		err := checkCache(d)
 		assert.EqualError(t, err, `in subdirectory "y" on index 0: list of non-empty files in directory "y" is not sorted: "a" on index 1 should come before "b" on index 0`)
 	})
 	t.Run("invalid order of nested subdirs", func(t *testing.T) {
-		d := testdata()
+		d := makeTestdata()
 		d1 := d.Dirs[1]
 		d1.Dirs[1], d1.Dirs[2] = d1.Dirs[2], d1.Dirs[1]
 		err := checkCache(d)
@@ -261,19 +261,19 @@ func Test__checkCache_rejects_nonempty_file_with_empty_name(t *testing.T) {
 
 func Test__checkCache_rejects_dir_with_empty_name(t *testing.T) {
 	t.Run("root directory with empty name", func(t *testing.T) {
-		testdata := &scan.Dir{Name: ""}
-		err := checkCache(testdata)
+		cache := &scan.Dir{Name: ""}
+		err := checkCache(cache)
 		assert.EqualError(t, err, `directory name is empty`)
 	})
 	t.Run("nested directory name with empty name", func(t *testing.T) {
-		testdata := &scan.Dir{
+		cache := &scan.Dir{
 			Name: "x",
 			Dirs: []*scan.Dir{
 				{Name: "y"},
 				{Name: "z", Dirs: []*scan.Dir{{Name: ""}}},
 			},
 		}
-		err := checkCache(testdata)
+		err := checkCache(cache)
 		assert.EqualError(t, err, `in subdirectory "z" on index 1: in subdirectory "" on index 0: directory name is empty`)
 	})
 }
