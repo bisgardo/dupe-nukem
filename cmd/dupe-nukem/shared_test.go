@@ -49,7 +49,7 @@ func Test__loadScanDirFile_loads_scan_file(t *testing.T) {
 }
 
 func Test__loadScanDirFile_loads_compressed_scan_file(t *testing.T) {
-	f := "testdata/cache2.json.gz" // fun fact: uses CRLF when uncompressed (while cache1.json is normalized to LF)
+	f := "testdata/cache2.json.gz" // fun fact: uses CRLF when uncompressed (while cache1.json uses LF)
 	want := &scan.Dir{Name: "y"}
 	res, err := loadScanDirFile(f)
 	require.NoError(t, err)
