@@ -13,8 +13,8 @@ import (
 
 func Test__resolveReader_rejects_invalid_compressed_scan_file(t *testing.T) {
 	path := testutil.TempFileByPattern(t,
-		"invalid-*.gz", // the '*' is swapped out for gibberish instead of it being appended after the '.gz'
-		"totally legit compression",
+		"invalid-*.gz",                      // the '*' is swapped out for gibberish instead of it being appended after the '.gz'
+		[]byte("totally legit compression"), // spoiler alert: it's not!
 	)
 	f, err := os.Open(path)
 	require.NoError(t, err)
@@ -49,7 +49,7 @@ func Test__loadScanDirFile_loads_scan_file(t *testing.T) {
 }
 
 func Test__loadScanDirFile_loads_compressed_scan_file(t *testing.T) {
-	f := "testdata/cache2.json.gz"
+	f := "testdata/cache2.json.gz" // fun fact: uses CRLF when uncompressed (while cache1.json is normalized to LF)
 	want := &scan.Dir{Name: "y"}
 	res, err := loadScanDirFile(f)
 	require.NoError(t, err)
@@ -59,7 +59,7 @@ func Test__loadScanDirFile_loads_compressed_scan_file(t *testing.T) {
 func Test__loadScanDirFile_wraps_scan_file_error(t *testing.T) {
 	path := testutil.TempFileByPattern(t,
 		"invalid-*.gz", // the '*' is swapped out for gibberish instead of it being appended after the '.gz'
-		"",
+		nil,
 	)
 	_, err := loadScanDirFile(path)
 	assert.EqualError(t, err, "cannot resolve file reader: EOF")

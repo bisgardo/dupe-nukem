@@ -54,7 +54,7 @@ func Test__nonexistent_root_fails(t *testing.T) {
 }
 
 func Test__file_root_fails(t *testing.T) {
-	path := testutil.TempFile(t, "")
+	path := testutil.TempStringFile(t, "")
 	_, err := Run(path, NoSkip, nil)
 	assert.EqualError(t, err, fmt.Sprintf("invalid root directory %q: not a directory", path))
 }
@@ -392,7 +392,7 @@ func Test__hashes_from_cache_are_used(t *testing.T) {
 		"b/d": file{c: "x\n", ts: ts},
 		"e/f": dir{
 			"a": file{c: "z\n", ts: ts, hashFromCache: 42},
-			"g": file{},
+			"g": file{ts: ts},
 		},
 		"h": file{c: "q\n", ts: ts},
 	}
@@ -424,7 +424,7 @@ func Test__hashes_from_cache_are_used(t *testing.T) {
 			// no entry for "a"
 			{Name: "b", Size: 1, ModTime: tsUnix, Hash: 69}, // not used: "b" is a dir in testdata
 			{Name: "c", Size: 2, ModTime: tsUnix, Hash: 53}, // used
-			{Name: "d", Size: 2, Hash: 69},                  // not used: no such file in testdata
+			{Name: "d", Size: 2, ModTime: tsUnix, Hash: 69}, // not used: no such file in testdata
 		},
 	}
 	res, err := Run(rootPath, NoSkip, cache)

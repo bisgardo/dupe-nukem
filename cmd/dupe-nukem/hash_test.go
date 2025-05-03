@@ -37,7 +37,7 @@ func Test__hash_wraps_file_error(t *testing.T) {
 	// This test is basically identical to 'Test__hash_inaccessible_file_fails' (in package 'hash'),
 	// but, as indicated by the test name, the purpose is slightly different:
 	// Hashing an inaccessible file just happens to be the easiest way to trigger an error.
-	path := testutil.TempFile(t, "")
+	path := testutil.TempStringFile(t, "")
 	testutil.MakeInaccessibleT(t, path)
 	_, err := Hash(path)
 	assert.EqualError(t, err, fmt.Sprintf("cannot hash file %q: cannot open file: access denied", path))

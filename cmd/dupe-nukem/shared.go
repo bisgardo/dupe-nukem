@@ -16,7 +16,7 @@ import (
 )
 
 func resolveReader(f *os.File) (io.Reader, error) {
-	// TODO: Read magic number instead of extension.
+	// TODO: Read magic number instead of extension (then update test 'Test__scan_testdata_uses_provided_cache').
 	if strings.HasSuffix(f.Name(), ".gz") {
 		return gzip.NewReader(f)
 	}

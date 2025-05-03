@@ -21,14 +21,15 @@ func Test__hash_reader(t *testing.T) {
 }
 
 func Test__hash_file(t *testing.T) {
-	res, err := File("testdata/a")
+	f := testutil.TempStringFile(t, "x\n")
+	res, err := File(f)
 	require.NoError(t, err)
 	assert.Equal(t, uint64(644258871406045975), res)
 }
 
 // TODO: Test other kinds of (broken) files.
 func Test__hash_dir_fails(t *testing.T) {
-	_, err := File("testdata")
+	_, err := File(".")
 
 	// The function should never be called with a directory (all current callers check this beforehand),
 	// so it doesn't really matter that the error message sucks.
@@ -42,13 +43,13 @@ func Test__hash_dir_fails(t *testing.T) {
 			wantReason = "Incorrect function."
 		}
 	}
-	assert.EqualError(t, err, fmt.Sprintf("read error after 0 bytes: read testdata: %s", wantReason))
+	assert.EqualError(t, err, fmt.Sprintf("read error after 0 bytes: read .: %s", wantReason))
 }
 
 func Test__hash_inaccessible_file_fails(t *testing.T) {
 	// This test is basically identical to 'Test__hash_wraps_file_error' (in package 'main'),
 	// but the purpose is slightly different (as indicated by the test name).
-	path := testutil.TempFile(t, "")
+	path := testutil.TempStringFile(t, "")
 	testutil.MakeInaccessibleT(t, path)
 	_, err := File(path)
 	assert.EqualError(t, err, "cannot open file: access denied")
