@@ -295,7 +295,7 @@ func Test__scan_testdata(t *testing.T) {
 	want := &scan.Dir{
 		Name: "testdata",
 		Files: []*scan.File{
-			{Name: ".gitattributes", Size: 18, ModTime: modTime(t, "./testdata/.gitattributes"), Hash: 6438349529549545461},
+			{Name: ".gitattributes", Size: 26, ModTime: modTime(t, "./testdata/.gitattributes"), Hash: 4669089596920409881},
 			{Name: "cache1.json", Size: 232, ModTime: modTime(t, "./testdata/cache1.json"), Hash: 17698409774061682325},
 			{Name: "cache2.json.gz", Size: 47, ModTime: modTime(t, "./testdata/cache2.json.gz"), Hash: 9363661890766539952},
 			{Name: "skipnames", Size: 7, ModTime: modTime(t, "./testdata/skipnames"), Hash: 10951817445047336725},
@@ -351,7 +351,7 @@ func Test__scan_testdata_uses_provided_cache(t *testing.T) {
 	want := &scan.Dir{
 		Name: "testdata",
 		Files: []*scan.File{
-			{Name: ".gitattributes", Size: 18, ModTime: modTime_gitattributes, Hash: 6438349529549545461}, // not present in cache
+			{Name: ".gitattributes", Size: 26, ModTime: modTime_gitattributes, Hash: 4669089596920409881}, // not present in cache
 			{Name: "cache1.json", Size: 232, ModTime: modTime_cache1, Hash: 69},                           // wrong hash loaded from cache
 			{Name: "cache2.json.gz", Size: 47, ModTime: modTime_cache2, Hash: 9363661890766539952},        // computed as cache didn't match
 			{Name: "skipnames", Size: 7, ModTime: modTime_skipnames, Hash: 10951817445047336725},          // computed as cache didn't match

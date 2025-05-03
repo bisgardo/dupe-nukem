@@ -1,1 +1,2 @@
-!*.gz text eol=lf
+* text eol=lf
+*.gz binary
