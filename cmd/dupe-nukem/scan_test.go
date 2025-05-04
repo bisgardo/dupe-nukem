@@ -34,11 +34,15 @@ func Test__parseSkipNames_splits_on_comma(t *testing.T) {
 }
 
 func Test__parseSkipNames_with_at_prefix_splits_file_on_newline(t *testing.T) {
-	input := "@testdata/skipnames"
+	tests := []string{"@testdata/skipnames", "@testdata/skipnames_crlf"}
 	want := []string{"a", "b", "c"}
-	res, err := parseSkipNames(input)
-	require.NoError(t, err)
-	assert.Equal(t, want, res)
+	for _, test := range tests {
+		t.Run(test, func(t *testing.T) {
+			res, err := parseSkipNames(test)
+			require.NoError(t, err)
+			assert.Equal(t, want, res)
+		})
+	}
 }
 
 func Test__parseSkipNames_file_with_length_255_is_allowed(t *testing.T) {
@@ -295,10 +299,11 @@ func Test__scan_testdata(t *testing.T) {
 	want := &scan.Dir{
 		Name: "testdata",
 		Files: []*scan.File{
-			{Name: ".gitattributes", Size: 26, ModTime: modTime(t, "./testdata/.gitattributes"), Hash: 4669089596920409881},
+			{Name: ".gitattributes", Size: 8, ModTime: modTime(t, "./testdata/.gitattributes"), Hash: 14181289122033052373},
 			{Name: "cache1.json", Size: 232, ModTime: modTime(t, "./testdata/cache1.json"), Hash: 17698409774061682325},
 			{Name: "cache2.json.gz", Size: 47, ModTime: modTime(t, "./testdata/cache2.json.gz"), Hash: 9363661890766539952},
 			{Name: "skipnames", Size: 7, ModTime: modTime(t, "./testdata/skipnames"), Hash: 10951817445047336725},
+			{Name: "skipnames_crlf", Size: 11, ModTime: modTime(t, "./testdata/skipnames_crlf"), Hash: 15953509558814875971},
 		},
 	}
 
@@ -347,14 +352,16 @@ func Test__scan_testdata_uses_provided_cache(t *testing.T) {
 	modTime_cache1 := modTime(t, "./testdata/cache1.json")
 	modTime_cache2 := modTime(t, "./testdata/cache2.json.gz")
 	modTime_skipnames := modTime(t, "./testdata/skipnames")
+	modTime_skipnames_crlf := modTime(t, "./testdata/skipnames_crlf")
 
 	want := &scan.Dir{
 		Name: "testdata",
 		Files: []*scan.File{
-			{Name: ".gitattributes", Size: 26, ModTime: modTime_gitattributes, Hash: 4669089596920409881}, // not present in cache
+			{Name: ".gitattributes", Size: 8, ModTime: modTime_gitattributes, Hash: 14181289122033052373}, // not present in cache
 			{Name: "cache1.json", Size: 232, ModTime: modTime_cache1, Hash: 69},                           // wrong hash loaded from cache
 			{Name: "cache2.json.gz", Size: 47, ModTime: modTime_cache2, Hash: 9363661890766539952},        // computed as cache didn't match
 			{Name: "skipnames", Size: 7, ModTime: modTime_skipnames, Hash: 10951817445047336725},          // computed as cache didn't match
+			{Name: "skipnames_crlf", Size: 11, ModTime: modTime_skipnames_crlf, Hash: 15953509558814875971},
 		},
 	}
 
@@ -363,9 +370,10 @@ func Test__scan_testdata_uses_provided_cache(t *testing.T) {
 		Name: "testdata",
 		Files: []*scan.File{
 			// .gitattributes                                                      // not present
-			{Name: "cache1.json", Size: 232, ModTime: modTime_cache1, Hash: 69},   // correct size and mod time
-			{Name: "cache2.json.gz", Size: 69, ModTime: modTime_cache2, Hash: 69}, // incorrect size
-			{Name: "skipnames", Size: 7, ModTime: 23, Hash: 69},                   // incorrect mod time
+			{Name: "cache1.json", Size: 232, ModTime: modTime_cache1, Hash: 69},           // correct size and mod time
+			{Name: "cache2.json.gz", Size: 69, ModTime: modTime_cache2, Hash: 69},         // incorrect size
+			{Name: "skipnames", Size: 7, ModTime: 23, Hash: 69},                           // incorrect mod time
+			{Name: "skipnames_clrs", Size: 11, ModTime: modTime_skipnames_crlf, Hash: 69}, // incorrect name
 		},
 	}
 	for _, compressCache := range []bool{false, true} {
