@@ -357,11 +357,11 @@ func Test__scan_testdata_uses_provided_cache(t *testing.T) {
 	want := &scan.Dir{
 		Name: "testdata",
 		Files: []*scan.File{
-			{Name: ".gitattributes", Size: 8, ModTime: modTime_gitattributes, Hash: 14181289122033052373}, // not present in cache
-			{Name: "cache1.json", Size: 232, ModTime: modTime_cache1, Hash: 69},                           // wrong hash loaded from cache
-			{Name: "cache2.json.gz", Size: 47, ModTime: modTime_cache2, Hash: 9363661890766539952},        // computed as cache didn't match
-			{Name: "skipnames", Size: 7, ModTime: modTime_skipnames, Hash: 10951817445047336725},          // computed as cache didn't match
-			{Name: "skipnames_crlf", Size: 11, ModTime: modTime_skipnames_crlf, Hash: 15953509558814875971},
+			{Name: ".gitattributes", Size: 8, ModTime: modTime_gitattributes, Hash: 14181289122033052373},   // not present in cache
+			{Name: "cache1.json", Size: 232, ModTime: modTime_cache1, Hash: 69},                             // wrong hash loaded from cache
+			{Name: "cache2.json.gz", Size: 47, ModTime: modTime_cache2, Hash: 9363661890766539952},          // computed as cache didn't match
+			{Name: "skipnames", Size: 7, ModTime: modTime_skipnames, Hash: 10951817445047336725},            // computed as cache didn't match
+			{Name: "skipnames_crlf", Size: 11, ModTime: modTime_skipnames_crlf, Hash: 15953509558814875971}, // computed as cache didn't match (not actually present)
 		},
 	}
 
@@ -369,7 +369,7 @@ func Test__scan_testdata_uses_provided_cache(t *testing.T) {
 	cache := &scan.Dir{
 		Name: "testdata",
 		Files: []*scan.File{
-			// .gitattributes                                                      // not present
+			// .gitattributes                                                              // not present
 			{Name: "cache1.json", Size: 232, ModTime: modTime_cache1, Hash: 69},           // correct size and mod time
 			{Name: "cache2.json.gz", Size: 69, ModTime: modTime_cache2, Hash: 69},         // incorrect size
 			{Name: "skipnames", Size: 7, ModTime: 23, Hash: 69},                           // incorrect mod time
