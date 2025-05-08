@@ -2,11 +2,12 @@ package testutil
 
 import (
 	"bytes"
+	"fmt"
 	"log"
 )
 
-// LogBuffer redirects output from the builtin logger to a new buffer and returns this buffer.
-func LogBuffer() *bytes.Buffer {
+// CollectLogs returns a collector of logs emitted with the [log] package.
+func CollectLogs() fmt.Stringer {
 	var buf bytes.Buffer
 	log.SetFlags(0)
 	log.SetOutput(&buf)

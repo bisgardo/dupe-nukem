@@ -1,7 +1,6 @@
 package scan
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/bisgardo/dupe-nukem/testutil"
+	. "github.com/bisgardo/dupe-nukem/testutil"
 )
 
 // TODO: Revise data setup of all tests using the new system (construct more targeted setups)
@@ -54,26 +53,26 @@ func Test__nonexistent_root_fails(t *testing.T) {
 }
 
 func Test__file_root_fails(t *testing.T) {
-	path := testutil.TempStringFile(t, "")
+	path := TempStringFile(t, "")
 	_, err := Run(path, NoSkip, nil)
 	assert.EqualError(t, err, fmt.Sprintf("invalid root directory %q: not a directory", path))
 }
 
 func Test__inaccessible_root_is_skipped_and_logged(t *testing.T) {
 	rootPath := tempDir(t)
-	testutil.MakeInaccessibleT(t, rootPath)
+	MakeInaccessibleT(t, rootPath)
 	want := &Dir{Name: filepath.Base(rootPath)}
 
-	buf := testutil.LogBuffer()
+	logs := CollectLogs()
 	res, err := Run(rootPath, NoSkip, nil)
 	require.NoError(t, err)
 	res.assertEqual(t, want)
 	assert.Equal(t,
 		fmt.Sprintf(
-			lines("skipping inaccessible directory %q"),
+			Lines("skipping inaccessible directory %q"),
 			rootPath,
 		),
-		buf.String(),
+		logs.String(),
 	)
 }
 
@@ -164,7 +163,7 @@ func Test__skip_root_fails(t *testing.T) {
 // SKIPPED on Windows unless running as administrator.
 func Test__skip_symlinked_root_fails(t *testing.T) {
 	//goland:noinspection GoBoolExpressions
-	if runtime.GOOS == "windows" && !testutil.IsWindowsAdministrator() {
+	if runtime.GOOS == "windows" && !IsWindowsAdministrator() {
 		t.Skip("Creating symlinks on Windows requires elevated privileges.")
 	}
 	tests := []struct {
@@ -205,16 +204,16 @@ func Test__skip_dir_without_subdirs_is_logged(t *testing.T) {
 	root.writeTestdata(t, rootPath)
 	want := root.simulateScan(filepath.Base(rootPath))
 
-	buf := testutil.LogBuffer()
+	logs := CollectLogs()
 	res, err := Run(rootPath, skip("b"), nil)
 	require.NoError(t, err)
 	res.assertEqual(t, want)
 	assert.Equal(t,
 		fmt.Sprintf(
-			lines("skipping directory %q based on skip list"),
+			Lines("skipping directory %q based on skip list"),
 			filepath.Join(rootPath, "b"),
 		),
-		buf.String(),
+		logs.String(),
 	)
 }
 
@@ -237,16 +236,16 @@ func Test__skip_dir_with_subdirs_is_logged(t *testing.T) {
 	root.writeTestdata(t, rootPath)
 	want := root.simulateScan(filepath.Base(rootPath))
 
-	buf := testutil.LogBuffer()
+	logs := CollectLogs()
 	res, err := Run(rootPath, skip("e"), nil)
 	require.NoError(t, err)
 	res.assertEqual(t, want)
 	assert.Equal(t,
 		fmt.Sprintf(
-			lines("skipping directory %q based on skip list"),
+			Lines("skipping directory %q based on skip list"),
 			filepath.Join(rootPath, "e"),
 		),
-		buf.String(),
+		logs.String(),
 	)
 }
 
@@ -264,20 +263,20 @@ func Test__skip_nonempty_files_is_logged(t *testing.T) {
 	root.writeTestdata(t, rootPath)
 	want := root.simulateScan(filepath.Base(rootPath))
 
-	buf := testutil.LogBuffer()
+	logs := CollectLogs()
 	res, err := Run(rootPath, skip("a"), nil)
 	require.NoError(t, err)
 	res.assertEqual(t, want)
 	assert.Equal(t,
 		fmt.Sprintf(
-			lines(
+			Lines(
 				"skipping file %q based on skip list",
 				"skipping file %q based on skip list",
 			),
 			filepath.Join(rootPath, "a"),
 			filepath.Join(rootPath, "e/f/a"),
 		),
-		buf.String(),
+		logs.String(),
 	)
 }
 
@@ -320,16 +319,16 @@ func Test__inaccessible_internal_file_is_not_hashed_and_is_logged(t *testing.T) 
 	root.writeTestdata(t, rootPath)
 	want := root.simulateScan(filepath.Base(rootPath))
 
-	buf := testutil.LogBuffer()
+	logs := CollectLogs()
 	res, err := Run(rootPath, NoSkip, nil)
 	require.NoError(t, err)
 	res.assertEqual(t, want)
 	assert.Equal(t,
 		fmt.Sprintf(
-			lines("error: cannot hash file %q: cannot open file: access denied"),
+			Lines("error: cannot hash file %q: cannot open file: access denied"),
 			filepath.Join(rootPath, "inaccessible"),
 		),
-		buf.String(),
+		logs.String(),
 	)
 }
 
@@ -347,16 +346,16 @@ func Test__inaccessible_internal_dir_is_logged(t *testing.T) {
 	root.writeTestdata(t, rootPath)
 	want := root.simulateScan(filepath.Base(rootPath))
 
-	buf := testutil.LogBuffer()
+	logs := CollectLogs()
 	res, err := Run(rootPath, NoSkip, nil)
 	require.NoError(t, err)
 	res.assertEqual(t, want)
 	assert.Equal(t,
 		fmt.Sprintf(
-			lines("skipping inaccessible directory %q"),
+			Lines("skipping inaccessible directory %q"),
 			filepath.Join(rootPath, "f/inaccessible"),
 		),
-		buf.String(),
+		logs.String(),
 	)
 }
 
@@ -368,11 +367,11 @@ func Test__inaccessible_internal_empty_file_is_not_logged(t *testing.T) {
 	rootPath := tempDir(t)
 	root.writeTestdata(t, rootPath)
 	want := root.simulateScan(filepath.Base(rootPath))
-	buf := testutil.LogBuffer()
+	logs := CollectLogs()
 	res, err := Run(rootPath, NoSkip, nil)
 	require.NoError(t, err)
 	res.assertEqual(t, want)
-	assert.Empty(t, buf.String())
+	assert.Empty(t, logs.String())
 }
 
 func Test__cache_with_mismatching_root_fails(t *testing.T) {
@@ -536,16 +535,16 @@ func Test__cache_entry_with_hash_0_is_ignored_and_logged(t *testing.T) {
 			},
 		},
 	}
-	buf := testutil.LogBuffer()
+	logs := CollectLogs()
 	res, err := Run(rootPath, NoSkip, cache)
 	require.NoError(t, err)
 	res.assertEqual(t, want)
 	assert.Equal(t,
 		fmt.Sprintf(
-			lines("warning: cached hash value 0 of file %q ignored"),
+			Lines("warning: cached hash value 0 of file %q ignored"),
 			filepath.Join(rootPath, "d"),
 		),
-		buf.String(),
+		logs.String(),
 	)
 }
 
@@ -558,23 +557,23 @@ func Test__hash_computed_as_0_is_logged(t *testing.T) {
 	root.writeTestdata(t, rootPath)
 	want := root.simulateScan(filepath.Base(rootPath))
 
-	buf := testutil.LogBuffer()
+	logs := CollectLogs()
 	res, err := Run(rootPath, NoSkip, nil)
 	require.NoError(t, err)
 	res.assertEqual(t, want)
 	assert.Equal(t,
 		fmt.Sprintf(
-			lines("info: hash of file %q evaluated to 0 - this might result in warnings (which can be safely ignored) if the output is used as cache in future scans"),
+			Lines("info: hash of file %q evaluated to 0 - this might result in warnings (which can be safely ignored) if the output is used as cache in future scans"),
 			filepath.Join(rootPath, "hash0"),
 		),
-		buf.String(),
+		logs.String(),
 	)
 }
 
 // SKIPPED on Windows unless running as administrator.
 func Test__root_symlink_is_followed_and_logged(t *testing.T) {
 	//goland:noinspection GoBoolExpressions
-	if runtime.GOOS == "windows" && !testutil.IsWindowsAdministrator() {
+	if runtime.GOOS == "windows" && !IsWindowsAdministrator() {
 		t.Skip("Creating symlinks on Windows requires elevated privileges.")
 	}
 
@@ -592,24 +591,24 @@ func Test__root_symlink_is_followed_and_logged(t *testing.T) {
 	rootSymlinkPath := filepath.Join(rootPath, symlinkName)
 	want := symlinkedDir.simulateScan(symlinkName)
 
-	buf := testutil.LogBuffer()
+	logs := CollectLogs()
 	res, err := Run(rootSymlinkPath, NoSkip, nil)
 	require.NoError(t, err)
 	res.assertEqual(t, want)
 	assert.Equal(t,
 		fmt.Sprintf(
-			lines("following root symlink %q to %q"),
+			Lines("following root symlink %q to %q"),
 			rootSymlinkPath,
 			filepath.Join(rootPath, "data"),
 		),
-		buf.String(),
+		logs.String(),
 	)
 }
 
 // SKIPPED on Windows unless running as administrator.
 func Test__root_broken_symlink_fails(t *testing.T) {
 	//goland:noinspection GoBoolExpressions
-	if runtime.GOOS == "windows" && !testutil.IsWindowsAdministrator() {
+	if runtime.GOOS == "windows" && !IsWindowsAdministrator() {
 		t.Skip("Creating symlinks on Windows requires elevated privileges.")
 	}
 
@@ -630,7 +629,7 @@ func Test__root_broken_symlink_fails(t *testing.T) {
 // SKIPPED on Windows unless running as administrator.
 func Test__root_indirect_symlink_is_followed_and_logged(t *testing.T) {
 	//goland:noinspection GoBoolExpressions
-	if runtime.GOOS == "windows" && !testutil.IsWindowsAdministrator() {
+	if runtime.GOOS == "windows" && !IsWindowsAdministrator() {
 		t.Skip("Creating symlinks on Windows requires elevated privileges.")
 	}
 
@@ -649,24 +648,24 @@ func Test__root_indirect_symlink_is_followed_and_logged(t *testing.T) {
 	rootSymlinkPath := filepath.Join(rootPath, symlinkName)
 	want := symlinkedDir.simulateScan(symlinkName)
 
-	buf := testutil.LogBuffer()
+	logs := CollectLogs()
 	res, err := Run(rootSymlinkPath, NoSkip, nil)
 	require.NoError(t, err)
 	res.assertEqual(t, want)
 	assert.Equal(t,
 		fmt.Sprintf(
-			lines("following root symlink %q to %q"),
+			Lines("following root symlink %q to %q"),
 			rootSymlinkPath,
 			filepath.Join(rootPath, "data"),
 		),
-		buf.String(),
+		logs.String(),
 	)
 }
 
 // SKIPPED on Windows unless running as administrator.
 func Test__internal_symlink_is_skipped_and_logged(t *testing.T) {
 	//goland:noinspection GoBoolExpressions
-	if runtime.GOOS == "windows" && !testutil.IsWindowsAdministrator() {
+	if runtime.GOOS == "windows" && !IsWindowsAdministrator() {
 		t.Skip("Creating symlinks on Windows requires elevated privileges.")
 	}
 
@@ -695,16 +694,16 @@ func Test__internal_symlink_is_skipped_and_logged(t *testing.T) {
 		test.root.writeTestdata(t, rootPath)
 		want := test.root.simulateScan(filepath.Base(rootPath))
 
-		buf := testutil.LogBuffer()
+		logs := CollectLogs()
 		res, err := Run(rootPath, NoSkip, nil)
 		require.NoError(t, err)
 		res.assertEqual(t, want)
 		assert.Equal(t,
 			fmt.Sprintf(
-				lines("skipping symlink %q during scan"),
+				Lines("skipping symlink %q during scan"),
 				filepath.Join(rootPath, symlinkName),
 			),
-			buf.String(),
+			logs.String(),
 		)
 	}
 }
@@ -712,7 +711,7 @@ func Test__internal_symlink_is_skipped_and_logged(t *testing.T) {
 // SKIPPED on Windows unless running as administrator.
 func Test__root_symlink_to_ancestor_is_followed_but_skipped_and_logged_when_internal(t *testing.T) {
 	//goland:noinspection GoBoolExpressions
-	if runtime.GOOS == "windows" && !testutil.IsWindowsAdministrator() {
+	if runtime.GOOS == "windows" && !IsWindowsAdministrator() {
 		t.Skip("Creating symlinks on Windows requires elevated privileges.")
 	}
 	symlinkName := "parent-symlink"
@@ -729,17 +728,19 @@ func Test__root_symlink_to_ancestor_is_followed_but_skipped_and_logged_when_inte
 	root.writeTestdata(t, rootPath)
 	want := &Dir{
 		Name: symlinkName,
-		Dirs: []*Dir{symlinkedDir.simulateScan(symlinkTargetName)},
+		Dirs: []*Dir{
+			symlinkedDir.simulateScan(symlinkTargetName),
+		},
 	}
 
-	buf := testutil.LogBuffer()
+	logs := CollectLogs()
 	rootSymlinkPath := filepath.Join(rootPath, symlinkTargetName, symlinkName)
 	res, err := Run(rootSymlinkPath, NoSkip, nil)
 	require.NoError(t, err)
 	res.assertEqual(t, want)
 	assert.Equal(t,
 		fmt.Sprintf(
-			lines(
+			Lines(
 				"following root symlink %q to %q",
 				"skipping symlink %q during scan",
 			),
@@ -747,7 +748,7 @@ func Test__root_symlink_to_ancestor_is_followed_but_skipped_and_logged_when_inte
 			rootPath,
 			rootSymlinkPath,
 		),
-		buf.String(),
+		logs.String(),
 	)
 }
 
@@ -766,15 +767,6 @@ func tempDir(t *testing.T) string {
 	dir, err := filepath.EvalSymlinks(t.TempDir())
 	require.NoError(t, err)
 	return dir
-}
-
-func lines(ls ...string) string {
-	var buf bytes.Buffer
-	for _, l := range ls {
-		buf.Write([]byte(l))
-		buf.WriteByte('\n')
-	}
-	return buf.String()
 }
 
 func skip(names ...string) ShouldSkipPath {

@@ -101,3 +101,10 @@ func runCommand(cmd *exec.Cmd) error {
 	out, err := cmd.CombinedOutput()
 	return errors.Wrapf(err, string(out))
 }
+
+// ModTime reads the modification time of a file (using os.Lstat).
+func ModTime(t *testing.T, path string) int64 {
+	info, err := os.Lstat(path)
+	require.NoError(t, err)
+	return info.ModTime().Unix()
+}

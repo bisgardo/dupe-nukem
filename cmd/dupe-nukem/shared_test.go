@@ -8,11 +8,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/bisgardo/dupe-nukem/scan"
-	"github.com/bisgardo/dupe-nukem/testutil"
+	. "github.com/bisgardo/dupe-nukem/testutil"
 )
 
 func Test__resolveReader_rejects_invalid_compressed_scan_file(t *testing.T) {
-	path := testutil.TempFileByPattern(t,
+	path := TempFileByPattern(t,
 		"invalid-*.gz",                      // the '*' is swapped out for gibberish instead of it being appended after the '.gz'
 		[]byte("totally legit compression"), // spoiler alert: it's not!
 	)
@@ -57,7 +57,7 @@ func Test__loadScanDirFile_loads_compressed_scan_file(t *testing.T) {
 }
 
 func Test__loadScanDirFile_wraps_scan_file_error(t *testing.T) {
-	path := testutil.TempFileByPattern(t,
+	path := TempFileByPattern(t,
 		"invalid-*.gz", // the '*' is swapped out for gibberish instead of it being appended after the '.gz'
 		nil,
 	)

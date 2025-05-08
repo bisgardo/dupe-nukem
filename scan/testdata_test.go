@@ -16,10 +16,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/bisgardo/dupe-nukem/hash"
-	"github.com/bisgardo/dupe-nukem/testutil"
+	. "github.com/bisgardo/dupe-nukem/testutil"
 )
 
-// node is an interface for building test data for Run.
+// node is a content item of a dir, used for building test data for Run.
 type node interface {
 	// simulateScanFromParent adds the "scan" result of the node to the Dir representing the parent node.
 	simulateScanFromParent(parent *Dir, name string)
@@ -112,7 +112,7 @@ func (d dirExt) simulateScanFromParent(parent *Dir, name string) {
 func (d dirExt) writeTestdata(t *testing.T, path string) {
 	d.dir.writeTestdata(t, path)
 	if d.inaccessible {
-		testutil.MakeInaccessibleT(t, path)
+		MakeInaccessibleT(t, path)
 	}
 }
 
@@ -177,7 +177,7 @@ func (f file) writeTestdata(t *testing.T, path string) {
 		require.NoErrorf(t, err, "cannot update modification time of file %q", path)
 	}
 	if f.inaccessible {
-		testutil.MakeInaccessibleT(t, path)
+		MakeInaccessibleT(t, path)
 	}
 }
 
@@ -440,30 +440,38 @@ func readPath(path string, info os.FileInfo, expectInaccessible bool) (string, e
 // This exception exists because we don't want to explicitly set the mod times of all generated test files,
 // in which case they default to the time that the test is run.
 // The solution of patching the expectation with the current time didn't work well and was replaced with this one.
-func (d *Dir) assertEqual(t *testing.T, expected *Dir) {
-	assert.Equal(t, d.Name, expected.Name)
-	assert.Equal(t, expected.EmptyFiles, d.EmptyFiles)
-	assert.Equal(t, expected.SkippedFiles, d.SkippedFiles)
-	assert.Equal(t, expected.SkippedDirs, d.SkippedDirs)
+func (d *Dir) assertEqual(t *testing.T, want *Dir) {
+	if d == nil {
+		assert.Nil(t, want)
+		return
+	}
+	assert.Equal(t, want.Name, d.Name)
+	assert.Equal(t, want.EmptyFiles, d.EmptyFiles)
+	assert.Equal(t, want.SkippedFiles, d.SkippedFiles)
+	assert.Equal(t, want.SkippedDirs, d.SkippedDirs)
 
-	dirCount := len(expected.Dirs)
-	fileCount := len(expected.Files)
+	dirCount := len(want.Dirs)
+	fileCount := len(want.Files)
 	assert.Len(t, d.Dirs, dirCount)
 	assert.Len(t, d.Files, fileCount)
 	// Avoid recursing if assertions already failed.
 	for i := 0; i < dirCount && !t.Failed(); i++ {
-		d.Dirs[i].assertEqual(t, expected.Dirs[i])
+		d.Dirs[i].assertEqual(t, want.Dirs[i])
 	}
 	for i := 0; i < fileCount && !t.Failed(); i++ {
-		d.Files[i].assertEqual(t, expected.Files[i])
+		d.Files[i].assertEqual(t, want.Files[i])
 	}
 }
 
-func (f *File) assertEqual(t *testing.T, expected *File) {
-	assert.Equal(t, expected.Name, f.Name)
-	assert.Equal(t, expected.Size, f.Size)
-	if expected.ModTime != 0 {
-		assert.Equal(t, expected.ModTime, f.ModTime)
+func (f *File) assertEqual(t *testing.T, want *File) {
+	if f == nil {
+		assert.Nil(t, want)
+		return
 	}
-	assert.Equal(t, expected.Hash, f.Hash)
+	assert.Equal(t, want.Name, f.Name)
+	assert.Equal(t, want.Size, f.Size)
+	if want.ModTime != 0 {
+		assert.Equal(t, want.ModTime, f.ModTime)
+	}
+	assert.Equal(t, want.Hash, f.Hash)
 }

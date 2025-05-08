@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/bisgardo/dupe-nukem/testutil"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	. "github.com/bisgardo/dupe-nukem/testutil"
 )
 
 func Test__hash_stdin(t *testing.T) {
@@ -37,8 +37,8 @@ func Test__hash_wraps_file_error(t *testing.T) {
 	// This test is basically identical to 'Test__hash_inaccessible_file_fails' (in package 'hash'),
 	// but, as indicated by the test name, the purpose is slightly different:
 	// Hashing an inaccessible file just happens to be the easiest way to trigger an error.
-	path := testutil.TempStringFile(t, "")
-	testutil.MakeInaccessibleT(t, path)
+	path := TempStringFile(t, "")
+	MakeInaccessibleT(t, path)
 	_, err := Hash(path)
 	assert.EqualError(t, err, fmt.Sprintf("cannot hash file %q: cannot open file: access denied", path))
 }
