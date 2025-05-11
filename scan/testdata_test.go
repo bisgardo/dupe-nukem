@@ -25,7 +25,33 @@ type node interface {
 	simulateScanFromParent(parent *Dir, name string)
 
 	// writeTestdata writes the directory structure rooted at the node to the provided path on disk.
-	writeTestdata(t *testing.T, path string)
+	// TODO: For `testdata` to be actually useful it would have to be the complete directory tree
+	//       (with key paths resulting in nested objects).
+	//       Which is way overkill for our needs.
+	writeTestdata(t *testing.T, path string) testdata
+}
+
+type testdata struct {
+	node node
+	path string
+}
+
+func (p testdata) find(elems ...string) testdata {
+	n := p.node
+	for _, e := range elems {
+		d, ok := n.(dir)
+		if !ok {
+			panic(fmt.Sprintf("node %q is not a dir", n))
+		}
+		n, ok = d[e]
+		if !ok {
+			panic(fmt.Sprintf("no entry of dir named %q", e))
+		}
+	}
+	return testdata{
+		node: n,
+		path: filepath.Join(p.path, filepath.Join(elems...)),
+	}
 }
 
 // dir is a directory node, implemented as a mapping to entry nodes by relative path.
@@ -74,7 +100,7 @@ func (d dir) simulateScan(name string) *Dir {
 	return res
 }
 
-func (d dir) writeTestdata(t *testing.T, path string) {
+func (d dir) writeTestdata(t *testing.T, path string) testdata {
 	if err := os.MkdirAll(path, 0700); err != nil { // permissions chosen to be unaffected by umask
 		require.NoErrorf(t, err, "cannot create dir on path %q", path)
 	}
@@ -88,6 +114,7 @@ func (d dir) writeTestdata(t *testing.T, path string) {
 		// Path may have arbitrary number of components.
 		n.writeTestdata(t, nodePath)
 	}
+	return testdata{node: d, path: path}
 }
 
 // dirExt is an extension of dir that adds the ability
@@ -109,11 +136,12 @@ func (d dirExt) simulateScanFromParent(parent *Dir, name string) {
 	d.dir.simulateScanFromParent(parent, name)
 }
 
-func (d dirExt) writeTestdata(t *testing.T, path string) {
+func (d dirExt) writeTestdata(t *testing.T, path string) testdata {
 	d.dir.writeTestdata(t, path)
 	if d.inaccessible {
 		MakeInaccessibleT(t, path)
 	}
+	return testdata{node: d, path: path}
 }
 
 // file is a file node.
@@ -163,7 +191,7 @@ func (f file) simulateScan(name string) *File {
 	return NewFile(name, int64(len(data)), unixTime, h)
 }
 
-func (f file) writeTestdata(t *testing.T, path string) {
+func (f file) writeTestdata(t *testing.T, path string) testdata {
 	data := []byte(f.c)
 	_, err := os.Stat(path)
 	if !errors.Is(err, os.ErrNotExist) {
@@ -179,6 +207,7 @@ func (f file) writeTestdata(t *testing.T, path string) {
 	if f.inaccessible {
 		MakeInaccessibleT(t, path)
 	}
+	return testdata{node: f, path: path}
 }
 
 type symlink string // target path relative to own location
@@ -187,9 +216,10 @@ func (s symlink) simulateScanFromParent(*Dir, string) {
 	// Symlinks are ignored.
 }
 
-func (s symlink) writeTestdata(t *testing.T, path string) {
+func (s symlink) writeTestdata(t *testing.T, path string) testdata {
 	err := os.Symlink(string(s), path)
 	require.NoErrorf(t, err, "cannot create symlink with value %q at path %q", s, path)
+	return testdata{node: s, path: path}
 }
 
 // Verify conformance to node interface.

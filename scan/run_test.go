@@ -587,8 +587,8 @@ func Test__root_symlink_is_followed_and_logged(t *testing.T) {
 		"data":      symlinkedDir,
 	}
 	rootPath := tempDir(t)
-	root.writeTestdata(t, rootPath)
-	rootSymlinkPath := filepath.Join(rootPath, symlinkName)
+	data := root.writeTestdata(t, rootPath)
+	rootSymlinkPath := data.find(symlinkName).path
 	want := symlinkedDir.simulateScan(symlinkName)
 
 	logs := CollectLogs()
@@ -644,8 +644,8 @@ func Test__root_indirect_symlink_is_followed_and_logged(t *testing.T) {
 		"data":      symlinkedDir,
 	}
 	rootPath := tempDir(t)
-	root.writeTestdata(t, rootPath)
-	rootSymlinkPath := filepath.Join(rootPath, symlinkName)
+	data := root.writeTestdata(t, rootPath)
+	rootSymlinkPath := data.find(symlinkName).path
 	want := symlinkedDir.simulateScan(symlinkName)
 
 	logs := CollectLogs()
@@ -725,7 +725,7 @@ func Test__root_symlink_to_ancestor_is_followed_but_skipped_and_logged_when_inte
 		symlinkTargetName: symlinkedDir,
 	}
 	rootPath := tempDir(t)
-	root.writeTestdata(t, rootPath)
+	data := root.writeTestdata(t, rootPath)
 	want := &Dir{
 		Name: symlinkName,
 		Dirs: []*Dir{
@@ -734,7 +734,7 @@ func Test__root_symlink_to_ancestor_is_followed_but_skipped_and_logged_when_inte
 	}
 
 	logs := CollectLogs()
-	rootSymlinkPath := filepath.Join(rootPath, symlinkTargetName, symlinkName)
+	rootSymlinkPath := data.find(symlinkTargetName, symlinkName).path
 	res, err := Run(rootSymlinkPath, NoSkip, nil)
 	require.NoError(t, err)
 	res.assertEqual(t, want)
