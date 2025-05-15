@@ -7,6 +7,7 @@ import (
 )
 
 // CollectLogs returns a collector of logs emitted with the [log] package.
+// TODO: Restore output in cleanup function?
 func CollectLogs() fmt.Stringer {
 	var buf bytes.Buffer
 	log.SetFlags(0)

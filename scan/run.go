@@ -41,9 +41,6 @@ func SkipNameSet(names map[string]struct{}) ShouldSkipPath {
 // - The root is an existing directory.
 func Run(root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, error) {
 	rootName := filepath.Base(root)
-	if shouldSkip(filepath.Dir(root), rootName) {
-		return nil, fmt.Errorf("skipping root directory %q", root)
-	}
 	if cache != nil && cache.Name != rootName {
 		// While there's no technical reason for this requirement,
 		// it seems reasonable that differing root names would signal a mistake in most cases.
@@ -82,6 +79,10 @@ func validateRoot(path string) error {
 // run runs the "scan" command without any sanity checks.
 // In particular, the directory must not have a trailing slash as that will cause the file walk to panic.
 func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, error) {
+	if shouldSkip(filepath.Dir(root), filepath.Base(root)) {
+		log.Printf("not skipping root directory %q", root)
+	}
+
 	type walkContext struct {
 		prev     *walkContext
 		curDir   *Dir
