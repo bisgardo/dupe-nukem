@@ -93,7 +93,7 @@ func (d dir) writeTestdata(t *testing.T, path string) {
 // dirExt is an extension of dir that adds the ability
 // to expect the directory to be skipped or made inaccessible.
 type dirExt struct {
-	dir          dir
+	dir
 	skipped      bool
 	inaccessible bool
 }
@@ -192,12 +192,25 @@ func (s symlink) writeTestdata(t *testing.T, path string) {
 	require.NoErrorf(t, err, "cannot create symlink with value %q at path %q", s, path)
 }
 
+type symlinkExt struct {
+	symlink
+	skipped bool
+}
+
+func (s symlinkExt) simulateScanFromParent(dir *Dir, name string) {
+	if s.skipped {
+		dir.appendSkippedFile(name)
+	}
+	s.symlink.simulateScanFromParent(dir, name)
+}
+
 // Verify conformance to node interface.
 var (
 	_ node = dir{}
 	_ node = dirExt{}
 	_ node = file{}
 	_ node = symlink("")
+	_ node = symlinkExt{}
 )
 
 func Test__node(t *testing.T) {
