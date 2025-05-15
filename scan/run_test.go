@@ -28,8 +28,8 @@ func Test__empty_dir(t *testing.T) {
 		shouldSkip ShouldSkipPath
 	}{
 		{name: "without skip", shouldSkip: NoSkip},
-		{name: "skipping root", shouldSkip: skip(rootDir)},
-		{name: "skipping non-existing", shouldSkip: skip("non-existing")},
+		{name: "skipping root", shouldSkip: makeSkip(rootDir)},
+		{name: "skipping non-existing", shouldSkip: makeSkip("non-existing")},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -52,7 +52,7 @@ func Test__nonexistent_root_fails(t *testing.T) {
 	t.Run("skipping is not logged", func(t *testing.T) {
 		rootPath := "nonexistent"
 		logs := CollectLogs()
-		_, err := Run(rootPath, skip(filepath.Base(rootPath)), nil)
+		_, err := Run(rootPath, makeSkip(filepath.Base(rootPath)), nil)
 		assert.EqualError(t, err, `invalid root directory "nonexistent": not found`)
 		assert.Empty(t, logs.String())
 	})
@@ -81,7 +81,7 @@ func Test__symlink_to_nonexistent_root_fails(t *testing.T) {
 	})
 	t.Run("skipping is not logged", func(t *testing.T) {
 		logs := CollectLogs()
-		_, err := Run(symlinkPath, skip(filepath.Base(rootPath)), nil)
+		_, err := Run(symlinkPath, makeSkip(filepath.Base(rootPath)), nil)
 		assert.EqualError(t, err, fmt.Sprintf(`invalid root directory %q: not found`, symlinkPath))
 		assert.Empty(t, logs.String())
 	})
@@ -185,7 +185,7 @@ func Test__root_cannot_be_skipped(t *testing.T) {
 	root.writeTestdata(t, rootPath)
 	want := root.simulateScan(filepath.Base(rootPath))
 	logs := CollectLogs()
-	res, err := Run(rootPath, skip(filepath.Base(rootPath)), nil)
+	res, err := Run(rootPath, makeSkip(filepath.Base(rootPath)), nil)
 	require.NoError(t, err)
 	res.assertEqual(t, want)
 	assert.Equal(t,
@@ -236,7 +236,7 @@ func Test__symlink_root_cannot_be_skipped(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			logs := CollectLogs()
-			res, err := Run(symlinkPath, skip(test.skipName), nil)
+			res, err := Run(symlinkPath, makeSkip(test.skipName), nil)
 			require.NoError(t, err)
 			res.assertEqual(t, want)
 			assert.Equal(t, test.wantLogs, logs.String())
@@ -259,7 +259,7 @@ func Test__skip_dir_without_subdirs_is_logged(t *testing.T) {
 	want := root.simulateScan(filepath.Base(rootPath))
 
 	logs := CollectLogs()
-	res, err := Run(rootPath, skip("b"), nil)
+	res, err := Run(rootPath, makeSkip("b"), nil)
 	require.NoError(t, err)
 	res.assertEqual(t, want)
 	assert.Equal(t,
@@ -291,7 +291,7 @@ func Test__skip_dir_with_subdirs_is_logged(t *testing.T) {
 	want := root.simulateScan(filepath.Base(rootPath))
 
 	logs := CollectLogs()
-	res, err := Run(rootPath, skip("e"), nil)
+	res, err := Run(rootPath, makeSkip("e"), nil)
 	require.NoError(t, err)
 	res.assertEqual(t, want)
 	assert.Equal(t,
@@ -318,7 +318,7 @@ func Test__skip_nonempty_files_is_logged(t *testing.T) {
 	want := root.simulateScan(filepath.Base(rootPath))
 
 	logs := CollectLogs()
-	res, err := Run(rootPath, skip("a"), nil)
+	res, err := Run(rootPath, makeSkip("a"), nil)
 	require.NoError(t, err)
 	res.assertEqual(t, want)
 	assert.Equal(t,
@@ -343,7 +343,7 @@ func Test__skip_empty_file_is_logged(t *testing.T) {
 	root.writeTestdata(t, rootPath)
 	want := root.simulateScan(filepath.Base(rootPath))
 	logs := CollectLogs()
-	res, err := Run(rootPath, skip("g"), nil)
+	res, err := Run(rootPath, makeSkip("g"), nil)
 	require.NoError(t, err)
 	res.assertEqual(t, want)
 	assert.Equal(t,
@@ -368,7 +368,7 @@ func Test__skip_symlink_is_logged(t *testing.T) {
 	symlinkPath := filepath.Join(rootPath, symlinkName)
 	want := root.simulateScan(filepath.Base(rootPath))
 	logs := CollectLogs()
-	res, err := Run(rootPath, skip(symlinkName), nil)
+	res, err := Run(rootPath, makeSkip(symlinkName), nil)
 	require.NoError(t, err)
 	res.assertEqual(t, want)
 	assert.Equal(t,
@@ -834,7 +834,7 @@ func tempDir(t *testing.T) string {
 	return dir
 }
 
-func skip(names ...string) ShouldSkipPath {
+func makeSkip(names ...string) ShouldSkipPath {
 	return func(dir, name string) bool {
 		for _, n := range names {
 			if n == name {
