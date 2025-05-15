@@ -51,7 +51,7 @@ func Test__nonexistent_root_fails(t *testing.T) {
 	})
 	t.Run("skipping is not logged", func(t *testing.T) {
 		rootPath := "nonexistent"
-		logs := CollectLogs()
+		logs := CaptureLogs(t)
 		_, err := Run(rootPath, makeSkip(filepath.Base(rootPath)), nil)
 		assert.EqualError(t, err, `invalid root directory "nonexistent": not found`)
 		assert.Empty(t, logs.String())
@@ -80,7 +80,7 @@ func Test__symlink_to_nonexistent_root_fails(t *testing.T) {
 		assert.EqualError(t, err, fmt.Sprintf(`invalid root directory %q: not found`, root))
 	})
 	t.Run("skipping is not logged", func(t *testing.T) {
-		logs := CollectLogs()
+		logs := CaptureLogs(t)
 		_, err := Run(symlinkPath, makeSkip(filepath.Base(rootPath)), nil)
 		assert.EqualError(t, err, fmt.Sprintf(`invalid root directory %q: not found`, symlinkPath))
 		assert.Empty(t, logs.String())
@@ -98,7 +98,7 @@ func Test__inaccessible_root_is_skipped_and_logged(t *testing.T) {
 	MakeInaccessibleT(t, rootPath)
 	want := &Dir{Name: filepath.Base(rootPath)}
 
-	logs := CollectLogs()
+	logs := CaptureLogs(t)
 	res, err := Run(rootPath, NoSkip, nil)
 	require.NoError(t, err)
 	res.assertEqual(t, want)
@@ -184,7 +184,7 @@ func Test__root_cannot_be_skipped(t *testing.T) {
 	rootPath := tempDir(t)
 	root.writeTestdata(t, rootPath)
 	want := root.simulateScan(filepath.Base(rootPath))
-	logs := CollectLogs()
+	logs := CaptureLogs(t)
 	res, err := Run(rootPath, makeSkip(filepath.Base(rootPath)), nil)
 	require.NoError(t, err)
 	res.assertEqual(t, want)
@@ -235,7 +235,7 @@ func Test__symlink_root_cannot_be_skipped(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			logs := CollectLogs()
+			logs := CaptureLogs(t)
 			res, err := Run(symlinkPath, makeSkip(test.skipName), nil)
 			require.NoError(t, err)
 			res.assertEqual(t, want)
@@ -258,7 +258,7 @@ func Test__skip_dir_without_subdirs_is_logged(t *testing.T) {
 	root.writeTestdata(t, rootPath)
 	want := root.simulateScan(filepath.Base(rootPath))
 
-	logs := CollectLogs()
+	logs := CaptureLogs(t)
 	res, err := Run(rootPath, makeSkip("b"), nil)
 	require.NoError(t, err)
 	res.assertEqual(t, want)
@@ -290,7 +290,7 @@ func Test__skip_dir_with_subdirs_is_logged(t *testing.T) {
 	root.writeTestdata(t, rootPath)
 	want := root.simulateScan(filepath.Base(rootPath))
 
-	logs := CollectLogs()
+	logs := CaptureLogs(t)
 	res, err := Run(rootPath, makeSkip("e"), nil)
 	require.NoError(t, err)
 	res.assertEqual(t, want)
@@ -317,7 +317,7 @@ func Test__skip_nonempty_files_is_logged(t *testing.T) {
 	root.writeTestdata(t, rootPath)
 	want := root.simulateScan(filepath.Base(rootPath))
 
-	logs := CollectLogs()
+	logs := CaptureLogs(t)
 	res, err := Run(rootPath, makeSkip("a"), nil)
 	require.NoError(t, err)
 	res.assertEqual(t, want)
@@ -342,7 +342,7 @@ func Test__skip_empty_file_is_logged(t *testing.T) {
 	rootPath := tempDir(t)
 	root.writeTestdata(t, rootPath)
 	want := root.simulateScan(filepath.Base(rootPath))
-	logs := CollectLogs()
+	logs := CaptureLogs(t)
 	res, err := Run(rootPath, makeSkip("g"), nil)
 	require.NoError(t, err)
 	res.assertEqual(t, want)
@@ -367,7 +367,7 @@ func Test__skip_symlink_is_logged(t *testing.T) {
 	root.writeTestdata(t, rootPath)
 	symlinkPath := filepath.Join(rootPath, symlinkName)
 	want := root.simulateScan(filepath.Base(rootPath))
-	logs := CollectLogs()
+	logs := CaptureLogs(t)
 	res, err := Run(rootPath, makeSkip(symlinkName), nil)
 	require.NoError(t, err)
 	res.assertEqual(t, want)
@@ -405,7 +405,7 @@ func Test__inaccessible_internal_file_is_not_hashed_and_is_logged(t *testing.T) 
 	root.writeTestdata(t, rootPath)
 	want := root.simulateScan(filepath.Base(rootPath))
 
-	logs := CollectLogs()
+	logs := CaptureLogs(t)
 	res, err := Run(rootPath, NoSkip, nil)
 	require.NoError(t, err)
 	res.assertEqual(t, want)
@@ -432,7 +432,7 @@ func Test__inaccessible_internal_dir_is_logged(t *testing.T) {
 	root.writeTestdata(t, rootPath)
 	want := root.simulateScan(filepath.Base(rootPath))
 
-	logs := CollectLogs()
+	logs := CaptureLogs(t)
 	res, err := Run(rootPath, NoSkip, nil)
 	require.NoError(t, err)
 	res.assertEqual(t, want)
@@ -453,7 +453,7 @@ func Test__inaccessible_internal_empty_file_is_not_logged(t *testing.T) {
 	rootPath := tempDir(t)
 	root.writeTestdata(t, rootPath)
 	want := root.simulateScan(filepath.Base(rootPath))
-	logs := CollectLogs()
+	logs := CaptureLogs(t)
 	res, err := Run(rootPath, NoSkip, nil)
 	require.NoError(t, err)
 	res.assertEqual(t, want)
@@ -621,7 +621,7 @@ func Test__cache_entry_with_hash_0_is_ignored_and_logged(t *testing.T) {
 			},
 		},
 	}
-	logs := CollectLogs()
+	logs := CaptureLogs(t)
 	res, err := Run(rootPath, NoSkip, cache)
 	require.NoError(t, err)
 	res.assertEqual(t, want)
@@ -643,7 +643,7 @@ func Test__hash_computed_as_0_is_logged(t *testing.T) {
 	root.writeTestdata(t, rootPath)
 	want := root.simulateScan(filepath.Base(rootPath))
 
-	logs := CollectLogs()
+	logs := CaptureLogs(t)
 	res, err := Run(rootPath, NoSkip, nil)
 	require.NoError(t, err)
 	res.assertEqual(t, want)
@@ -677,7 +677,7 @@ func Test__root_symlink_is_followed_and_logged(t *testing.T) {
 	rootSymlinkPath := filepath.Join(rootPath, symlinkName)
 	want := symlinkedDir.simulateScan(symlinkName)
 
-	logs := CollectLogs()
+	logs := CaptureLogs(t)
 	res, err := Run(rootSymlinkPath, NoSkip, nil)
 	require.NoError(t, err)
 	res.assertEqual(t, want)
@@ -713,7 +713,7 @@ func Test__root_indirect_symlink_is_followed_and_logged(t *testing.T) {
 	rootSymlinkPath := filepath.Join(rootPath, symlinkName)
 	want := symlinkedDir.simulateScan(symlinkName)
 
-	logs := CollectLogs()
+	logs := CaptureLogs(t)
 	res, err := Run(rootSymlinkPath, NoSkip, nil)
 	require.NoError(t, err)
 	res.assertEqual(t, want)
@@ -759,7 +759,7 @@ func Test__internal_symlink_is_skipped_and_logged(t *testing.T) {
 		test.root.writeTestdata(t, rootPath)
 		want := test.root.simulateScan(filepath.Base(rootPath))
 
-		logs := CollectLogs()
+		logs := CaptureLogs(t)
 		res, err := Run(rootPath, NoSkip, nil)
 		require.NoError(t, err)
 		res.assertEqual(t, want)
@@ -798,7 +798,7 @@ func Test__root_symlink_to_ancestor_is_followed_but_skipped_and_logged_when_inte
 		},
 	}
 
-	logs := CollectLogs()
+	logs := CaptureLogs(t)
 	rootSymlinkPath := filepath.Join(rootPath, symlinkTargetName, symlinkName)
 	res, err := Run(rootSymlinkPath, NoSkip, nil)
 	require.NoError(t, err)

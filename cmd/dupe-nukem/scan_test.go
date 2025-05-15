@@ -132,7 +132,7 @@ func Test__loadCacheDir_empty_loads_nil(t *testing.T) {
 
 func Test__loadScanDirCacheFile_logs_file_before_and_after_loading(t *testing.T) {
 	f := "testdata/cache2.json.gz"
-	logs := CollectLogs()
+	logs := CaptureLogs(t)
 	_, err := loadScanDirCacheFile(f)
 	require.NoError(t, err)
 	ls := strings.Split(logs.String(), "\n")
@@ -144,7 +144,7 @@ func Test__loadScanDirCacheFile_logs_file_before_and_after_loading(t *testing.T)
 
 func Test__loadScanDirCacheFile_logs_nonexistent_file_before_loading(t *testing.T) {
 	f := "testdata/nonexistent-cache"
-	logs := CollectLogs()
+	logs := CaptureLogs(t)
 	_, err := loadScanDirCacheFile(f)
 	require.Error(t, err)
 	assert.Equal(t,
@@ -295,7 +295,7 @@ func Test__checkCache_rejects_dir_with_empty_name(t *testing.T) {
 
 func Test__checkCache_logs_warning_on_hash_0(t *testing.T) {
 	// We shouldn't reject this as it could theoretically come from a file that actually hashes to zero.
-	logs := CollectLogs()
+	logs := CaptureLogs(t)
 	err := checkCache(&scan.Dir{
 		Name:  "x",
 		Files: []*scan.File{{Name: "a", Size: 1, ModTime: 19, Hash: 0}},
@@ -340,7 +340,7 @@ func Test__scan_logs_absolute_path_of_relative_dir(t *testing.T) {
 	dir := "testdata"
 	absDir, err := filepath.Abs(dir)
 	require.NoError(t, err)
-	logs := CollectLogs()
+	logs := CaptureLogs(t)
 	_, err = Scan(dir, "", "")
 	require.NoError(t, err)
 	assert.Equal(t,
@@ -356,7 +356,7 @@ func Test__scan_logs_absolute_path_of_relative_dir(t *testing.T) {
 func Test__scan_does_not_log_absolute_dir_path(t *testing.T) {
 	absDir, err := filepath.Abs("testdata")
 	require.NoError(t, err)
-	logs := CollectLogs()
+	logs := CaptureLogs(t)
 	_, err = Scan(absDir, "", "")
 	require.NoError(t, err)
 	assert.Empty(t, logs.String())
