@@ -84,15 +84,12 @@ or point to a file `<f>` that contains a name for each non-empty line using the 
 A reference file `<file>` from a previous call to `scan` may be provided to use as
 a cache for file hashes.
 The hashes of scanned files will be looked up in this file as long as the file sizes match.
+As a sanity check, the root name (path, really) of the cache must match that of the root (with symlinks evaluated).
 If the filename ends with `.gz`, it will automatically be gzip decompressed.
 
-The root dir in the JSON output is the basename of `<dir>`.
-The commands below will have a way of mapping this root dir back to the concrete location
-in the filesystem (or URI in general).
-The reason for this behavior is that the scanning may be performed in one context (e.g. locally)
-and validation etc. in another (e.g. remotely or mounted on a different path).
-It could make sense to keep the (absolute) path of the scanned directory in the file
-while still being able to remap by need in later commands, so this might change in the future.
+The root directory "name" in the JSON output is the absolute path of `<dir>`.
+The commands below might provide some way of understanding what a path from one context (scan)
+means in others (matching, validating, etc.).
 
 The command is intended to also be able to scan archive files,
 but this feature is not yet implemented.

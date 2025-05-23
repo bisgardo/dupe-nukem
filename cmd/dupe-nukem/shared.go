@@ -23,7 +23,7 @@ func resolveReader(f *os.File) (io.Reader, error) {
 	return f, nil
 }
 
-func loadScanDirFile(path string) (*scan.Dir, error) {
+func loadScanResultFile(path string) (*scan.Result, error) {
 	// TODO: Pass in 'open' function to enable tests to return error, create fake file, disallow closing, etc.
 	f, err := os.Open(path)
 	if err != nil {
@@ -38,9 +38,13 @@ func loadScanDirFile(path string) (*scan.Dir, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot resolve file reader")
 	}
-	var res scan.Dir
-	err = json.NewDecoder(r).Decode(&res)
-	return &res, errors.Wrapf(err, "cannot decode file as JSON")
+	return decodeScanResult(r)
+}
+
+func decodeScanResult(r io.Reader) (*scan.Result, error) {
+	var res scan.Result
+	err := json.NewDecoder(r).Decode(&res)
+	return &res, util.JSONError(err)
 }
 
 func absPath(path string) (string, error) {

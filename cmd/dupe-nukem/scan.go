@@ -31,12 +31,12 @@ func init() {
 
 // Scan parses the skip expression and cache path passed from the command line
 // and then runs scan.Run with the resulting values.
-func Scan(dir, skipExpr, cachePath string) (*scan.Dir, error) {
+func Scan(dir, skipExpr, cachePath string) (*scan.Result, error) {
 	shouldSkip, err := loadShouldSkip(skipExpr)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot process skip dirs expression %q", skipExpr)
 	}
-	cacheDir, err := loadScanDirCacheFile(cachePath)
+	cache, err := loadScanCache(cachePath)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot load scan cache file %q", cachePath)
 	}
@@ -47,7 +47,7 @@ func Scan(dir, skipExpr, cachePath string) (*scan.Dir, error) {
 	if absDir != dir {
 		log.Printf("absolute path of %q resolved to %q\n", dir, absDir)
 	}
-	return scan.Run(absDir, shouldSkip, cacheDir)
+	return scan.Run(absDir, shouldSkip, cache)
 }
 
 func loadShouldSkip(expr string) (scan.ShouldSkipPath, error) {
@@ -132,38 +132,52 @@ func validateSkipName(name string) error {
 	return nil
 }
 
-func loadScanDirCacheFile(path string) (*scan.Dir, error) {
+func loadScanCache(path string) (*scan.Dir, error) {
 	if path == "" {
 		return nil, nil
 	}
 	log.Printf("loading scan cache file %q...\n", path)
 	start := time.Now()
-	scanDir, err := loadScanDirFile(path)
+	cacheRoot, err := loadScanCacheResultRoot(path)
 	if err != nil {
 		return nil, err
 	}
 	// Could just sort lists instead of (only) validating,
 	// but it appears to be a needless complication for something that should never happen.
 	// So if it does, it probably indicates a problem that's worth alarming the user about.
-	if err := checkCache(scanDir); err != nil {
-		return nil, errors.Wrap(err, "invalid contents") // caller wraps path
+	if err := checkCache(cacheRoot); err != nil {
+		return nil, errors.Wrap(err, "invalid root") // caller wraps path
 	}
 	log.Printf("scan cache loaded successfully from %q in %v\n", path, timeSince(start))
-	return scanDir, nil
+	return cacheRoot, nil
 }
 
-func checkCache(dir *scan.Dir) error {
+func loadScanCacheResultRoot(path string) (*scan.Dir, error) {
+	cacheRes, err := loadScanResultFile(path)
+	if err != nil {
+		return nil, err
+	}
+	if cacheRes.Version != scan.CurrentVersion {
+		return nil, errors.Errorf("unsupported format version: %d", cacheRes.Version)
+	}
+	return cacheRes.Root, nil
+}
+
+func checkCache(root *scan.Dir) error {
+	if root == nil {
+		return fmt.Errorf("root is empty")
+	}
 	// Require non-empty name.
-	if dir.Name == "" {
+	if root.Name == "" {
 		return fmt.Errorf("directory name is empty")
 	}
 
 	// Check subdirs.
 	var ld *scan.Dir
-	for i, d := range dir.Dirs {
+	for i, d := range root.Dirs {
 		// Require lexical order.
 		if ld != nil && ld.Name > d.Name {
-			return fmt.Errorf("list of subdirectories of %q is not sorted: %q on index %d should come before %q on index %d", dir.Name, d.Name, i, ld.Name, i-1)
+			return fmt.Errorf("list of subdirectories of %q is not sorted: %q on index %d should come before %q on index %d", root.Name, d.Name, i, ld.Name, i-1)
 		}
 		ld = d
 
@@ -174,10 +188,10 @@ func checkCache(dir *scan.Dir) error {
 	}
 	// Check non-empty files (empty files/dirs aren't used for caching).
 	var lf *scan.File
-	for i, f := range dir.Files {
+	for i, f := range root.Files {
 		// Require lexical order.
 		if lf != nil && lf.Name > f.Name {
-			return fmt.Errorf("list of non-empty files in directory %q is not sorted: %q on index %d should come before %q on index %d", dir.Name, f.Name, i, lf.Name, i-1)
+			return fmt.Errorf("list of non-empty files in directory %q is not sorted: %q on index %d should come before %q on index %d", root.Name, f.Name, i, lf.Name, i-1)
 		}
 		lf = f
 
