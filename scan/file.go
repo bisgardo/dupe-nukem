@@ -23,11 +23,7 @@ func NewDir(name string) *Dir {
 	if name == "" {
 		panic("directory name cannot be empty")
 	}
-	return &Dir{
-		Name:  name,
-		Dirs:  nil,
-		Files: nil,
-	}
+	return &Dir{Name: name}
 }
 
 // appendDir appends a Dir to the list of subdirectories.

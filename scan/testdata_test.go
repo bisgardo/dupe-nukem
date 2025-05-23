@@ -213,6 +213,13 @@ var (
 	_ node = symlinkExt{}
 )
 
+func simulateScan(d dir, rootPath string) *Result {
+	return &Result{
+		Version: CurrentVersion,
+		Root:    d.simulateScan(rootPath),
+	}
+}
+
 func Test__node(t *testing.T) {
 	ts, err := time.Parse(time.Layout, time.Layout)
 	require.NoError(t, err)
@@ -487,4 +494,13 @@ func (f *File) assertEqual(t *testing.T, want *File) {
 		assert.Equal(t, want.ModTime, f.ModTime)
 	}
 	assert.Equal(t, want.Hash, f.Hash)
+}
+
+func (r *Result) assertEqual(t *testing.T, want *Result) {
+	if r == nil {
+		assert.Nil(t, want)
+		return
+	}
+	assert.Equal(t, want.Version, r.Version)
+	r.Root.assertEqual(t, want.Root)
 }
