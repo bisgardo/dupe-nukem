@@ -17,7 +17,7 @@ func Hash(path string) (uint64, error) {
 	}
 	info, err := os.Stat(path)
 	if err != nil {
-		return 0, errors.Wrapf(util.SimplifyIOError(err), "cannot stat %q", path)
+		return 0, errors.Wrapf(util.IOError(err), "cannot stat %q", path)
 	}
 	if info.IsDir() {
 		return 0, errors.Errorf("cannot hash directory %q", path)

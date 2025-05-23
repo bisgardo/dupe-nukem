@@ -84,7 +84,7 @@ func parseSkipNameFile(path string) ([]string, error) {
 	// TODO: Pass 'open' function (see comment in 'loadScanDirFile').
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, errors.Wrapf(util.SimplifyIOError(err), "cannot open file")
+		return nil, errors.Wrapf(util.IOError(err), "cannot open file")
 	}
 	defer func() {
 		if err := f.Close(); err != nil {

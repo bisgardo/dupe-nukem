@@ -27,7 +27,7 @@ func loadScanResultFile(path string) (*scan.Result, error) {
 	// TODO: Pass in 'open' function to enable tests to return error, create fake file, disallow closing, etc.
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, errors.Wrap(util.SimplifyIOError(err), "cannot open file")
+		return nil, errors.Wrap(util.IOError(err), "cannot open file")
 	}
 	defer func() {
 		if err := f.Close(); err != nil {
@@ -50,7 +50,7 @@ func decodeScanResult(r io.Reader) (*scan.Result, error) {
 func absPath(path string) (string, error) {
 	a, err := filepath.Abs(path)
 	if err != nil {
-		return "", errors.Wrapf(util.SimplifyIOError(err), "cannot resolve absolute path of %q", path) // only tested on Windows ('Test__Scan_wraps_invalid_dir_error')
+		return "", errors.Wrapf(util.IOError(err), "cannot resolve absolute path of %q", path) // only tested on Windows ('Test__Scan_wraps_invalid_dir_error')
 	}
 	//if runtime.GOOS == "windows" {
 	//	return `\\?\` + a, nil // hack to enable long paths on Windows

@@ -48,7 +48,7 @@ func SkipNameSet(names map[string]struct{}) ShouldSkipPath {
 func Run(root string, shouldSkip ShouldSkipPath, cache *Dir) (*Result, error) {
 	rootPath, err := resolveRoot(root)
 	if err != nil {
-		return nil, errors.Wrapf(util.SimplifyIOError(err), "invalid root directory %q", root)
+		return nil, errors.Wrapf(util.IOError(err), "invalid root directory %q", root)
 	}
 	if cache != nil && cache.Name != rootPath {
 		// While there's no technical reason for this requirement,
@@ -127,7 +127,7 @@ func run(rootPath string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, error) {
 			//       - setting the file descriptor limit to a value lower than the number of files in a directory
 			//         (use 'syscall.Setrlimit(syscall.RLIMIT_NOFILE, &rLimit)')
 			//       These approaches should also be useful for testing other things currently deemed "cannot test".
-			return errors.Wrapf(util.SimplifyIOError(err), "cannot walk %v %q", modeName, path) // cannot test
+			return errors.Wrapf(util.IOError(err), "cannot walk %v %q", modeName, path) // cannot test
 		}
 		parentPath := filepath.Dir(path)
 		name := filepath.Base(path)
