@@ -16,11 +16,18 @@ import (
 // should be skipped when walking a file tree.
 type ShouldSkipPath func(dir, name string) bool
 
+// Result is the result of calling Run.
 type Result struct {
-	Version int  `json:"version"`
-	Root    *Dir `json:"root"`
+	// Version if the format version of the result.
+	Version int `json:"version"`
+	// Root is the scanned directory data as a recursive data structure.
+	Root *Dir `json:"root"`
 }
 
+// CurrentVersion is the format/schema version of the scan result JSON file.
+// The oldest format is version 1 to ensure that the default decode value of 0 is never valid.
+// The value is not going to be bumped before the application reaches a stable, useful state,
+// even if there are breaking changes to the format.
 const CurrentVersion = 1
 
 // NoSkip doesn't skip any files.
@@ -53,6 +60,12 @@ func Run(root string, shouldSkip ShouldSkipPath, cache *Dir) (*Result, error) {
 	if cache != nil && cache.Name != rootPath {
 		// While there's no technical reason for this requirement,
 		// it seems reasonable that differing root names would signal a mistake in most cases.
+		// For now, we keep it simple and just require the paths to match (one can always edit the file manually).
+		// In the future you could imagine this being relaxed in ways like:
+		// - Allow remapping the name.
+		// - Allow caches that only cover some subdirectory.
+		//   Could even allow multiple such files (using the one of the closest parent).
+		// - Bypass the check entirely.
 		return nil, fmt.Errorf("cache of directory %q cannot be used with root directory %q", cache.Name, rootPath)
 	}
 	res, err := run(rootPath, shouldSkip, cache)

@@ -20,12 +20,20 @@ Examples of the kinds of questions that dupe-nukem can answer are:
   Do they, in combination, contain all the files?
 
 It may also be used to investigate how files have moved around (including renaming)
-relative to a previous backup.
+relative to a previous backup (or scan).
 
 Attempts are made to present the results in the aggregated form that makes the most sense:
 If all files in some directory are present in some other,
 it just reports that the directories match - not that each individual file does.
 If they don't match exactly, it will report the differences if they're relevant.
+
+The tool is designed with the following decentralized workflow in mind:
+
+1. Run command `scan` on the directories (or archives) of interest.
+   This is the only command that's expected to run locally (but with remote file systems like SSHFS might not even have to).
+2. Match the result files of `scan` runs with command `match` to compare the scanned directories.
+   The compared directories may be different (possibly on different hosts) or one directory scanned at different times.
+3. Analyze, visualize, and act on the conclusions.
 
 ## Status
 
@@ -33,7 +41,7 @@ This project is at a very early stage:
 Only the `scan` command (of regular directories) has been implemented.
 
 The commands listed below make up an approximate subset of the envisioned interface
-to give a rough idea of what should be done.
+to give a rough idea of what remains to be done.
 
 ### Windows
 
@@ -77,19 +85,21 @@ dupe-nukem scan --dir <dir> [--skip <expr>] [--cache <file>]
 Builds structure of directory `<dir>` and dumps it, along with all sizes, modification times, and hashes (in JSON).
 
 A skip expression `<expr>` may be used to make the command skip
-certain files and directories like '.git', '.stack-work', 'vendor', 'node_modules', '.DS_Store', etc.
+certain files and directories like `.git`, `.stack-work`, `vendor`, `node_modules`, `.DS_Store`, etc.
 The skip expression may either specify these names literally as a comma-separated list
 or point to a file `<f>` that contains a name for each non-empty line using the expression `@<f>`.
 
-A reference file `<file>` from a previous call to `scan` may be provided to use as
-a cache for file hashes.
-The hashes of scanned files will be looked up in this file as long as the file sizes match.
-As a sanity check, the root name (path, really) of the cache must match that of the root (with symlinks evaluated).
-If the filename ends with `.gz`, it will automatically be gzip decompressed.
+The result file `<file>` of a previous `scan` may be provided for use as a "cache"
+for hashes of files that didn't change since that previous run:
+As long as the size and modification time of any given file being scanned matches what's in the cache file,
+then the hash is simply read from that file.
+As a sanity check, the root name (which, as mentioned below, is an absolute path) of the cache
+must match that of the root (with any symlinks evaluated).
+If the filename ends with `.gz`, then the file is automatically decompressed.
 
 The root directory "name" in the JSON output is the absolute path of `<dir>`.
-The commands below might provide some way of understanding what a path from one context (scan)
-means in others (matching, validating, etc.).
+The other commands are likely going to provide ways of understanding what a path from one context (scan)
+means in others (matching, validating, etc.) as different actions may happen on different hosts.
 
 The command is intended to also be able to scan archive files,
 but this feature is not yet implemented.
