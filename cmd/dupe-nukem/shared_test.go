@@ -13,7 +13,7 @@ import (
 
 func Test__resolveReader_rejects_invalid_compressed_scan_file(t *testing.T) {
 	path := TempFileByPattern(t,
-		"invalid-*.gz",                      // the '*' is swapped out for gibberish instead of it being appended after the '.gz'
+		"invalid-*.gz",                      // the '*' is swapped out for gibberish instead of it being appended after ".gz"
 		[]byte("totally legit compression"), // spoiler alert: it's not!
 	)
 	f, err := os.Open(path)
@@ -29,7 +29,7 @@ func Test__resolveReader_rejects_invalid_compressed_scan_file(t *testing.T) {
 func Test__loadScanDirFile_loads_scan_file(t *testing.T) {
 	f := "testdata/cache1.json"
 	want := &scan.Result{
-		Version: scan.CurrentVersion,
+		TypeVersion: scan.CurrentResultTypeVersion,
 		Root: &scan.Dir{
 			Name: "x",
 			Dirs: []*scan.Dir{
@@ -54,8 +54,8 @@ func Test__loadScanDirFile_loads_scan_file(t *testing.T) {
 func Test__loadScanDirFile_loads_compressed_scan_file(t *testing.T) {
 	f := "testdata/cache2.json.gz" // fun fact: uses CRLF when uncompressed (while cache1.json uses LF)
 	want := &scan.Result{
-		Version: scan.CurrentVersion,
-		Root:    &scan.Dir{Name: "y"},
+		TypeVersion: scan.CurrentResultTypeVersion,
+		Root:        &scan.Dir{Name: "y"},
 	}
 	res, err := loadScanResultFile(f)
 	require.NoError(t, err)
@@ -64,7 +64,7 @@ func Test__loadScanDirFile_loads_compressed_scan_file(t *testing.T) {
 
 func Test__loadScanDirFile_wraps_scan_file_error(t *testing.T) {
 	path := TempFileByPattern(t,
-		"invalid-*.gz", // the '*' is swapped out for gibberish instead of it being appended after the '.gz'
+		"invalid-*.gz", // the '*' is swapped out for gibberish instead of it being appended after ".gz"
 		nil,
 	)
 	_, err := loadScanResultFile(path)

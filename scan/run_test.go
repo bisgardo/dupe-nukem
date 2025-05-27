@@ -23,8 +23,8 @@ func Test__empty_dir(t *testing.T) {
 	rootDir := tempDir(t)
 
 	want := &Result{
-		Version: CurrentVersion,
-		Root:    &Dir{Name: rootDir},
+		TypeVersion: CurrentResultTypeVersion,
+		Root:        &Dir{Name: rootDir},
 	}
 
 	tests := []struct {
@@ -101,8 +101,8 @@ func Test__inaccessible_root_is_skipped_and_logged(t *testing.T) {
 	rootPath := tempDir(t)
 	MakeInaccessibleT(t, rootPath)
 	want := &Result{
-		Version: CurrentVersion,
-		Root:    &Dir{Name: rootPath},
+		TypeVersion: CurrentResultTypeVersion,
+		Root:        &Dir{Name: rootPath},
 	}
 	logs := CaptureLogs(t)
 	res, err := Run(rootPath, NoSkip, nil)
@@ -480,8 +480,8 @@ func Test__cache_root_name_check(t *testing.T) {
 		res, err := Run(rootPath, NoSkip, cache)
 		require.NoError(t, err)
 		assert.Equal(t, &Result{
-			Version: CurrentVersion,
-			Root:    &Dir{Name: rootPath},
+			TypeVersion: CurrentResultTypeVersion,
+			Root:        &Dir{Name: rootPath},
 		}, res)
 	})
 	t.Run("cache name matches after resolving root symlink", func(t *testing.T) {
@@ -500,8 +500,8 @@ func Test__cache_root_name_check(t *testing.T) {
 		res, err := Run(rootSymlinkPath, NoSkip, cache)
 		require.NoError(t, err)
 		assert.Equal(t, &Result{
-			Version: CurrentVersion,
-			Root:    &Dir{Name: rootPath}, //
+			TypeVersion: CurrentResultTypeVersion,
+			Root:        &Dir{Name: rootPath}, //
 		}, res)
 	})
 	t.Run("cache name symlink is not followed", func(t *testing.T) {
@@ -846,7 +846,7 @@ func Test__root_symlink_to_ancestor_is_followed_but_skipped_and_logged_when_inte
 	rootPath := tempDir(t)
 	root.writeTestdata(t, rootPath)
 	want := &Result{
-		Version: CurrentVersion,
+		TypeVersion: CurrentResultTypeVersion,
 		Root: &Dir{
 			Name: rootPath,
 			Dirs: []*Dir{

@@ -215,8 +215,8 @@ var (
 
 func simulateScan(d dir, rootPath string) *Result {
 	return &Result{
-		Version: CurrentVersion,
-		Root:    d.simulateScan(rootPath),
+		TypeVersion: CurrentResultTypeVersion,
+		Root:        d.simulateScan(rootPath),
 	}
 }
 
@@ -501,6 +501,6 @@ func (r *Result) assertEqual(t *testing.T, want *Result) {
 		assert.Nil(t, want)
 		return
 	}
-	assert.Equal(t, want.Version, r.Version)
+	assert.Equal(t, want.TypeVersion, r.TypeVersion)
 	r.Root.assertEqual(t, want.Root)
 }

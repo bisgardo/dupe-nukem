@@ -157,8 +157,8 @@ func loadScanCacheResultRoot(path string) (*scan.Dir, error) {
 	if err != nil {
 		return nil, err
 	}
-	if cacheRes.Version != scan.CurrentVersion {
-		return nil, errors.Errorf("unsupported format version: %d", cacheRes.Version)
+	if cacheRes.TypeVersion != scan.CurrentResultTypeVersion {
+		return nil, errors.Errorf("unsupported format version: %d", cacheRes.TypeVersion)
 	}
 	return cacheRes.Root, nil
 }

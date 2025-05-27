@@ -18,17 +18,21 @@ type ShouldSkipPath func(dir, name string) bool
 
 // Result is the result of calling Run.
 type Result struct {
-	// Version if the format version of the result.
-	Version int `json:"version"`
+	// TypeVersion is the "version" of the [Result] type.
+	// It's used to compare decoded values of external representations against [CurrentResultTypeVersion]
+	// (which is the value that it's always encoded with).
+	// In the context of JSON, the type implicitly defines the schema of the result,
+	// so in that context the name is "schema_version".
+	TypeVersion int `json:"schema_version"`
 	// Root is the scanned directory data as a recursive data structure.
 	Root *Dir `json:"root"`
 }
 
-// CurrentVersion is the format/schema version of the scan result JSON file.
-// The oldest format is version 1 to ensure that the default decode value of 0 is never valid.
+// CurrentResultTypeVersion is the currently expected value of [Result.TypeVersion].
+// The initial (and current) version is 1 to ensure that the default decode value of 0 can be assumed to mean that the field is missing.
 // The value is not going to be bumped before the application reaches a stable, useful state,
-// even if there are breaking changes to the format.
-const CurrentVersion = 1
+// even if there are breaking changes to the format before then.
+const CurrentResultTypeVersion = 1
 
 // NoSkip doesn't skip any files.
 func NoSkip(string, string) bool {
@@ -70,8 +74,8 @@ func Run(root string, shouldSkip ShouldSkipPath, cache *Dir) (*Result, error) {
 	}
 	res, err := run(rootPath, shouldSkip, cache)
 	return &Result{
-		Version: CurrentVersion,
-		Root:    res,
+		TypeVersion: CurrentResultTypeVersion,
+		Root:        res,
 	}, errors.Wrapf(err, "cannot scan root directory %q", rootPath) // cannot test
 }
 

@@ -179,58 +179,58 @@ func Test__loadScanCacheFile_error(t *testing.T) {
 		}, {
 			name: "unsupported version",
 			contents: obj{
-				"version": scan.CurrentVersion + 1,
-				"root":    &scan.Dir{Name: "xyz"},
+				"schema_version": scan.CurrentResultTypeVersion + 1,
+				"root":           &scan.Dir{Name: "xyz"},
 			},
-			wantErr: fmt.Sprintf("unsupported format version: %d", scan.CurrentVersion+1),
+			wantErr: fmt.Sprintf("unsupported format version: %d", scan.CurrentResultTypeVersion+1),
 		}, {
 			name: "wrong version type",
 			contents: obj{
-				"version": "xyz",
-				"root":    &scan.Dir{Name: "xyz"},
+				"schema_version": "xyz",
+				"root":           &scan.Dir{Name: "xyz"},
 			},
-			wantErr: `cannot decode value of type "string" into field "version" of type "int"`,
+			wantErr: `cannot decode field "schema_version" of type "int" with value of type "string"`,
 		}, {
 			name: "no root",
 			contents: obj{
-				"version": scan.CurrentVersion,
+				"schema_version": scan.CurrentResultTypeVersion,
 			},
 			wantErr: `invalid root: root is empty`,
 		}, {
 			name: "null root",
 			contents: obj{
-				"version": scan.CurrentVersion,
-				"root":    nil,
+				"schema_version": scan.CurrentResultTypeVersion,
+				"root":           nil,
 			},
 			wantErr: `invalid root: root is empty`,
 		}, {
 			name: "wrong root type",
 			contents: obj{
-				"version": scan.CurrentVersion,
-				"root":    "xyz",
+				"schema_version": scan.CurrentResultTypeVersion,
+				"root":           "xyz",
 			},
-			wantErr: `cannot decode value of type "string" into field "root" of type "scan.Dir"`,
+			wantErr: `cannot decode field "root" of type "scan.Dir" with value of type "string"`,
 		}, {
 			name: "no root name",
 			contents: obj{
-				"version": scan.CurrentVersion,
-				"root":    obj{},
+				"schema_version": scan.CurrentResultTypeVersion,
+				"root":           obj{},
 			},
 			wantErr: `invalid root: directory name is empty`,
 		}, {
 			name: "empty root name",
 			contents: obj{
-				"version": scan.CurrentVersion,
-				"root":    obj{"name": ""},
+				"schema_version": scan.CurrentResultTypeVersion,
+				"root":           obj{"name": ""},
 			},
 			wantErr: `invalid root: directory name is empty`,
 		}, {
 			name: "wrong root name type",
 			contents: obj{
-				"version": scan.CurrentVersion,
-				"root":    obj{"name": 123},
+				"schema_version": scan.CurrentResultTypeVersion,
+				"root":           obj{"name": 123},
 			},
-			wantErr: `cannot decode value of type "number" into field "root.name" of type "string"`,
+			wantErr: `cannot decode field "root.name" of type "string" with value of type "number"`,
 		},
 	}
 	for _, test := range tests {
@@ -246,8 +246,8 @@ func Test__loadScanCacheFile_error(t *testing.T) {
 
 func Test__loadScanDirCacheFile_wraps_invalid_cache_error(t *testing.T) {
 	bs, err := json.Marshal(scan.Result{
-		Version: scan.CurrentVersion,
-		Root:    &scan.Dir{Name: ""},
+		TypeVersion: scan.CurrentResultTypeVersion,
+		Root:        &scan.Dir{Name: ""},
 	})
 	require.NoError(t, err)
 	path := TempStringFile(t, string(bs))
@@ -402,13 +402,13 @@ func Test__scan_testdata(t *testing.T) {
 	require.NoError(t, err)
 
 	want := &scan.Result{
-		Version: scan.CurrentVersion,
+		TypeVersion: scan.CurrentResultTypeVersion,
 		Root: &scan.Dir{
 			Name: absRootPath,
 			Files: []*scan.File{
 				{Name: ".gitattributes", Size: 8, ModTime: ModTime(t, "./testdata/.gitattributes"), Hash: 14181289122033052373},
-				{Name: "cache1.json", Size: 290, ModTime: ModTime(t, "./testdata/cache1.json"), Hash: 4269706996546821754},
-				{Name: "cache2.json.gz", Size: 73, ModTime: ModTime(t, "./testdata/cache2.json.gz"), Hash: 11995247557126867681},
+				{Name: "cache1.json", Size: 297, ModTime: ModTime(t, "./testdata/cache1.json"), Hash: 4470884388509523918},
+				{Name: "cache2.json.gz", Size: 80, ModTime: ModTime(t, "./testdata/cache2.json.gz"), Hash: 921101782703557466},
 				{Name: "skipnames", Size: 7, ModTime: ModTime(t, "./testdata/skipnames"), Hash: 10951817445047336725},
 				{Name: "skipnames_crlf", Size: 11, ModTime: ModTime(t, "./testdata/skipnames_crlf"), Hash: 15953509558814875971},
 			},
@@ -474,13 +474,13 @@ func Test__scan_testdata_uses_provided_cache(t *testing.T) {
 	require.NoError(t, err)
 
 	want := &scan.Result{
-		Version: scan.CurrentVersion,
+		TypeVersion: scan.CurrentResultTypeVersion,
 		Root: &scan.Dir{
 			Name: rootPath,
 			Files: []*scan.File{
 				{Name: ".gitattributes", Size: 8, ModTime: modTime_gitattributes, Hash: 14181289122033052373},   // not present in cache
-				{Name: "cache1.json", Size: 290, ModTime: modTime_cache1, Hash: 69},                             // wrong hash loaded from cache
-				{Name: "cache2.json.gz", Size: 73, ModTime: modTime_cache2, Hash: 11995247557126867681},         // computed as cache didn't match
+				{Name: "cache1.json", Size: 297, ModTime: modTime_cache1, Hash: 69},                             // wrong hash loaded from cache
+				{Name: "cache2.json.gz", Size: 80, ModTime: modTime_cache2, Hash: 921101782703557466},           // computed as cache didn't match
 				{Name: "skipnames", Size: 7, ModTime: modTime_skipnames, Hash: 10951817445047336725},            // computed as cache didn't match
 				{Name: "skipnames_crlf", Size: 11, ModTime: modTime_skipnames_crlf, Hash: 15953509558814875971}, // computed as cache didn't match (not actually present)
 			},
@@ -489,12 +489,12 @@ func Test__scan_testdata_uses_provided_cache(t *testing.T) {
 
 	// Setup cache and write it to tmp file.
 	cache := &scan.Result{
-		Version: scan.CurrentVersion,
+		TypeVersion: scan.CurrentResultTypeVersion,
 		Root: &scan.Dir{
 			Name: rootPath,
 			Files: []*scan.File{
 				// .gitattributes                                                              // not present
-				{Name: "cache1.json", Size: 290, ModTime: modTime_cache1, Hash: 69},           // correct size and mod time
+				{Name: "cache1.json", Size: 297, ModTime: modTime_cache1, Hash: 69},           // correct size and mod time
 				{Name: "cache2.json.gz", Size: 666, ModTime: modTime_cache2, Hash: 69},        // incorrect size
 				{Name: "skipnames", Size: 7, ModTime: 23, Hash: 69},                           // incorrect mod time
 				{Name: "skipnames_clrs", Size: 11, ModTime: modTime_skipnames_crlf, Hash: 69}, // incorrect name

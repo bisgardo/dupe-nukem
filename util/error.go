@@ -32,10 +32,10 @@ func JSONError(err error) error {
 	var jsonErr *json.UnmarshalTypeError
 	if errors.As(err, &jsonErr) {
 		return errors.Errorf(
-			"cannot decode value of type %q into field %q of type %q",
-			jsonErr.Value,
+			"cannot decode field %q of type %q with value of type %q",
 			jsonErr.Field,
 			jsonErr.Type,
+			jsonErr.Value,
 		)
 	}
 	return errors.Wrap(err, "invalid JSON")
