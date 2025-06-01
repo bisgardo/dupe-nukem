@@ -16,19 +16,21 @@ import (
 // should be skipped when walking a file tree.
 type ShouldSkipPath func(dir, name string) bool
 
-// Result is the result of calling Run.
+// Result is the result of calling [Run].
 type Result struct {
-	// TypeVersion is the "version" of the [Result] type.
-	// It's used to compare decoded values of external representations against [CurrentResultTypeVersion]
-	// (which is the value that it's always encoded with).
-	// In the context of JSON, the type implicitly defines the schema of the result,
-	// so in that context the name is "schema_version".
+	// TypeVersion is used to determine compatibility of a [Result] value
+	// that was deserialized from some external representation.
+	// New values are always initialized as [CurrentResultTypeVersion].
+	// In the context of JSON, the field is named "schema_version",
+	// as the type implicitly defines the schema of the result,
 	TypeVersion int `json:"schema_version"`
 	// Root is the scanned directory data as a recursive data structure.
 	Root *Dir `json:"root"`
 }
 
 // CurrentResultTypeVersion is the currently expected value of [Result.TypeVersion].
+// It identifies the exact semantics of serialized values of [Result] (and thus also [Dir] and [File]).
+// Any given build of dupe-nukem can decode any [Result] whose version matches its own value of this constant.
 // The initial (and current) version is 1 to ensure that the default decode value of 0 can be assumed to mean that the field is missing.
 // The value is not going to be bumped before the application reaches a stable, useful state,
 // even if there are breaking changes to the format before then.

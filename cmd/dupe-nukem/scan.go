@@ -157,8 +157,12 @@ func loadScanCacheResultRoot(path string) (*scan.Dir, error) {
 	if err != nil {
 		return nil, err
 	}
+	// TODO: Allow force-skipping version check?
+	if cacheRes.TypeVersion == 0 {
+		return nil, errors.Errorf("schema version is missing")
+	}
 	if cacheRes.TypeVersion != scan.CurrentResultTypeVersion {
-		return nil, errors.Errorf("unsupported format version: %d", cacheRes.TypeVersion)
+		return nil, errors.Errorf("unsupported schema version: %d", cacheRes.TypeVersion)
 	}
 	return cacheRes.Root, nil
 }

@@ -175,14 +175,14 @@ func Test__loadScanCacheFile_error(t *testing.T) {
 			contents: obj{
 				"root": scan.Dir{Name: "xyz"},
 			},
-			wantErr: `unsupported format version: 0`,
+			wantErr: `schema version is missing`,
 		}, {
 			name: "unsupported version",
 			contents: obj{
 				"schema_version": scan.CurrentResultTypeVersion + 1,
 				"root":           &scan.Dir{Name: "xyz"},
 			},
-			wantErr: fmt.Sprintf("unsupported format version: %d", scan.CurrentResultTypeVersion+1),
+			wantErr: fmt.Sprintf("unsupported schema version: %d", scan.CurrentResultTypeVersion+1),
 		}, {
 			name: "wrong version type",
 			contents: obj{

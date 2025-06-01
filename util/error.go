@@ -28,6 +28,7 @@ func IOError(err error) error {
 	return err
 }
 
+// JSONError rewrites JSON decoding errors into more concise, platform-independent ones.
 func JSONError(err error) error {
 	var jsonErr *json.UnmarshalTypeError
 	if errors.As(err, &jsonErr) {
