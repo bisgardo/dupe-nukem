@@ -125,7 +125,7 @@ func Test__Scan_wraps_parse_error_of_skip_names(t *testing.T) {
 }
 
 func Test__loadCacheDir_empty_loads_nil(t *testing.T) {
-	res, err := loadScanDirCacheFile("")
+	res, err := loadScanCache("")
 	require.NoError(t, err)
 	assert.Nil(t, res)
 }
@@ -133,7 +133,7 @@ func Test__loadCacheDir_empty_loads_nil(t *testing.T) {
 func Test__loadScanDirCacheFile_logs_file_before_and_after_loading(t *testing.T) {
 	f := "testdata/cache2.json.gz"
 	logs := CaptureLogs(t)
-	_, err := loadScanDirCacheFile(f)
+	_, err := loadScanCache(f)
 	require.NoError(t, err)
 	ls := strings.Split(logs.String(), "\n")
 	assert.Len(t, ls, 3)
@@ -145,8 +145,8 @@ func Test__loadScanDirCacheFile_logs_file_before_and_after_loading(t *testing.T)
 func Test__loadScanDirCacheFile_logs_nonexistent_file_before_loading(t *testing.T) {
 	f := "testdata/nonexistent-cache"
 	logs := CaptureLogs(t)
-	_, err := loadScanDirCacheFile(f)
-	require.Error(t, err)
+	_, err := loadScanCache(f)
+	assert.EqualError(t, err, "cannot open file: not found")
 	assert.Equal(t,
 		fmt.Sprintf(
 			Lines("loading scan cache file %q..."),
@@ -156,10 +156,103 @@ func Test__loadScanDirCacheFile_logs_nonexistent_file_before_loading(t *testing.
 	)
 }
 
+func Test__loadScanDirResultFile_empty(t *testing.T) {
+	path := TempStringFile(t, "")
+	_, err := loadScanCache(path)
+	assert.EqualError(t, err, `invalid JSON: EOF`)
+}
+
+func Test__loadScanCacheFile_error(t *testing.T) {
+	type obj map[string]interface{}
+
+	tests := []struct {
+		name     string
+		contents obj
+		wantErr  string
+	}{
+		{
+			name: "no version",
+			contents: obj{
+				"root": scan.Dir{Name: "xyz"},
+			},
+			wantErr: `schema version is missing`,
+		}, {
+			name: "unsupported version",
+			contents: obj{
+				"schema_version": scan.CurrentResultTypeVersion + 1,
+				"root":           &scan.Dir{Name: "xyz"},
+			},
+			wantErr: fmt.Sprintf("unsupported schema version: %d", scan.CurrentResultTypeVersion+1),
+		}, {
+			name: "wrong version type",
+			contents: obj{
+				"schema_version": "xyz",
+				"root":           &scan.Dir{Name: "xyz"},
+			},
+			wantErr: `cannot decode field "schema_version" of type "int" with value of type "string"`,
+		}, {
+			name: "no root",
+			contents: obj{
+				"schema_version": scan.CurrentResultTypeVersion,
+			},
+			wantErr: `invalid root: root is empty`,
+		}, {
+			name: "null root",
+			contents: obj{
+				"schema_version": scan.CurrentResultTypeVersion,
+				"root":           nil,
+			},
+			wantErr: `invalid root: root is empty`,
+		}, {
+			name: "wrong root type",
+			contents: obj{
+				"schema_version": scan.CurrentResultTypeVersion,
+				"root":           "xyz",
+			},
+			wantErr: `cannot decode field "root" of type "scan.Dir" with value of type "string"`,
+		}, {
+			name: "no root name",
+			contents: obj{
+				"schema_version": scan.CurrentResultTypeVersion,
+				"root":           obj{},
+			},
+			wantErr: `invalid root: directory name is empty`,
+		}, {
+			name: "empty root name",
+			contents: obj{
+				"schema_version": scan.CurrentResultTypeVersion,
+				"root":           obj{"name": ""},
+			},
+			wantErr: `invalid root: directory name is empty`,
+		}, {
+			name: "wrong root name type",
+			contents: obj{
+				"schema_version": scan.CurrentResultTypeVersion,
+				"root":           obj{"name": 123},
+			},
+			wantErr: `cannot decode field "root.name" of type "string" with value of type "number"`,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			bs, err := json.Marshal(test.contents)
+			require.NoError(t, err)
+			path := TempStringFile(t, string(bs))
+			_, err = loadScanCache(path)
+			assert.EqualError(t, err, test.wantErr)
+		})
+	}
+}
+
 func Test__loadScanDirCacheFile_wraps_invalid_cache_error(t *testing.T) {
-	path := TempStringFile(t, `{"name":""}`)
-	_, err := loadScanDirCacheFile(path)
-	assert.EqualError(t, err, `invalid contents: directory name is empty`)
+	bs, err := json.Marshal(scan.Result{
+		TypeVersion: scan.CurrentResultTypeVersion,
+		Root:        &scan.Dir{Name: ""},
+	})
+	require.NoError(t, err)
+	path := TempStringFile(t, string(bs))
+	_, err = loadScanCache(path)
+	assert.EqualError(t, err, `invalid root: directory name is empty`)
 }
 
 func Test__Scan_wraps_invalid_dir_error(t *testing.T) {
@@ -190,7 +283,7 @@ func Test__Scan_wraps_cache_file_not_accessible_error(t *testing.T) {
 func Test__Scan_wraps_cache_load_error(t *testing.T) {
 	path := TempStringFile(t, "{")
 	_, err := Scan("x", "", path)
-	assert.EqualError(t, err, fmt.Sprintf("cannot load scan cache file %q: cannot decode file as JSON: unexpected EOF", path))
+	assert.EqualError(t, err, fmt.Sprintf("cannot load scan cache file %q: invalid JSON: unexpected EOF", path))
 }
 
 func Test__checkCache_rejects_unsorted_lists_for_nonempty_items(t *testing.T) {
@@ -305,14 +398,20 @@ func Test__checkCache_logs_warning_on_hash_0(t *testing.T) {
 }
 
 func Test__scan_testdata(t *testing.T) {
-	want := &scan.Dir{
-		Name: "testdata",
-		Files: []*scan.File{
-			{Name: ".gitattributes", Size: 8, ModTime: ModTime(t, "./testdata/.gitattributes"), Hash: 14181289122033052373},
-			{Name: "cache1.json", Size: 232, ModTime: ModTime(t, "./testdata/cache1.json"), Hash: 17698409774061682325},
-			{Name: "cache2.json.gz", Size: 47, ModTime: ModTime(t, "./testdata/cache2.json.gz"), Hash: 9363661890766539952},
-			{Name: "skipnames", Size: 7, ModTime: ModTime(t, "./testdata/skipnames"), Hash: 10951817445047336725},
-			{Name: "skipnames_crlf", Size: 11, ModTime: ModTime(t, "./testdata/skipnames_crlf"), Hash: 15953509558814875971},
+	absRootPath, err := filepath.Abs("testdata")
+	require.NoError(t, err)
+
+	want := &scan.Result{
+		TypeVersion: scan.CurrentResultTypeVersion,
+		Root: &scan.Dir{
+			Name: absRootPath,
+			Files: []*scan.File{
+				{Name: ".gitattributes", Size: 8, ModTime: ModTime(t, "./testdata/.gitattributes"), Hash: 14181289122033052373},
+				{Name: "cache1.json", Size: 297, ModTime: ModTime(t, "./testdata/cache1.json"), Hash: 4470884388509523918},
+				{Name: "cache2.json.gz", Size: 80, ModTime: ModTime(t, "./testdata/cache2.json.gz"), Hash: 921101782703557466},
+				{Name: "skipnames", Size: 7, ModTime: ModTime(t, "./testdata/skipnames"), Hash: 10951817445047336725},
+				{Name: "skipnames_crlf", Size: 11, ModTime: ModTime(t, "./testdata/skipnames_crlf"), Hash: 15953509558814875971},
+			},
 		},
 	}
 
@@ -322,10 +421,11 @@ func Test__scan_testdata(t *testing.T) {
 		"./testdata":  {},
 		"./testdata/": {},
 	}
-	// Include OS-specific path separation
+	// Include OS-specific path separation.
 	for root := range roots {
 		// It's fine to modify the map while iterating it (https://go.dev/ref/spec#For_range):
-		// added entries may or may not get visited by the loop but that doesn't matter.
+		// added entries may or may not get visited by the loop but that doesn't matter
+		// as they'll just re-add themselves.
 		roots[filepath.FromSlash(root)] = struct{}{}
 	}
 
@@ -370,26 +470,35 @@ func Test__scan_testdata_uses_provided_cache(t *testing.T) {
 	modTime_skipnames := ModTime(t, "./testdata/skipnames")
 	modTime_skipnames_crlf := ModTime(t, "./testdata/skipnames_crlf")
 
-	want := &scan.Dir{
-		Name: "testdata",
-		Files: []*scan.File{
-			{Name: ".gitattributes", Size: 8, ModTime: modTime_gitattributes, Hash: 14181289122033052373},   // not present in cache
-			{Name: "cache1.json", Size: 232, ModTime: modTime_cache1, Hash: 69},                             // wrong hash loaded from cache
-			{Name: "cache2.json.gz", Size: 47, ModTime: modTime_cache2, Hash: 9363661890766539952},          // computed as cache didn't match
-			{Name: "skipnames", Size: 7, ModTime: modTime_skipnames, Hash: 10951817445047336725},            // computed as cache didn't match
-			{Name: "skipnames_crlf", Size: 11, ModTime: modTime_skipnames_crlf, Hash: 15953509558814875971}, // computed as cache didn't match (not actually present)
+	rootPath, err := filepath.Abs("./testdata")
+	require.NoError(t, err)
+
+	want := &scan.Result{
+		TypeVersion: scan.CurrentResultTypeVersion,
+		Root: &scan.Dir{
+			Name: rootPath,
+			Files: []*scan.File{
+				{Name: ".gitattributes", Size: 8, ModTime: modTime_gitattributes, Hash: 14181289122033052373},   // not present in cache
+				{Name: "cache1.json", Size: 297, ModTime: modTime_cache1, Hash: 69},                             // wrong hash loaded from cache
+				{Name: "cache2.json.gz", Size: 80, ModTime: modTime_cache2, Hash: 921101782703557466},           // computed as cache didn't match
+				{Name: "skipnames", Size: 7, ModTime: modTime_skipnames, Hash: 10951817445047336725},            // computed as cache didn't match
+				{Name: "skipnames_crlf", Size: 11, ModTime: modTime_skipnames_crlf, Hash: 15953509558814875971}, // computed as cache didn't match (not actually present)
+			},
 		},
 	}
 
 	// Setup cache and write it to tmp file.
-	cache := &scan.Dir{
-		Name: "testdata",
-		Files: []*scan.File{
-			// .gitattributes                                                              // not present
-			{Name: "cache1.json", Size: 232, ModTime: modTime_cache1, Hash: 69},           // correct size and mod time
-			{Name: "cache2.json.gz", Size: 69, ModTime: modTime_cache2, Hash: 69},         // incorrect size
-			{Name: "skipnames", Size: 7, ModTime: 23, Hash: 69},                           // incorrect mod time
-			{Name: "skipnames_clrs", Size: 11, ModTime: modTime_skipnames_crlf, Hash: 69}, // incorrect name
+	cache := &scan.Result{
+		TypeVersion: scan.CurrentResultTypeVersion,
+		Root: &scan.Dir{
+			Name: rootPath,
+			Files: []*scan.File{
+				// .gitattributes                                                              // not present
+				{Name: "cache1.json", Size: 297, ModTime: modTime_cache1, Hash: 69},           // correct size and mod time
+				{Name: "cache2.json.gz", Size: 666, ModTime: modTime_cache2, Hash: 69},        // incorrect size
+				{Name: "skipnames", Size: 7, ModTime: 23, Hash: 69},                           // incorrect mod time
+				{Name: "skipnames_clrs", Size: 11, ModTime: modTime_skipnames_crlf, Hash: 69}, // incorrect name
+			},
 		},
 	}
 	for _, compressCache := range []bool{false, true} {
@@ -398,7 +507,7 @@ func Test__scan_testdata_uses_provided_cache(t *testing.T) {
 			require.NoError(t, err)
 			var pattern string
 			if compressCache {
-				pattern = "*.gz" // remove once 'resolveReader' uses magic number instead of extension
+				pattern = "*.gz" // remove once 'resolveReader' uses magic number instead of relying on extension
 				var buf bytes.Buffer
 				w := gzip.NewWriter(&buf)
 				_, err := w.Write(cacheBytes)
@@ -408,7 +517,7 @@ func Test__scan_testdata_uses_provided_cache(t *testing.T) {
 				cacheBytes = buf.Bytes()
 			}
 			cachePath := TempFileByPattern(t, pattern, cacheBytes)
-			res, err := Scan("testdata", "", cachePath)
+			res, err := Scan(rootPath, "", cachePath)
 			require.NoError(t, err)
 			assert.Equal(t, want, res)
 		})

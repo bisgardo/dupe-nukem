@@ -16,6 +16,26 @@ import (
 // should be skipped when walking a file tree.
 type ShouldSkipPath func(dir, name string) bool
 
+// Result is the result of calling [Run].
+type Result struct {
+	// TypeVersion is used to determine compatibility of a [Result] value
+	// that was deserialized from some external representation.
+	// New values are always initialized as [CurrentResultTypeVersion].
+	// In the context of JSON, the field is named "schema_version",
+	// as the type implicitly defines the schema of the result,
+	TypeVersion int `json:"schema_version"`
+	// Root is the scanned directory data as a recursive data structure.
+	Root *Dir `json:"root"`
+}
+
+// CurrentResultTypeVersion is the currently expected value of [Result.TypeVersion].
+// It identifies the exact semantics of serialized values of [Result] (and thus also [Dir] and [File]).
+// Any given build of dupe-nukem can decode any [Result] whose version matches its own value of this constant.
+// The initial (and current) version is 1 to ensure that the default decode value of 0 can be assumed to mean that the field is missing.
+// The value is not going to be bumped before the application reaches a stable, useful state,
+// even if there are breaking changes to the format before then.
+const CurrentResultTypeVersion = 1
+
 // NoSkip doesn't skip any files.
 func NoSkip(string, string) bool {
 	return false
@@ -36,21 +56,29 @@ func SkipNameSet(names map[string]struct{}) ShouldSkipPath {
 // If the root is a symlink, then this link is traversed recursively.
 // The root name of the scan result keeps the name of the original symlink.
 // The following sanity checks are performed:
-// - The root directory must not be skipped.
-// - If a cache is provided, its root must have the same name as the provided root.
+// - If a cache is provided, its root must have the same name as the provided root (after following any symlinks).
 // - The root is an existing directory.
-func Run(root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, error) {
-	rootName := filepath.Base(root)
-	if cache != nil && cache.Name != rootName {
+func Run(root string, shouldSkip ShouldSkipPath, cache *Dir) (*Result, error) {
+	rootPath, err := resolveRoot(root)
+	if err != nil {
+		return nil, errors.Wrapf(util.IOError(err), "invalid root directory %q", root)
+	}
+	if cache != nil && cache.Name != rootPath {
 		// While there's no technical reason for this requirement,
 		// it seems reasonable that differing root names would signal a mistake in most cases.
-		return nil, fmt.Errorf("cache of directory %q cannot be used with root directory %q", cache.Name, rootName)
+		// For now, we keep it simple and just require the paths to match (one can always edit the file manually).
+		// In the future you could imagine this being relaxed in ways like:
+		// - Allow remapping the name.
+		// - Allow caches that only cover some subdirectory.
+		//   Could even allow multiple such files (using the one of the closest parent).
+		// - Bypass the check entirely.
+		return nil, fmt.Errorf("cache of directory %q cannot be used with root directory %q", cache.Name, rootPath)
 	}
-	r, err := resolveRoot(root)
-	if err != nil {
-		return nil, errors.Wrapf(util.SimplifyIOError(err), "invalid root directory %q", root)
-	}
-	return run(rootName, r, shouldSkip, cache)
+	res, err := run(rootPath, shouldSkip, cache)
+	return &Result{
+		TypeVersion: CurrentResultTypeVersion,
+		Root:        res,
+	}, errors.Wrapf(err, "cannot scan root directory %q", rootPath) // cannot test
 }
 
 func resolveRoot(path string) (string, error) {
@@ -62,7 +90,10 @@ func resolveRoot(path string) (string, error) {
 	if p != filepath.Clean(path) {
 		log.Printf("following root symlink %q to %q\n", path, p)
 	}
-	return p, validateRoot(p)
+	if err := validateRoot(p); err != nil {
+		return "", err
+	}
+	return filepath.Abs(p)
 }
 
 func validateRoot(path string) error {
@@ -77,10 +108,10 @@ func validateRoot(path string) error {
 }
 
 // run runs the "scan" command without any sanity checks.
-// In particular, the directory must not have a trailing slash as that will cause the file walk to panic.
-func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, error) {
-	if shouldSkip(filepath.Dir(root), filepath.Base(root)) {
-		log.Printf("not skipping root directory %q", root)
+// In particular, the root path must not have a trailing slash as that would cause the file walk to panic.
+func run(rootPath string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, error) {
+	if shouldSkip(filepath.Dir(rootPath), filepath.Base(rootPath)) {
+		log.Printf("not skipping root directory %q", rootPath)
 	}
 
 	type walkContext struct {
@@ -90,17 +121,16 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 		cacheDir *Dir
 	}
 
-	rootDir := NewDir(rootName)
+	res := NewDir(rootPath)
 	head := &walkContext{
 		prev:     nil,
-		curDir:   rootDir,
-		pathLen:  len(root),
+		curDir:   res,
+		pathLen:  len(rootPath),
 		cacheDir: cache,
 	}
-
-	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+	return res, filepath.Walk(rootPath, func(path string, info os.FileInfo, err error) error {
 		// Propagate error and skip root.
-		if err != nil || path == root {
+		if err != nil || path == rootPath {
 			modeName := util.FileInfoModeName(info)
 			switch {
 			case os.IsPermission(err):
@@ -116,7 +146,7 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 			//       - setting the file descriptor limit to a value lower than the number of files in a directory
 			//         (use 'syscall.Setrlimit(syscall.RLIMIT_NOFILE, &rLimit)')
 			//       These approaches should also be useful for testing other things currently deemed "cannot test".
-			return errors.Wrapf(util.SimplifyIOError(err), "cannot walk %v %q", modeName, path) // cannot test
+			return errors.Wrapf(util.IOError(err), "cannot walk %v %q", modeName, path) // cannot test
 		}
 		parentPath := filepath.Dir(path)
 		name := filepath.Base(path)
@@ -181,7 +211,6 @@ func run(rootName, root string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, er
 		}
 		return nil
 	})
-	return rootDir, errors.Wrapf(err, "cannot scan root directory %q", root) // cannot test
 }
 
 // hashFromCache looks up the hash of the contents of the provided file in the provided cache dir.
