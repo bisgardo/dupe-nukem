@@ -153,18 +153,21 @@ func loadScanCache(path string) (*scan.Dir, error) {
 }
 
 func loadScanCacheResultRoot(path string) (*scan.Dir, error) {
-	cacheRes, err := loadScanResultFile(path)
+	res, err := loadScanResultFile(path)
 	if err != nil {
 		return nil, err
 	}
-	// TODO: Allow force-skipping version check?
-	if cacheRes.TypeVersion == 0 {
-		return nil, errors.Errorf("schema version is missing")
+	return res.Root, checkResultTypeVersion(res.TypeVersion)
+}
+
+func checkResultTypeVersion(v int) error {
+	if v == 0 {
+		return errors.Errorf("schema version is missing")
 	}
-	if cacheRes.TypeVersion != scan.CurrentResultTypeVersion {
-		return nil, errors.Errorf("unsupported schema version: %d", cacheRes.TypeVersion)
+	if v != scan.CurrentResultTypeVersion {
+		return errors.Errorf("unsupported schema version: %d", v)
 	}
-	return cacheRes.Root, nil
+	return nil
 }
 
 func checkCache(root *scan.Dir) error {
@@ -181,7 +184,10 @@ func checkCache(root *scan.Dir) error {
 	for i, d := range root.Dirs {
 		// Require lexical order.
 		if ld != nil && ld.Name > d.Name {
-			return fmt.Errorf("list of subdirectories of %q is not sorted: %q on index %d should come before %q on index %d", root.Name, d.Name, i, ld.Name, i-1)
+			return fmt.Errorf(
+				"list of subdirectories of %q is not sorted: %q on index %d should come before %q on index %d",
+				root.Name, d.Name, i, ld.Name, i-1,
+			)
 		}
 		ld = d
 
@@ -195,7 +201,10 @@ func checkCache(root *scan.Dir) error {
 	for i, f := range root.Files {
 		// Require lexical order.
 		if lf != nil && lf.Name > f.Name {
-			return fmt.Errorf("list of non-empty files in directory %q is not sorted: %q on index %d should come before %q on index %d", root.Name, f.Name, i, lf.Name, i-1)
+			return fmt.Errorf(
+				"list of non-empty files in directory %q is not sorted: %q on index %d should come before %q on index %d",
+				root.Name, f.Name, i, lf.Name, i-1,
+			)
 		}
 		lf = f
 
