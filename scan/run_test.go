@@ -3,7 +3,9 @@ package scan
 import (
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
+	"pgregory.net/rapid"
 	"runtime"
 	"testing"
 	"time"
@@ -900,4 +902,73 @@ func makeSkip(names ...string) ShouldSkipPath {
 		}
 		return false
 	}
+}
+
+func timeGen() *rapid.Generator[time.Time] {
+	var zeroTime time.Time
+	return rapid.OneOf(
+		rapid.Custom(func(t *rapid.T) time.Time {
+			return time.Unix(rapid.Int64Range(0, 999999999).Draw(t, "sec"), 0)
+		}),
+		rapid.Just(zeroTime),
+	)
+}
+
+func fileGen() *rapid.Generator[file] {
+	return rapid.Custom(func(t *rapid.T) file {
+		return file{
+			c:  rapid.String().Draw(t, "contents"),
+			ts: timeGen().Draw(t, "ts"),
+			//hashFromCache: rapid.Uint64().Draw(t, "hashFromCache"),
+			hashFromCache: 0,
+			//skipped:       rapid.Bool().Draw(t, "skipped"),
+			skipped: false,
+			//inaccessible:  rapid.Bool().Draw(t, "inaccessible"),
+			inaccessible: false,
+		}
+	})
+}
+
+func dirGen() *rapid.Generator[dir] {
+	return rapid.OneOf[dir](
+		rapid.Custom(func(t *rapid.T) dir {
+			return rapid.MapOfN(pathGen(), nodeGen(), 0, 5).Draw(t, "dir")
+		}),
+		rapid.Just[dir](nil),
+	)
+}
+
+func pathGen() *rapid.Generator[string] {
+	// Using all lowercase to ensure that we don't generate strings that only differ in casing,
+	// as the FS might be case-insensitive (as rapid.MapOfN must be taking care not to use literal duplicates).
+	componentGen := rapid.StringMatching(`[a-z0-9._-]+`).
+		Filter(func(s string) bool { return s != "." && s != ".." })
+	return rapid.Custom(func(t *rapid.T) string {
+		components := rapid.SliceOfN(componentGen, 1, 4).Draw(t, "components")
+		return path.Join(components...)
+	})
+}
+
+func nodeGen() *rapid.Generator[node] {
+	return rapid.OneOf[node](
+		rapid.Custom(func(t *rapid.T) node { return fileGen().Draw(t, "file") }),
+		rapid.Custom(func(t *rapid.T) node { return dirGen().Draw(t, "dir") }),
+	)
+}
+
+func Test__scan_property(t *testing.T) {
+	// Wrapping function that uses testing.T.TempDir() which isn't exposed by rapid.T.
+	// This (almost surely) means that the directories are only cleaned up after the entire test completes,
+	// not after each individual run - which is fine.
+	makeRootPath := func() string { return tempDir(t) }
+
+	rapid.Check(t, func(t *rapid.T) {
+		root := dirGen().Draw(t, "root")
+		rootPath := makeRootPath()
+		root.writeTestdata(t, rootPath)
+		want := simulateScan(root, rootPath)
+		res, err := Run(rootPath, NoSkip, nil)
+		require.NoError(t, err)
+		res.assertEqual(t, want)
+	})
 }

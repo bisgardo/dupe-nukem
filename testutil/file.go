@@ -86,7 +86,7 @@ func MakeInaccessible(path string) (func() error, error) {
 }
 
 // MakeInaccessibleT wraps MakeInaccessible with error handling and automatic cleanup using the provided testing.T object.
-func MakeInaccessibleT(t *testing.T, path string) {
+func MakeInaccessibleT(t T, path string) {
 	cleanup, err := MakeInaccessible(path)
 	require.NoErrorf(t, err, "cannot make file or directory %q inaccessible", path)
 	if cleanup != nil {

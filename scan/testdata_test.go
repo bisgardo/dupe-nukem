@@ -25,7 +25,7 @@ type node interface {
 	simulateScanFromParent(parent *Dir, name string)
 
 	// writeTestdata writes the directory structure rooted at the node to the provided path on disk.
-	writeTestdata(t *testing.T, path string)
+	writeTestdata(t T, path string)
 }
 
 // dir is a directory node, implemented as a mapping to entry nodes by relative path.
@@ -74,7 +74,7 @@ func (d dir) simulateScan(name string) *Dir {
 	return res
 }
 
-func (d dir) writeTestdata(t *testing.T, path string) {
+func (d dir) writeTestdata(t T, path string) {
 	if err := os.MkdirAll(path, 0700); err != nil { // permissions chosen to be unaffected by umask
 		require.NoErrorf(t, err, "cannot create dir on path %q", path)
 	}
@@ -109,7 +109,7 @@ func (d dirExt) simulateScanFromParent(parent *Dir, name string) {
 	d.dir.simulateScanFromParent(parent, name)
 }
 
-func (d dirExt) writeTestdata(t *testing.T, path string) {
+func (d dirExt) writeTestdata(t T, path string) {
 	d.dir.writeTestdata(t, path)
 	if d.inaccessible {
 		MakeInaccessibleT(t, path)
@@ -163,13 +163,10 @@ func (f file) simulateScan(name string) *File {
 	return NewFile(name, int64(len(data)), unixTime, h)
 }
 
-func (f file) writeTestdata(t *testing.T, path string) {
+func (f file) writeTestdata(t T, path string) {
 	data := []byte(f.c)
 	_, err := os.Stat(path)
-	if !errors.Is(err, os.ErrNotExist) {
-		panic(fmt.Errorf("duplicate file %q", filepath.Base(path)))
-	}
-	require.ErrorIs(t, err, os.ErrNotExist)
+	require.ErrorIs(t, err, os.ErrNotExist, "duplicate file %q", filepath.Base(path))
 	err = os.WriteFile(path, data, 0600) // permissions chosen to be unaffected by umask
 	require.NoErrorf(t, err, "cannot create file %q with contents %q", path, f.c)
 	if !f.ts.IsZero() {
@@ -187,7 +184,7 @@ func (s symlink) simulateScanFromParent(*Dir, string) {
 	// Symlinks are ignored.
 }
 
-func (s symlink) writeTestdata(t *testing.T, path string) {
+func (s symlink) writeTestdata(t T, path string) {
 	err := os.Symlink(string(s), path)
 	require.NoErrorf(t, err, "cannot create symlink with value %q at path %q", s, path)
 }
@@ -460,7 +457,7 @@ func readPath(path string, info os.FileInfo, expectInaccessible bool) (string, e
 // This exception exists because we don't want to explicitly set the mod times of all generated test files,
 // in which case they default to the time that the test is run.
 // The solution of patching the expectation with the current time didn't work well and was replaced with this one.
-func (d *Dir) assertEqual(t *testing.T, want *Dir) {
+func (d *Dir) assertEqual(t T, want *Dir) {
 	if d == nil {
 		assert.Nil(t, want)
 		return
@@ -483,7 +480,7 @@ func (d *Dir) assertEqual(t *testing.T, want *Dir) {
 	}
 }
 
-func (f *File) assertEqual(t *testing.T, want *File) {
+func (f *File) assertEqual(t T, want *File) {
 	if f == nil {
 		assert.Nil(t, want)
 		return
@@ -496,7 +493,7 @@ func (f *File) assertEqual(t *testing.T, want *File) {
 	assert.Equal(t, want.Hash, f.Hash)
 }
 
-func (r *Result) assertEqual(t *testing.T, want *Result) {
+func (r *Result) assertEqual(t T, want *Result) {
 	if r == nil {
 		assert.Nil(t, want)
 		return
