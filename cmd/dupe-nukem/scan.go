@@ -142,10 +142,13 @@ func loadScanCache(path string) (*scan.Dir, error) {
 	if err != nil {
 		return nil, err
 	}
+	if cacheRoot == nil {
+		return nil, errors.Errorf("no root")
+	}
 	// Could just sort lists instead of (only) validating,
 	// but it appears to be a needless complication for something that should never happen.
 	// So if it does, it probably indicates a problem that's worth alarming the user about.
-	if err := checkCache(cacheRoot); err != nil {
+	if err := checkCacheRoot(cacheRoot); err != nil {
 		return nil, errors.Wrap(err, "invalid root") // caller wraps path
 	}
 	log.Printf("scan cache loaded successfully from %q in %v\n", path, timeSince(start))
@@ -170,13 +173,10 @@ func checkResultTypeVersion(v int) error {
 	return nil
 }
 
-func checkCache(root *scan.Dir) error {
-	if root == nil {
-		return fmt.Errorf("root is empty")
-	}
+func checkCacheRoot(root *scan.Dir) error {
 	// Require non-empty name.
 	if root.Name == "" {
-		return fmt.Errorf("directory name is empty")
+		return fmt.Errorf("directory has no name")
 	}
 
 	// Check subdirs.
@@ -192,7 +192,7 @@ func checkCache(root *scan.Dir) error {
 		ld = d
 
 		// Recurse.
-		if err := checkCache(d); err != nil {
+		if err := checkCacheRoot(d); err != nil {
 			return errors.Wrapf(err, "in subdirectory %q on index %d", d.Name, i)
 		}
 	}
@@ -210,14 +210,14 @@ func checkCache(root *scan.Dir) error {
 
 		// Require non-empty name and non-zero size.
 		if f.Name == "" {
-			return fmt.Errorf("name of non-empty file on index %d is empty", i)
+			return fmt.Errorf("file on index %d has no name", i)
 		}
 		if f.Size == 0 {
-			return fmt.Errorf("non-empty file %q on index %d has size 0", f.Name, i)
+			return fmt.Errorf("file %q on index %d has size 0, but is not listed as empty", f.Name, i)
 		}
 		// Log warning if hash is zero.
 		if f.Hash == 0 {
-			log.Printf("warning: file %q is cached with hash 0 - this hash will be ignored\n", f.Name)
+			log.Printf("warning: file %q is cached with hash 0 - this hash will be recomputed\n", f.Name)
 		}
 		// Timestamps are used by the cache, but any value is valid, so there's nothing to check.
 	}
