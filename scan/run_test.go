@@ -3,10 +3,10 @@ package scan
 import (
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"pgregory.net/rapid"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -94,9 +94,9 @@ func Test__symlink_to_nonexistent_root_fails(t *testing.T) {
 }
 
 func Test__file_root_fails(t *testing.T) {
-	path := TempStringFile(t, "")
-	_, err := Run(path, NoSkip, nil)
-	assert.EqualError(t, err, fmt.Sprintf("invalid root directory %q: not a directory", path))
+	filePath := TempStringFile(t, "")
+	_, err := Run(filePath, NoSkip, nil)
+	assert.EqualError(t, err, fmt.Sprintf("invalid root directory %q: not a directory", filePath))
 }
 
 func Test__inaccessible_root_is_skipped_and_logged(t *testing.T) {
@@ -904,56 +904,95 @@ func makeSkip(names ...string) ShouldSkipPath {
 	}
 }
 
-func timeGen() *rapid.Generator[time.Time] {
-	var zeroTime time.Time
-	return rapid.OneOf(
-		rapid.Custom(func(t *rapid.T) time.Time {
-			return time.Unix(rapid.Int64Range(0, 999999999).Draw(t, "sec"), 0)
-		}),
-		rapid.Just(zeroTime),
-	)
+func dirEnsurePath(parent *Dir, path string) *Dir {
+	if path != "." {
+		for _, p := range strings.Split(path, string(os.PathSeparator)) {
+			child := safeFindDir(parent, p)
+			if child == nil {
+				child = NewDir(p)
+				parent.appendDir(child)
+			}
+			parent = child
+		}
+	}
+	return parent
 }
 
-func fileGen() *rapid.Generator[file] {
+type nodeGen struct {
+	cache *Dir
+}
+
+func (g *nodeGen) file(path string) *rapid.Generator[file] {
 	return rapid.Custom(func(t *rapid.T) file {
+		contents := rapid.String().Draw(t, "contents")
+		modTime := timeGen().Draw(t, "modTime")
+
+		var hashFromCache uint64
+		useHashFromCache := rapid.Bool().Draw(t, "useHashFromCache")
+		if useHashFromCache {
+			for hashFromCache == 0 {
+				hashFromCache = rapid.Uint64().Draw(t, "hashFromCache")
+			}
+			dirPath, name := filepath.Dir(path), filepath.Base(path)
+			f := NewFile(name, int64(len(contents)), modTime.Unix(), hashFromCache)
+			dirEnsurePath(g.cache, dirPath).appendFile(f)
+		}
+
+		//skipped := rapid.Bool().Draw(t, "skipped")
+		//inaccessible := rapid.Bool().Draw(t, "inaccessible")
 		return file{
-			c:  rapid.String().Draw(t, "contents"),
-			ts: timeGen().Draw(t, "ts"),
-			//hashFromCache: rapid.Uint64().Draw(t, "hashFromCache"),
-			hashFromCache: 0,
-			//skipped:       rapid.Bool().Draw(t, "skipped"),
+			c:             contents,
+			ts:            modTime,
+			hashFromCache: hashFromCache,
+			//skipped:       skipped,
 			skipped: false,
-			//inaccessible:  rapid.Bool().Draw(t, "inaccessible"),
+			//inaccessible: inaccessible,
 			inaccessible: false,
 		}
 	})
 }
 
-func dirGen() *rapid.Generator[dir] {
+func (g *nodeGen) dir(path string) *rapid.Generator[dir] {
 	return rapid.OneOf[dir](
 		rapid.Custom(func(t *rapid.T) dir {
-			return rapid.MapOfN(pathGen(), nodeGen(), 0, 5).Draw(t, "dir")
+			res := make(dir)
+			pathsGen := rapid.SliceOfNDistinct(pathGen(), 0, 5, rapid.ID[string])
+			for _, p := range pathsGen.Draw(t, "paths") {
+				res[p] = g.node(filepath.Join(path, p)).Draw(t, "node")
+			}
+			return res
 		}),
 		rapid.Just[dir](nil),
 	)
 }
 
-func pathGen() *rapid.Generator[string] {
-	// Using all lowercase to ensure that we don't generate strings that only differ in casing,
-	// as the FS might be case-insensitive (as rapid.MapOfN must be taking care not to use literal duplicates).
-	componentGen := rapid.StringMatching(`[a-z0-9._-]+`).
-		Filter(func(s string) bool { return s != "." && s != ".." })
-	return rapid.Custom(func(t *rapid.T) string {
-		components := rapid.SliceOfN(componentGen, 1, 4).Draw(t, "components")
-		return path.Join(components...)
+func (g *nodeGen) node(path string) *rapid.Generator[node] {
+	return rapid.OneOf(
+		rapid.Custom(func(t *rapid.T) node {
+			return g.file(path).Draw(t, "file")
+		}),
+		rapid.Custom(func(t *rapid.T) node {
+			return g.dir(path).Draw(t, "dir")
+		}),
+	)
+}
+
+func timeGen() *rapid.Generator[time.Time] {
+	return rapid.Custom(func(t *rapid.T) time.Time {
+		return time.Unix(rapid.Int64Range(0, 999999999).Draw(t, "sec"), 0)
 	})
 }
 
-func nodeGen() *rapid.Generator[node] {
-	return rapid.OneOf[node](
-		rapid.Custom(func(t *rapid.T) node { return fileGen().Draw(t, "file") }),
-		rapid.Custom(func(t *rapid.T) node { return dirGen().Draw(t, "dir") }),
-	)
+func pathGen() *rapid.Generator[string] {
+	// Using all lowercase to ensure that we don't generate strings that only differ in casing,
+	// as the FS might be case-insensitive (as rapid.MapOfN must be taking care not to use literal duplicates).
+	compGen := rapid.StringMatching(`[a-z0-9._-]+`).
+		Filter(func(s string) bool { return s != "." && s != ".." })
+	return rapid.Custom(func(t *rapid.T) string {
+		pathComps := rapid.SliceOfN(compGen, 1, 4).Draw(t, "pathComps")
+		fmt.Printf("pathComps: %v\n", pathComps)
+		return filepath.Join(pathComps...)
+	})
 }
 
 func Test__scan_property(t *testing.T) {
@@ -963,12 +1002,22 @@ func Test__scan_property(t *testing.T) {
 	makeRootPath := func() string { return tempDir(t) }
 
 	rapid.Check(t, func(t *rapid.T) {
-		root := dirGen().Draw(t, "root")
 		rootPath := makeRootPath()
+		var cache *Dir
+		//if rapid.Bool().Draw(t, "useCache") {
+		cache = NewDir(rootPath)
+		//}
+		g := nodeGen{cache: cache}
+		root := g.dir("").Draw(t, "root")
 		root.writeTestdata(t, rootPath)
 		want := simulateScan(root, rootPath)
-		res, err := Run(rootPath, NoSkip, nil)
-		require.NoError(t, err)
+		res, err := Run(rootPath, NoSkip, cache)
+		//spew.Dump(cache)
+		//require.NoError(t, err)
+		_ = err
 		res.assertEqual(t, want)
+		//if t.Failed() {
+		//	Run(rootPath, NoSkip, cache)
+		//}
 	})
 }

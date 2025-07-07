@@ -121,6 +121,7 @@ type file struct {
 	// The file's contents as a string.
 	c string
 	// The file's latest modification time (with second accuracy).
+	// TODO: Rename to 'modTime'?
 	ts time.Time
 	// The file's hash as resolved from a cache file rather than being computed (if non-zero).
 	// Should not be combined with inaccessible.
