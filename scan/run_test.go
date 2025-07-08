@@ -927,15 +927,16 @@ func (g *nodeGen) file(path string) *rapid.Generator[file] {
 		contents := rapid.String().Draw(t, "contents")
 		modTime := timeGen().Draw(t, "modTime")
 
-		var hashFromCache uint64
-		useHashFromCache := rapid.Bool().Draw(t, "useHashFromCache")
-		if useHashFromCache {
-			for hashFromCache == 0 {
-				hashFromCache = rapid.Uint64().Draw(t, "hashFromCache")
+		var cachedHash uint64
+		if g.cache != nil {
+			if rapid.Bool().Draw(t, "useHashFromCache") {
+				for cachedHash == 0 {
+					cachedHash = rapid.Uint64().Draw(t, "cachedHash")
+				}
+				dirPath, name := filepath.Dir(path), filepath.Base(path)
+				f := NewFile(name, int64(len(contents)), modTime.Unix(), cachedHash)
+				dirEnsurePath(g.cache, dirPath).appendFile(f)
 			}
-			dirPath, name := filepath.Dir(path), filepath.Base(path)
-			f := NewFile(name, int64(len(contents)), modTime.Unix(), hashFromCache)
-			dirEnsurePath(g.cache, dirPath).appendFile(f)
 		}
 
 		//skipped := rapid.Bool().Draw(t, "skipped")
@@ -943,7 +944,7 @@ func (g *nodeGen) file(path string) *rapid.Generator[file] {
 		return file{
 			c:             contents,
 			ts:            modTime,
-			hashFromCache: hashFromCache,
+			hashFromCache: cachedHash,
 			//skipped:       skipped,
 			skipped: false,
 			//inaccessible: inaccessible,
@@ -990,7 +991,6 @@ func pathGen() *rapid.Generator[string] {
 		Filter(func(s string) bool { return s != "." && s != ".." })
 	return rapid.Custom(func(t *rapid.T) string {
 		pathComps := rapid.SliceOfN(compGen, 1, 4).Draw(t, "pathComps")
-		fmt.Printf("pathComps: %v\n", pathComps)
 		return filepath.Join(pathComps...)
 	})
 }
@@ -1004,20 +1004,15 @@ func Test__scan_property(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		rootPath := makeRootPath()
 		var cache *Dir
-		//if rapid.Bool().Draw(t, "useCache") {
-		cache = NewDir(rootPath)
-		//}
+		if rapid.Bool().Draw(t, "useCache") {
+			cache = NewDir(rootPath)
+		}
 		g := nodeGen{cache: cache}
 		root := g.dir("").Draw(t, "root")
 		root.writeTestdata(t, rootPath)
 		want := simulateScan(root, rootPath)
 		res, err := Run(rootPath, NoSkip, cache)
-		//spew.Dump(cache)
-		//require.NoError(t, err)
-		_ = err
+		require.NoError(t, err)
 		res.assertEqual(t, want)
-		//if t.Failed() {
-		//	Run(rootPath, NoSkip, cache)
-		//}
 	})
 }
