@@ -1,11 +1,13 @@
 package scan
 
 import (
+	"cmp"
 	"fmt"
 	"os"
 	"path/filepath"
 	"pgregory.net/rapid"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -911,6 +913,8 @@ func dirEnsurePath(parent *Dir, path string) *Dir {
 			if child == nil {
 				child = NewDir(p)
 				parent.appendDir(child)
+				// Maintain ordering requirement.
+				slices.SortFunc(parent.Dirs, func(l, r *Dir) int { return cmp.Compare(l.Name, r.Name) })
 			}
 			parent = child
 		}
@@ -935,7 +939,10 @@ func (g *nodeGen) file(path string) *rapid.Generator[file] {
 				}
 				dirPath, name := filepath.Dir(path), filepath.Base(path)
 				f := NewFile(name, int64(len(contents)), modTime.Unix(), cachedHash)
-				dirEnsurePath(g.cache, dirPath).appendFile(f)
+				parent := dirEnsurePath(g.cache, dirPath)
+				parent.appendFile(f)
+				// Maintain ordering requirement.
+				slices.SortFunc(parent.Files, func(l, r *File) int { return cmp.Compare(l.Name, r.Name) })
 			}
 		}
 
@@ -957,8 +964,7 @@ func (g *nodeGen) dir(path string) *rapid.Generator[dir] {
 	return rapid.OneOf[dir](
 		rapid.Custom(func(t *rapid.T) dir {
 			res := make(dir)
-			pathsGen := rapid.SliceOfNDistinct(pathGen(), 0, 5, rapid.ID[string])
-			for _, p := range pathsGen.Draw(t, "paths") {
+			for _, p := range pathsGen(5, 5).Draw(t, "paths") {
 				res[p] = g.node(filepath.Join(path, p)).Draw(t, "node")
 			}
 			return res
@@ -984,14 +990,24 @@ func timeGen() *rapid.Generator[time.Time] {
 	})
 }
 
-func pathGen() *rapid.Generator[string] {
-	// Using all lowercase to ensure that we don't generate strings that only differ in casing,
-	// as the FS might be case-insensitive (as rapid.MapOfN must be taking care not to use literal duplicates).
-	compGen := rapid.StringMatching(`[a-z0-9._-]+`).
+// pathsGen generates a slice of paths that don't overlap in the first component (as required by dir.simulateScan).
+func pathsGen(maxCount int, maxComponents int) *rapid.Generator[[]string] {
+	compGen := rapid.StringMatching(`[a-zA-Z0-9._-]+`).
 		Filter(func(s string) bool { return s != "." && s != ".." })
-	return rapid.Custom(func(t *rapid.T) string {
-		pathComps := rapid.SliceOfN(compGen, 1, 4).Draw(t, "pathComps")
-		return filepath.Join(pathComps...)
+	prefixGen := rapid.SliceOfNDistinct(compGen, 0, maxCount, func(name string) string {
+		// Don't generate names that differ only in casing to appease case-insensitive file systems.
+		return strings.ToLower(name)
+	})
+
+	return rapid.Custom(func(t *rapid.T) []string {
+		pathPrefixes := prefixGen.Draw(t, "pathPrefixes")
+		var paths []string
+		for _, p := range pathPrefixes {
+			pathSuffix := rapid.SliceOfN(compGen, 0, maxComponents-1).Draw(t, "pathSuffix")
+			comps := append([]string{p}, pathSuffix...)
+			paths = append(paths, filepath.Join(comps...))
+		}
+		return paths
 	})
 }
 

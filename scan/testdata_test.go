@@ -1,12 +1,13 @@
 package scan
 
 import (
+	"cmp"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
-	"sort"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -33,6 +34,8 @@ type node interface {
 // Different keys must not define any subdirectory more than once (i.e. paths must not overlap).
 type dir map[string]node
 
+const pathSep = '/'
+
 func (d dir) simulateScanFromParent(parent *Dir, name string) {
 	s := d.simulateScan(name)
 	parent.appendDir(s)
@@ -45,13 +48,21 @@ func (d dir) simulateScan(name string) *Dir {
 	for n := range d {
 		nodePaths = append(nodePaths, n)
 	}
-	sort.Strings(nodePaths)
-	for _, nodePath := range nodePaths {
+	slices.SortFunc(nodePaths, func(l string, r string) int {
+		// Replace path separator ('/') will null character to prevent "lesser" characters (like '.')
+		// from messing up the ordering.
+		return cmp.Compare(
+			strings.ReplaceAll(l, string(pathSep), "\x00"),
+			strings.ReplaceAll(r, string(pathSep), "\x00"),
+		)
+	})
+	for idx, nodePath := range nodePaths {
+		_ = idx
 		res := res // prevent overwriting for future iterations
 		n := d[nodePath]
 		for {
 			// Handle name being a (Unix) path.
-			slashIdx := strings.IndexRune(nodePath, '/')
+			slashIdx := strings.IndexRune(nodePath, pathSep)
 			if slashIdx == -1 {
 				// nodePath is no longer a path, just a name.
 				break
@@ -59,7 +70,16 @@ func (d dir) simulateScan(name string) *Dir {
 			dirName := nodePath[0:slashIdx]  // extract dir name
 			nodePath = nodePath[slashIdx+1:] // pop dir name
 
-			// Reject duplicated dir.
+			// Reject duplicated dir:
+			// While this could be allowed, it introduces ambiguity in use, is likely a mistake,
+			// and requires more logic than it's worth to handle all cases correctly.
+			// Problematic example:
+			//   dir{
+			//     "a":   dir{"b/y": file{}},
+			//     "a/b": dir{"x": file{}},
+			//   }
+			// Without additional sorting, "a/b/y" will be added before "a/b/x" because "a" is processed before "a/b".
+			//
 			// Note that we only have to check nested paths (e.g. "x/y") because the key sorting above ensures
 			// that any non-nested case (e.g. "x") is always processed first.
 			if safeFindDir(res, dirName) != nil {
@@ -167,7 +187,10 @@ func (f file) simulateScan(name string) *File {
 func (f file) writeTestdata(t T, path string) {
 	data := []byte(f.c)
 	_, err := os.Stat(path)
-	require.ErrorIs(t, err, os.ErrNotExist, "duplicate file %q", filepath.Base(path))
+	if !errors.Is(err, os.ErrNotExist) {
+		// Use panic instead of require.ErrorIs to be able to test that the method fails successfully.
+		panic(fmt.Errorf("duplicate file %q", filepath.Base(path)))
+	}
 	err = os.WriteFile(path, data, 0600) // permissions chosen to be unaffected by umask
 	require.NoErrorf(t, err, "cannot create file %q with contents %q", path, f.c)
 	if !f.ts.IsZero() {
@@ -275,11 +298,6 @@ func Test__node(t *testing.T) {
 
 	t.Run("simulateScan", func(t *testing.T) {
 		root := makeRoot()
-		s := root.simulateScan("root")
-
-		// Assert that root wasn't modified.
-		require.Equal(t, makeRoot(), root)
-
 		want := &Dir{
 			Name: "root",
 			Dirs: []*Dir{
@@ -313,6 +331,10 @@ func Test__node(t *testing.T) {
 			SkippedFiles: []string{"h"},
 			SkippedDirs:  []string{"d"},
 		}
+
+		s := root.simulateScan(want.Name)
+		// Assert that root wasn't modified.
+		require.Equal(t, makeRoot(), root)
 		s.assertEqual(t, want)
 	})
 }
@@ -366,6 +388,31 @@ func Test__node_with_overlapping_files(t *testing.T) {
 			root.simulateScan("root")
 		})
 	})
+}
+
+func Test__simulateScan_subdir_sorting(t *testing.T) {
+	// As the paths are sorted as strings, dir "a." ends up being added before "a" (because "." is lexically less than "/").
+	// Bug found with rapid.
+	root := dir{
+		"a/b":  file{},
+		"a./b": file{},
+	}
+	want := &Dir{
+		Name: "root",
+		Dirs: []*Dir{
+			{
+				Name:       "a",
+				EmptyFiles: []string{"b"},
+			},
+			{
+				Name:       "a.",
+				EmptyFiles: []string{"b"},
+			},
+		},
+	}
+
+	s := root.simulateScan(want.Name)
+	s.assertEqual(t, want)
 }
 
 func assertCompatibleInfos(t *testing.T, want, infos map[string]fileInfo, before, after time.Time) {
