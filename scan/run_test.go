@@ -947,15 +947,14 @@ func (g *nodeGen) file(path string) *rapid.Generator[file] {
 		}
 
 		//skipped := rapid.Bool().Draw(t, "skipped")
-		//inaccessible := rapid.Bool().Draw(t, "inaccessible")
+		inaccessible := rapid.Bool().Draw(t, "inaccessible")
 		return file{
 			c:             contents,
 			ts:            modTime,
 			hashFromCache: cachedHash,
 			//skipped:       skipped,
-			skipped: false,
-			//inaccessible: inaccessible,
-			inaccessible: false,
+			skipped:      false,
+			inaccessible: inaccessible,
 		}
 	})
 }
@@ -992,22 +991,20 @@ func timeGen() *rapid.Generator[time.Time] {
 
 // pathsGen generates a slice of paths that don't overlap in the first component (as required by dir.simulateScan).
 func pathsGen(maxCount int, maxComponents int) *rapid.Generator[[]string] {
-	compGen := rapid.StringMatching(`[a-zA-Z0-9._-]+`).
-		Filter(func(s string) bool { return s != "." && s != ".." })
+	compGen := rapid.StringMatching(`[a-zA-Z0-9._-]+`).Filter(func(s string) bool { return s != "." && s != ".." })
 	prefixGen := rapid.SliceOfNDistinct(compGen, 0, maxCount, func(name string) string {
-		// Don't generate names that differ only in casing to appease case-insensitive file systems.
+		// Don't generate names that differ only in casing (for compatibility with case-insensitive file systems).
 		return strings.ToLower(name)
 	})
 
 	return rapid.Custom(func(t *rapid.T) []string {
-		pathPrefixes := prefixGen.Draw(t, "pathPrefixes")
-		var paths []string
-		for _, p := range pathPrefixes {
-			pathSuffix := rapid.SliceOfN(compGen, 0, maxComponents-1).Draw(t, "pathSuffix")
-			comps := append([]string{p}, pathSuffix...)
-			paths = append(paths, filepath.Join(comps...))
+		var res []string
+		for _, pathHead := range prefixGen.Draw(t, "pathHeads") {
+			pathTail := rapid.SliceOfN(compGen, 0, maxComponents-1).Draw(t, "pathTail")
+			path := append([]string{pathHead}, pathTail...)
+			res = append(res, filepath.Join(path...))
 		}
-		return paths
+		return res
 	})
 }
 
