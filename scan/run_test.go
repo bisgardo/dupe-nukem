@@ -383,6 +383,29 @@ func Test__skip_symlink_is_logged(t *testing.T) {
 	)
 }
 
+func Test__skip_file_after_dir(t *testing.T) {
+	// Added while fixing a bug where the skipped node was wrongfully added to the directory
+	// that was just scanned because 'head' wasn't getting updated until *after* the skip check.
+	root := dir{
+		"a": dir{},
+		"x": file{skipped: true},
+	}
+	rootPath := tempDir(t)
+	root.writeTestdata(t, rootPath)
+	want := simulateScan(root, rootPath)
+	logs := CaptureLogs(t)
+	res, err := Run(rootPath, makeSkip("x"), nil)
+	require.NoError(t, err)
+	res.assertEqual(t, want)
+	assert.Equal(t,
+		fmt.Sprintf(
+			Lines("skipping file %q based on skip list"),
+			filepath.Join(rootPath, "x"),
+		),
+		logs.String(),
+	)
+}
+
 func Test__trailing_slash_of_run_path_gets_removed(t *testing.T) {
 	root := dir{
 		"a": file{c: "z\n"},
