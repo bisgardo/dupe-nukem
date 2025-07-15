@@ -149,6 +149,14 @@ func run(rootPath string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, error) {
 			return errors.Wrapf(util.IOError(err), "cannot walk %v %q", modeName, path) // cannot test
 		}
 		parentPath := filepath.Dir(path)
+
+		// Detect that the walk has returned up the stack, as we aren't given any information about that.
+		// Checking just the length of the path works because directories are guaranteed to be visited
+		// before the files that they contain.
+		for head.pathLen != len(parentPath) {
+			head = head.prev
+		}
+
 		name := filepath.Base(path)
 		if shouldSkip(parentPath, name) {
 			log.Printf("skipping %v %q based on skip list\n", util.FileModeName(info.Mode()), path)
@@ -158,13 +166,6 @@ func run(rootPath string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, error) {
 			}
 			head.curDir.appendSkippedFile(name)
 			return nil
-		}
-
-		// Detect that the walk has returned up the stack, as we aren't given any information about that.
-		// Checking just the length of the path works because directories are guaranteed to be visited
-		// before the files that they contain.
-		for head.pathLen != len(parentPath) {
-			head = head.prev
 		}
 
 		if mode := info.Mode(); mode.IsDir() {
