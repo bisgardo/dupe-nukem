@@ -47,7 +47,13 @@ func Scan(dir, skipExpr, cachePath string) (*scan.Result, error) {
 	if absDir != dir {
 		log.Printf("absolute path of %q resolved to %q\n", dir, absDir)
 	}
-	return scan.Run(absDir, shouldSkip, cache)
+	runStart := time.Now()
+	run, err := scan.Run(absDir, shouldSkip, cache)
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("scan completed successfully in %v\n", timeSince(runStart))
+	return run, nil
 }
 
 func loadShouldSkip(expr string) (scan.ShouldSkipPath, error) {

@@ -443,14 +443,11 @@ func Test__scan_logs_absolute_path_of_relative_dir(t *testing.T) {
 	logs := CaptureLogs(t)
 	_, err = Scan(dir, "", "")
 	require.NoError(t, err)
-	assert.Equal(t,
-		fmt.Sprintf(
-			Lines("absolute path of %q resolved to %q"),
-			dir,
-			absDir,
-		),
-		logs.String(),
-	)
+	ls := strings.Split(logs.String(), "\n")
+	assert.Len(t, ls, 3)
+	assert.Equal(t, fmt.Sprintf("absolute path of %q resolved to %q", dir, absDir), ls[0])
+	assert.Regexp(t, `^scan completed successfully in [\w.]+s$`, ls[1])
+	assert.Empty(t, ls[2])
 }
 
 func Test__scan_does_not_log_absolute_dir_path(t *testing.T) {
@@ -459,7 +456,10 @@ func Test__scan_does_not_log_absolute_dir_path(t *testing.T) {
 	logs := CaptureLogs(t)
 	_, err = Scan(absDir, "", "")
 	require.NoError(t, err)
-	assert.Empty(t, logs.String())
+	ls := strings.Split(logs.String(), "\n")
+	assert.Len(t, ls, 2)
+	assert.Regexp(t, `^scan completed successfully in [\w.]+s$`, ls[0])
+	assert.Empty(t, ls[1])
 }
 
 //goland:noinspection GoSnakeCaseUsage
