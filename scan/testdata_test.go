@@ -19,26 +19,27 @@ import (
 	. "github.com/bisgardo/dupe-nukem/testutil"
 )
 
-// node is a content item of a dir, used for building test data for Run.
-type node interface {
-	// simulateScanFromParent adds the "scan" result of the node to the Dir representing the parent node.
-	simulateScanFromParent(parent *Dir, name string)
+// Node is a content item of a DirNode, used for building test data for Run.
+type Node interface {
+	// SimulateScanFromParent adds the "scan" result of the Node to the Dir representing the parent Node.
+	SimulateScanFromParent(parent *Dir, name string)
 
-	// writeTestdata writes the directory structure rooted at the node to the provided path on disk.
-	writeTestdata(t *testing.T, path string)
+	// WriteTestdata writes the directory structure rooted at the Node to the provided path on disk.
+	WriteTestdata(t *testing.T, path string)
 }
 
-// dir is a directory node, implemented as a mapping to entry nodes by relative path.
-// That is, the keys may contain '/' characters to implicitly define nested dir nodes.
+// DirNode is a directory Node, implemented as a mapping to entry nodes by a relative path.
+// Components in this path are separated by forward slash characters regardless of the platform we're running on.
+// That is, the keys may include '/' to implicitly define nested DirNode (as long as it forms a valid path).
 // Different keys must not define any subdirectory more than once (i.e. paths must not overlap).
-type dir map[string]node
+type DirNode map[string]Node
 
-func (d dir) simulateScanFromParent(parent *Dir, name string) {
-	s := d.simulateScan(name)
+func (d DirNode) SimulateScanFromParent(parent *Dir, name string) {
+	s := d.SimulateScan(name)
 	parent.appendDir(s)
 }
 
-func (d dir) simulateScan(name string) *Dir {
+func (d DirNode) SimulateScan(name string) *Dir {
 	res := NewDir(name)
 	// Iterate nodes in sorted order to respect ordering requirements of the append functions of Dir.
 	nodePaths := make([]string, 0, len(d))
@@ -69,12 +70,12 @@ func (d dir) simulateScan(name string) *Dir {
 			res.appendDir(r)
 			res = r
 		}
-		n.simulateScanFromParent(res, nodePath)
+		n.SimulateScanFromParent(res, nodePath)
 	}
 	return res
 }
 
-func (d dir) writeTestdata(t *testing.T, path string) {
+func (d DirNode) WriteTestdata(t *testing.T, path string) {
 	if err := os.MkdirAll(path, 0700); err != nil { // permissions chosen to be unaffected by umask
 		require.NoErrorf(t, err, "cannot create dir on path %q", path)
 	}
@@ -83,170 +84,172 @@ func (d dir) writeTestdata(t *testing.T, path string) {
 		nodePath := filepath.Join(path, name)
 		if p := filepath.Dir(nodePath); p != path {
 			// nodePath has multiple components: create intermediary directories.
-			dir(nil).writeTestdata(t, p)
+			DirNode(nil).WriteTestdata(t, p)
 		}
 		// Path may have arbitrary number of components.
-		n.writeTestdata(t, nodePath)
+		n.WriteTestdata(t, nodePath)
 	}
 }
 
-// dirExt is an extension of dir that adds the ability
+// DirNodeExt is an extension of DirNode that adds the ability
 // to expect the directory to be skipped or made inaccessible.
-type dirExt struct {
-	dir
-	skipped      bool
-	inaccessible bool
+type DirNodeExt struct {
+	Dir          DirNode
+	Skipped      bool
+	Inaccessible bool
 }
 
-func (d dirExt) simulateScanFromParent(parent *Dir, name string) {
-	if d.inaccessible {
+func (d DirNodeExt) SimulateScanFromParent(parent *Dir, name string) {
+	if d.Inaccessible {
 		return
 	}
-	if d.skipped {
+	if d.Skipped {
 		parent.appendSkippedDir(name)
 		return
 	}
-	d.dir.simulateScanFromParent(parent, name)
+	d.Dir.SimulateScanFromParent(parent, name)
 }
 
-func (d dirExt) writeTestdata(t *testing.T, path string) {
-	d.dir.writeTestdata(t, path)
-	if d.inaccessible {
+func (d DirNodeExt) WriteTestdata(t *testing.T, path string) {
+	d.Dir.WriteTestdata(t, path)
+	if d.Inaccessible {
 		MakeInaccessibleT(t, path)
 	}
 }
 
-// file is a file node.
-type file struct {
+// FileNode is a Node that represents a file.
+type FileNode struct {
 	// The file's contents as a string.
-	c string
+	C string
 	// The file's latest modification time (with second accuracy).
-	ts time.Time
-	// The file's hash as resolved from a cache file rather than being computed (if non-zero).
-	// Should not be combined with inaccessible.
-	hashFromCache uint64
-	// Whether the file is expected to be skipped by Run.
-	skipped bool
-	// Whether the file is to be made inaccessible (and thus expecting Run to find it so).
-	inaccessible bool
+	Ts time.Time
+	// The file's simulated hash.
+	// If the value is non-zero (or Inaccessible is true), then SimulateScan will expect the hash to resolve to this value
+	// (as if it was read from a cache file) instead of explicitly computing it.
+	HashFromCache uint64
+	// Whether SimulateScan should expect the file to be skipped by Run.
+	Skipped bool
+	// Whether WriteTestdata is to make the file inaccessible (and thus expecting Run to find it so).
+	Inaccessible bool
 }
 
-func (f file) simulateScanFromParent(parent *Dir, name string) {
-	if f.skipped {
+func (f FileNode) SimulateScanFromParent(parent *Dir, name string) {
+	if f.Skipped {
 		parent.appendSkippedFile(name)
 		return
 	}
-	if len(f.c) == 0 {
+	if len(f.C) == 0 {
 		parent.appendEmptyFile(name)
 		return
 	}
-	// Inaccessibility is handled in simulateScan (by hashing to 0).
+	// Inaccessibility is handled in SimulateScan (by hashing to 0).
 	// We don't have to check whether the file is already there,
 	// as that cannot be expressed without duplicating dir (which is already checked).
-	s := f.simulateScan(name)
+	s := f.SimulateScan(name)
 	parent.appendFile(s)
 }
 
-func (f file) simulateScan(name string) *File {
-	data := []byte(f.c)
-	h := f.hashFromCache
-	if h == 0 && !f.inaccessible {
-		// If both hashFromCache and inaccessible are set, then the cached value is used.
+func (f FileNode) SimulateScan(name string) *File {
+	data := []byte(f.C)
+	h := f.HashFromCache
+	if h == 0 && !f.Inaccessible {
+		// If both HashFromCache and Inaccessible are set, then the cached value is used.
 		// This represents the situation that the file has become inaccessible since the run that produced the cache:
-		// As the hash is cached, we make no attempts of opening the file, and thus don't notice that it's inaccessible.
+		// As the hash is cached, we make no attempts of opening the file, and thus won't notice it being inaccessible.
 		h = hash.Bytes(data)
 	}
 	var unixTime int64
-	if !f.ts.IsZero() {
-		unixTime = f.ts.Unix()
+	if !f.Ts.IsZero() {
+		unixTime = f.Ts.Unix()
 	}
 	return NewFile(name, int64(len(data)), unixTime, h)
 }
 
-func (f file) writeTestdata(t *testing.T, path string) {
-	data := []byte(f.c)
+func (f FileNode) WriteTestdata(t *testing.T, path string) {
+	data := []byte(f.C)
 	_, err := os.Stat(path)
 	if !errors.Is(err, os.ErrNotExist) {
 		panic(fmt.Errorf("duplicate file %q", filepath.Base(path)))
 	}
 	require.ErrorIs(t, err, os.ErrNotExist)
 	err = os.WriteFile(path, data, 0600) // permissions chosen to be unaffected by umask
-	require.NoErrorf(t, err, "cannot create file %q with contents %q", path, f.c)
-	if !f.ts.IsZero() {
-		err := os.Chtimes(path, time.Time{}, f.ts)
+	require.NoErrorf(t, err, "cannot create file %q with contents %q", path, f.C)
+	if !f.Ts.IsZero() {
+		err := os.Chtimes(path, time.Time{}, f.Ts)
 		require.NoErrorf(t, err, "cannot update modification time of file %q", path)
 	}
-	if f.inaccessible {
+	if f.Inaccessible {
 		MakeInaccessibleT(t, path)
 	}
 }
 
-type symlink string // target path relative to own location
+// SymlinkNode is a Node that represents a symlink.
+// The underlying value is the target path relative to the symlink's own location.
+type SymlinkNode string
 
-func (s symlink) simulateScanFromParent(*Dir, string) {
+func (s SymlinkNode) SimulateScanFromParent(*Dir, string) {
 	// Symlinks are ignored.
 }
 
-func (s symlink) writeTestdata(t *testing.T, path string) {
+func (s SymlinkNode) WriteTestdata(t *testing.T, path string) {
 	err := os.Symlink(string(s), path)
 	require.NoErrorf(t, err, "cannot create symlink with value %q at path %q", s, path)
 }
 
-type symlinkExt struct {
-	symlink
-	skipped bool
+// SymlinkExtNode is an extension of SymlinkNode that adds the ability
+// to expect the directory to be skipped.
+type SymlinkExtNode struct {
+	Symlink SymlinkNode
+	Skipped bool
 }
 
-func (s symlinkExt) simulateScanFromParent(dir *Dir, name string) {
-	if s.skipped {
+func (s SymlinkExtNode) SimulateScanFromParent(dir *Dir, name string) {
+	if s.Skipped {
 		dir.appendSkippedFile(name)
 	}
-	s.symlink.simulateScanFromParent(dir, name)
+	s.Symlink.SimulateScanFromParent(dir, name)
 }
 
-// Verify conformance to node interface.
+func (s SymlinkExtNode) WriteTestdata(t *testing.T, path string) {
+	s.Symlink.WriteTestdata(t, path)
+}
+
+// Verify conformance to Node interface.
 var (
-	_ node = dir{}
-	_ node = dirExt{}
-	_ node = file{}
-	_ node = symlink("")
-	_ node = symlinkExt{}
+	_ Node = DirNode{}
+	_ Node = DirNodeExt{}
+	_ Node = FileNode{}
+	_ Node = SymlinkNode("")
+	_ Node = SymlinkExtNode{}
 )
-
-func simulateScan(d dir, rootPath string) *Result {
-	return &Result{
-		TypeVersion: CurrentResultTypeVersion,
-		Root:        d.simulateScan(rootPath),
-	}
-}
 
 func Test__node(t *testing.T) {
 	ts, err := time.Parse(time.Layout, time.Layout)
 	require.NoError(t, err)
 	ts = ts.Local() // assert.Equal only deems times equal if they're in the same time zone
 
-	makeRoot := func() dir {
-		return dir{
-			"a":   file{},
-			"b/d": file{c: "x\n", ts: ts},
-			"c":   file{c: "y\n", hashFromCache: 53},
-			"d":   dirExt{skipped: true},
-			"e/f": dir{
-				"a": file{c: "z\n", ts: ts, hashFromCache: 42},
-				"g": file{inaccessible: true},
-				"h": file{c: "h\n", ts: ts, inaccessible: true},
+	makeRoot := func() DirNode {
+		return DirNode{
+			"a":   FileNode{},
+			"b/d": FileNode{C: "x\n", Ts: ts},
+			"c":   FileNode{C: "y\n", HashFromCache: 53},
+			"d":   DirNodeExt{Skipped: true},
+			"e/f": DirNode{
+				"a": FileNode{C: "z\n", Ts: ts, HashFromCache: 42},
+				"g": FileNode{Inaccessible: true},
+				"h": FileNode{C: "h\n", Ts: ts, Inaccessible: true},
 			},
-			"h": file{c: "q", skipped: true},
-			"x": dir{},
-			"y": dirExt{inaccessible: true, dir: dir{"z": file{c: "zzz"}}},
+			"h": FileNode{C: "q", Skipped: true},
+			"x": DirNode{},
+			"y": DirNodeExt{Inaccessible: true, Dir: DirNode{"z": FileNode{C: "zzz"}}},
 		}
 	}
 
-	t.Run("writeTestdata", func(t *testing.T) {
+	t.Run("WriteTestdata", func(t *testing.T) {
 		before := time.Now()
 		root := makeRoot()
 		rootPath := tempDir(t)
-		root.writeTestdata(t, rootPath)
+		root.WriteTestdata(t, rootPath)
 		after := time.Now()
 
 		// Check that root wasn't modified.
@@ -275,9 +278,9 @@ func Test__node(t *testing.T) {
 		assertCompatibleInfos(t, want, infos, before, after)
 	})
 
-	t.Run("simulateScan", func(t *testing.T) {
+	t.Run("SimulateScan", func(t *testing.T) {
 		root := makeRoot()
-		s := root.simulateScan("root")
+		s := root.SimulateScan("root")
 
 		// Assert that root wasn't modified.
 		require.Equal(t, makeRoot(), root)
@@ -320,14 +323,14 @@ func Test__node(t *testing.T) {
 }
 
 func Test__node_with_overlapping_dirs(t *testing.T) {
-	root := dir{
-		"a/b": file{c: "ab"},
-		"a/c": file{c: "ac"},
+	root := DirNode{
+		"a/b": FileNode{C: "ab"},
+		"a/c": FileNode{C: "ac"},
 	}
-	t.Run("writeTestdata", func(t *testing.T) {
+	t.Run("WriteTestdata", func(t *testing.T) {
 		before := time.Now()
 		rootPath := tempDir(t)
-		root.writeTestdata(t, rootPath)
+		root.WriteTestdata(t, rootPath)
 		after := time.Now()
 
 		p := filepath.FromSlash // because Windows...
@@ -343,29 +346,29 @@ func Test__node_with_overlapping_dirs(t *testing.T) {
 		assertCompatibleInfos(t, want, infos, before, after)
 	})
 
-	t.Run("simulateScan", func(t *testing.T) {
+	t.Run("SimulateScan", func(t *testing.T) {
 		assert.PanicsWithError(t, "duplicate dir \"a\"", func() {
-			root.simulateScan("root")
+			root.SimulateScan("root")
 		})
 	})
 }
 
 func Test__node_with_overlapping_files(t *testing.T) {
-	root := dir{
-		"a":   dir{"b": file{c: "x"}},
-		"a/b": file{c: "y"},
+	root := DirNode{
+		"a":   DirNode{"b": FileNode{C: "x"}},
+		"a/b": FileNode{C: "y"},
 	}
-	t.Run("writeTestdata", func(t *testing.T) {
+	t.Run("WriteTestdata", func(t *testing.T) {
 		rootPath := tempDir(t)
 		assert.PanicsWithError(t, "duplicate file \"b\"", func() {
-			root.writeTestdata(t, rootPath)
+			root.WriteTestdata(t, rootPath)
 		})
 	})
 
-	t.Run("simulateScan", func(t *testing.T) {
+	t.Run("SimulateScan", func(t *testing.T) {
 		// Duplicate file implies duplicate dir.
 		assert.PanicsWithError(t, "duplicate dir \"a\"", func() {
-			root.simulateScan("root")
+			root.SimulateScan("root")
 		})
 	})
 }
@@ -451,56 +454,4 @@ func readPath(path string, info os.FileInfo, expectInaccessible bool) (string, e
 		return string(bs), nil
 	}
 	return "", nil
-}
-
-// TODO: Should name 'assertCompatible'?
-
-// assertEqual asserts that this Dir equals the provided expectation.
-// The assertion works like assert.Equal with the special rule that mod times are assumed equal if the expected one is zero.
-// This exception exists because we don't want to explicitly set the mod times of all generated test files,
-// in which case they default to the time that the test is run.
-// The solution of patching the expectation with the current time didn't work well and was replaced with this one.
-func (d *Dir) assertEqual(t *testing.T, want *Dir) {
-	if d == nil {
-		assert.Nil(t, want)
-		return
-	}
-	assert.Equal(t, want.Name, d.Name)
-	assert.Equal(t, want.EmptyFiles, d.EmptyFiles)
-	assert.Equal(t, want.SkippedFiles, d.SkippedFiles)
-	assert.Equal(t, want.SkippedDirs, d.SkippedDirs)
-
-	dirCount := len(want.Dirs)
-	fileCount := len(want.Files)
-	assert.Len(t, d.Dirs, dirCount)
-	assert.Len(t, d.Files, fileCount)
-	// Avoid recursing if assertions already failed.
-	for i := 0; i < dirCount && !t.Failed(); i++ {
-		d.Dirs[i].assertEqual(t, want.Dirs[i])
-	}
-	for i := 0; i < fileCount && !t.Failed(); i++ {
-		d.Files[i].assertEqual(t, want.Files[i])
-	}
-}
-
-func (f *File) assertEqual(t *testing.T, want *File) {
-	if f == nil {
-		assert.Nil(t, want)
-		return
-	}
-	assert.Equal(t, want.Name, f.Name)
-	assert.Equal(t, want.Size, f.Size)
-	if want.ModTime != 0 {
-		assert.Equal(t, want.ModTime, f.ModTime)
-	}
-	assert.Equal(t, want.Hash, f.Hash)
-}
-
-func (r *Result) assertEqual(t *testing.T, want *Result) {
-	if r == nil {
-		assert.Nil(t, want)
-		return
-	}
-	assert.Equal(t, want.TypeVersion, r.TypeVersion)
-	r.Root.assertEqual(t, want.Root)
 }

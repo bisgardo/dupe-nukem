@@ -72,7 +72,7 @@ func Test__symlink_to_nonexistent_root_fails(t *testing.T) {
 	symlinkName := "broken-root-symlink"
 	rootPath := tempDir(t)
 	symlinkPath := filepath.Join(rootPath, symlinkName)
-	symlink("nonexistent").writeTestdata(t, symlinkPath)
+	SymlinkNode("nonexistent").WriteTestdata(t, symlinkPath)
 
 	t.Run("without trailing slash", func(t *testing.T) {
 		_, err := Run(symlinkPath, NoSkip, nil)
@@ -118,17 +118,17 @@ func Test__inaccessible_root_is_skipped_and_logged(t *testing.T) {
 }
 
 func Test__no_skip(t *testing.T) {
-	root := dir{
-		"a":   file{c: "x\n"},
-		"c":   file{c: "y\n"},
-		"b/d": file{c: "x\n"},
-		"e/f": dir{
-			"a": file{c: "z\n"},
-			"g": file{},
+	root := DirNode{
+		"a":   FileNode{C: "x\n"},
+		"c":   FileNode{C: "y\n"},
+		"b/d": FileNode{C: "x\n"},
+		"e/f": DirNode{
+			"a": FileNode{C: "z\n"},
+			"g": FileNode{},
 		},
 	}
 	rootPath := tempDir(t)
-	root.writeTestdata(t, rootPath)
+	root.WriteTestdata(t, rootPath)
 	want := simulateScan(root, rootPath)
 
 	res, err := Run(rootPath, NoSkip, nil)
@@ -186,9 +186,9 @@ func Test__SkipNameSet_nonempty_returns_whether_basename_matches(t *testing.T) {
 }
 
 func Test__root_cannot_be_skipped(t *testing.T) {
-	root := dir{"a": file{c: "x"}}
+	root := DirNode{"a": FileNode{C: "x"}}
 	rootPath := tempDir(t)
-	root.writeTestdata(t, rootPath)
+	root.WriteTestdata(t, rootPath)
 	want := simulateScan(root, rootPath)
 	logs := CaptureLogs(t)
 	res, err := Run(rootPath, makeSkip(filepath.Base(rootPath)), nil)
@@ -206,16 +206,16 @@ func Test__symlink_root_cannot_be_skipped(t *testing.T) {
 	if runtime.GOOS == "windows" && !IsWindowsAdministrator() {
 		t.Skip("Creating symlinks on Windows requires elevated privileges.")
 	}
-	root := dir{"a": file{c: "x"}}
+	root := DirNode{"a": FileNode{C: "x"}}
 	symlinkName := "root-symlink"
 
 	rootName := "root"
-	wrap := dir{
+	wrap := DirNode{
 		rootName:    root,
-		symlinkName: symlink(rootName),
+		symlinkName: SymlinkNode(rootName),
 	}
 	wrapPath := tempDir(t)
-	wrap.writeTestdata(t, wrapPath)
+	wrap.WriteTestdata(t, wrapPath)
 	symlinkPath := filepath.Join(wrapPath, symlinkName)
 	rootPath := filepath.Join(wrapPath, rootName)
 
@@ -251,17 +251,17 @@ func Test__symlink_root_cannot_be_skipped(t *testing.T) {
 }
 
 func Test__skip_dir_without_subdirs_is_logged(t *testing.T) {
-	root := dir{
-		"a": file{c: "x\n"},
-		"c": file{c: "y\n"},
-		"b": dirExt{skipped: true},
-		"e/f": dir{
-			"a": file{c: "z\n"},
-			"g": file{},
+	root := DirNode{
+		"a": FileNode{C: "x\n"},
+		"c": FileNode{C: "y\n"},
+		"b": DirNodeExt{Skipped: true},
+		"e/f": DirNode{
+			"a": FileNode{C: "z\n"},
+			"g": FileNode{},
 		},
 	}
 	rootPath := tempDir(t)
-	root.writeTestdata(t, rootPath)
+	root.WriteTestdata(t, rootPath)
 	want := simulateScan(root, rootPath)
 
 	logs := CaptureLogs(t)
@@ -278,22 +278,22 @@ func Test__skip_dir_without_subdirs_is_logged(t *testing.T) {
 }
 
 func Test__skip_dir_with_subdirs_is_logged(t *testing.T) {
-	root := dir{
-		"a":   file{c: "x\n"},
-		"c":   file{c: "y\n"},
-		"b/d": file{c: "x\n"},
-		"e": dirExt{
-			skipped: true,
-			dir: dir{
-				"f": dir{
-					"a": file{c: "z\n"},
-					"g": file{},
+	root := DirNode{
+		"a":   FileNode{C: "x\n"},
+		"c":   FileNode{C: "y\n"},
+		"b/d": FileNode{C: "x\n"},
+		"e": DirNodeExt{
+			Skipped: true,
+			Dir: DirNode{
+				"f": DirNode{
+					"a": FileNode{C: "z\n"},
+					"g": FileNode{},
 				},
 			},
 		},
 	}
 	rootPath := tempDir(t)
-	root.writeTestdata(t, rootPath)
+	root.WriteTestdata(t, rootPath)
 	want := simulateScan(root, rootPath)
 
 	logs := CaptureLogs(t)
@@ -310,17 +310,17 @@ func Test__skip_dir_with_subdirs_is_logged(t *testing.T) {
 }
 
 func Test__skip_nonempty_files_is_logged(t *testing.T) {
-	root := dir{
-		"a":   file{c: "x\n", skipped: true},
-		"c":   file{c: "y\n"},
-		"b/d": file{c: "x\n"},
-		"e/f": dir{
-			"a": file{c: "z\n", skipped: true},
-			"g": file{},
+	root := DirNode{
+		"a":   FileNode{C: "x\n", Skipped: true},
+		"c":   FileNode{C: "y\n"},
+		"b/d": FileNode{C: "x\n"},
+		"e/f": DirNode{
+			"a": FileNode{C: "z\n", Skipped: true},
+			"g": FileNode{},
 		},
 	}
 	rootPath := tempDir(t)
-	root.writeTestdata(t, rootPath)
+	root.WriteTestdata(t, rootPath)
 	want := simulateScan(root, rootPath)
 
 	logs := CaptureLogs(t)
@@ -341,12 +341,12 @@ func Test__skip_nonempty_files_is_logged(t *testing.T) {
 }
 
 func Test__skip_empty_file_is_logged(t *testing.T) {
-	root := dir{
-		"a": file{c: "z\n"},
-		"g": file{skipped: true},
+	root := DirNode{
+		"a": FileNode{C: "z\n"},
+		"g": FileNode{Skipped: true},
 	}
 	rootPath := tempDir(t)
-	root.writeTestdata(t, rootPath)
+	root.WriteTestdata(t, rootPath)
 	want := simulateScan(root, rootPath)
 	logs := CaptureLogs(t)
 	res, err := Run(rootPath, makeSkip("g"), nil)
@@ -363,14 +363,14 @@ func Test__skip_empty_file_is_logged(t *testing.T) {
 
 func Test__skip_symlink_is_logged(t *testing.T) {
 	symlinkName := "symlink"
-	root := dir{
-		symlinkName: symlinkExt{
-			symlink: symlink("skipped"),
-			skipped: true,
+	root := DirNode{
+		symlinkName: SymlinkExtNode{
+			Symlink: SymlinkNode("Skipped"),
+			Skipped: true,
 		},
 	}
 	rootPath := tempDir(t)
-	root.writeTestdata(t, rootPath)
+	root.WriteTestdata(t, rootPath)
 	symlinkPath := filepath.Join(rootPath, symlinkName)
 	want := simulateScan(root, rootPath)
 	logs := CaptureLogs(t)
@@ -384,14 +384,14 @@ func Test__skip_symlink_is_logged(t *testing.T) {
 }
 
 func Test__skip_file_after_dir(t *testing.T) {
-	// Added while fixing a bug where the skipped node was wrongfully added to the directory
+	// Added while fixing a bug where the skipped file was wrongfully added to the directory
 	// that was just scanned because 'head' wasn't getting updated until *after* the skip check.
-	root := dir{
-		"a": dir{},
-		"x": file{skipped: true},
+	root := DirNode{
+		"a": DirNode{},
+		"x": FileNode{Skipped: true},
 	}
 	rootPath := tempDir(t)
-	root.writeTestdata(t, rootPath)
+	root.WriteTestdata(t, rootPath)
 	want := simulateScan(root, rootPath)
 	logs := CaptureLogs(t)
 	res, err := Run(rootPath, makeSkip("x"), nil)
@@ -407,12 +407,12 @@ func Test__skip_file_after_dir(t *testing.T) {
 }
 
 func Test__trailing_slash_of_run_path_gets_removed(t *testing.T) {
-	root := dir{
-		"a": file{c: "z\n"},
-		"g": file{},
+	root := DirNode{
+		"a": FileNode{C: "z\n"},
+		"g": FileNode{},
 	}
 	rootPath := tempDir(t)
-	root.writeTestdata(t, rootPath)
+	root.WriteTestdata(t, rootPath)
 	want := simulateScan(root, rootPath)
 
 	res, err := Run(rootPath+"/", NoSkip, nil) // note added '/'
@@ -425,13 +425,13 @@ func Test__trailing_slash_of_run_path_gets_removed(t *testing.T) {
 //
 //	... and maybe even call t.Parallel() automatically when certain features are not used?
 func Test__inaccessible_internal_file_is_not_hashed_and_is_logged(t *testing.T) {
-	root := dir{
-		"a":            file{c: "z\n"},
-		"g":            file{},
-		"inaccessible": file{c: "53cR31_", inaccessible: true},
+	root := DirNode{
+		"a":            FileNode{C: "z\n"},
+		"g":            FileNode{},
+		"inaccessible": FileNode{C: "53cR31_", Inaccessible: true},
 	}
 	rootPath := tempDir(t)
-	root.writeTestdata(t, rootPath)
+	root.WriteTestdata(t, rootPath)
 	want := simulateScan(root, rootPath)
 
 	logs := CaptureLogs(t)
@@ -450,15 +450,15 @@ func Test__inaccessible_internal_file_is_not_hashed_and_is_logged(t *testing.T) 
 // On Windows, this test only works if the repository is stored on a filesystem
 // that supports the command 'icacls' (such as NTFS).
 func Test__inaccessible_internal_dir_is_logged(t *testing.T) {
-	root := dir{
-		"f": dir{
-			"a":            file{c: "z\n"},
-			"g":            file{},
-			"inaccessible": dirExt{inaccessible: true},
+	root := DirNode{
+		"f": DirNode{
+			"a":            FileNode{C: "z\n"},
+			"g":            FileNode{},
+			"inaccessible": DirNodeExt{Inaccessible: true},
 		},
 	}
 	rootPath := tempDir(t)
-	root.writeTestdata(t, rootPath)
+	root.WriteTestdata(t, rootPath)
 	want := simulateScan(root, rootPath)
 
 	logs := CaptureLogs(t)
@@ -475,12 +475,12 @@ func Test__inaccessible_internal_dir_is_logged(t *testing.T) {
 }
 
 func Test__inaccessible_internal_empty_file_is_not_logged(t *testing.T) {
-	root := dir{
-		"a":                  file{c: "x"},
-		"inaccessible+empty": file{inaccessible: true},
+	root := DirNode{
+		"a":                  FileNode{C: "x"},
+		"inaccessible+empty": FileNode{Inaccessible: true},
 	}
 	rootPath := tempDir(t)
-	root.writeTestdata(t, rootPath)
+	root.WriteTestdata(t, rootPath)
 	want := simulateScan(root, rootPath)
 	logs := CaptureLogs(t)
 	res, err := Run(rootPath, NoSkip, nil)
@@ -510,12 +510,12 @@ func Test__cache_root_name_check(t *testing.T) {
 	t.Run("cache name matches after resolving root symlink", func(t *testing.T) {
 		rootName := "root"
 		symlinkName := "symlink"
-		wrap := dir{
-			rootName:    dir{},
-			symlinkName: symlink(rootName),
+		wrap := DirNode{
+			rootName:    DirNode{},
+			symlinkName: SymlinkNode(rootName),
 		}
 		wrapPath := tempDir(t)
-		wrap.writeTestdata(t, wrapPath)
+		wrap.WriteTestdata(t, wrapPath)
 		rootPath := filepath.Join(wrapPath, rootName)
 		rootSymlinkPath := filepath.Join(wrapPath, symlinkName)
 
@@ -530,12 +530,12 @@ func Test__cache_root_name_check(t *testing.T) {
 	t.Run("cache name symlink is not followed", func(t *testing.T) {
 		rootName := "root"
 		cacheSymlinkName := "cache-symlink"
-		wrap := dir{
-			rootName:         dir{},
-			cacheSymlinkName: symlink(rootName),
+		wrap := DirNode{
+			rootName:         DirNode{},
+			cacheSymlinkName: SymlinkNode(rootName),
 		}
 		wrapPath := tempDir(t)
-		wrap.writeTestdata(t, wrapPath)
+		wrap.WriteTestdata(t, wrapPath)
 		rootPath := filepath.Join(wrapPath, rootName)
 		cacheSymlinkPath := filepath.Join(wrapPath, cacheSymlinkName)
 
@@ -551,18 +551,18 @@ func Test__hashes_from_cache_are_used(t *testing.T) {
 	ts, err := time.Parse(time.Layout, time.Layout)
 	require.NoError(t, err)
 
-	root := dir{
-		"a":   file{c: "x\n", ts: ts},
-		"c":   file{c: "y\n", ts: ts, hashFromCache: 53},
-		"b/d": file{c: "x\n", ts: ts},
-		"e/f": dir{
-			"a": file{c: "z\n", ts: ts, hashFromCache: 42},
-			"g": file{ts: ts},
+	root := DirNode{
+		"a":   FileNode{C: "x\n", Ts: ts},
+		"c":   FileNode{C: "y\n", Ts: ts, HashFromCache: 53},
+		"b/d": FileNode{C: "x\n", Ts: ts},
+		"e/f": DirNode{
+			"a": FileNode{C: "z\n", Ts: ts, HashFromCache: 42},
+			"g": FileNode{Ts: ts},
 		},
-		"h": file{c: "q\n", ts: ts},
+		"h": FileNode{C: "q\n", Ts: ts},
 	}
 	rootPath := tempDir(t)
-	root.writeTestdata(t, rootPath)
+	root.WriteTestdata(t, rootPath)
 	want := simulateScan(root, rootPath)
 
 	tsUnix := ts.Unix()
@@ -601,11 +601,11 @@ func Test__cache_with_mismatching_file_size_is_not_used(t *testing.T) {
 	ts, err := time.Parse(time.Layout, time.Layout)
 	require.NoError(t, err)
 
-	root := dir{
-		"d": file{c: "x\n", ts: ts},
+	root := DirNode{
+		"d": FileNode{C: "x\n", Ts: ts},
 	}
 	rootPath := tempDir(t)
-	root.writeTestdata(t, rootPath)
+	root.WriteTestdata(t, rootPath)
 	want := simulateScan(root, rootPath)
 
 	cache := &Dir{
@@ -628,11 +628,11 @@ func Test__cache_with_mismatching_file_mod_time_is_not_used(t *testing.T) {
 	ts, err := time.Parse(time.Layout, time.Layout)
 	require.NoError(t, err)
 
-	root := dir{
-		"d": file{c: "x\n", ts: ts},
+	root := DirNode{
+		"d": FileNode{C: "x\n", Ts: ts},
 	}
 	rootPath := tempDir(t)
-	root.writeTestdata(t, rootPath)
+	root.WriteTestdata(t, rootPath)
 	want := simulateScan(root, rootPath)
 
 	cache := &Dir{
@@ -655,12 +655,12 @@ func Test__hash_of_inaccessible_file_is_used(t *testing.T) {
 	ts, err := time.Parse(time.Layout, time.Layout)
 	require.NoError(t, err)
 
-	root := dir{
-		"a": file{c: "x", ts: ts, inaccessible: true, hashFromCache: 42},
+	root := DirNode{
+		"a": FileNode{C: "x", Ts: ts, Inaccessible: true, HashFromCache: 42},
 	}
 
 	rootPath := tempDir(t)
-	root.writeTestdata(t, rootPath)
+	root.WriteTestdata(t, rootPath)
 	want := simulateScan(root, rootPath)
 
 	cache := &Dir{
@@ -683,11 +683,11 @@ func Test__cache_entry_with_hash_0_is_ignored_and_logged(t *testing.T) {
 	ts, err := time.Parse(time.Layout, time.Layout)
 	require.NoError(t, err)
 
-	root := dir{
-		"d": file{c: "x\n", ts: ts},
+	root := DirNode{
+		"d": FileNode{C: "x\n", Ts: ts},
 	}
 	rootPath := tempDir(t)
-	root.writeTestdata(t, rootPath)
+	root.WriteTestdata(t, rootPath)
 	want := simulateScan(root, rootPath)
 
 	cache := &Dir{
@@ -715,12 +715,12 @@ func Test__cache_entry_with_hash_0_is_ignored_and_logged(t *testing.T) {
 }
 
 func Test__hash_computed_as_0_is_logged(t *testing.T) {
-	root := dir{
+	root := DirNode{
 		// Contents hash to 0 (https://md5hashing.net/hash/fnv1a64/0000000000000000).
-		"hash0": file{c: "77kepQFQ8Kl"},
+		"hash0": FileNode{C: "77kepQFQ8Kl"},
 	}
 	rootPath := tempDir(t)
-	root.writeTestdata(t, rootPath)
+	root.WriteTestdata(t, rootPath)
 	want := simulateScan(root, rootPath)
 
 	logs := CaptureLogs(t)
@@ -743,18 +743,18 @@ func Test__root_symlink_is_followed_and_logged(t *testing.T) {
 		t.Skip("Creating symlinks on Windows requires elevated privileges.")
 	}
 
-	symlinkedDir := dir{
-		"a": file{c: "z\n"},
-		"g": file{},
+	symlinkedDir := DirNode{
+		"a": FileNode{C: "z\n"},
+		"g": FileNode{},
 	}
 	symlinkName := "symlink"
 	rootName := "data"
-	wrap := dir{
-		symlinkName: symlink(rootName),
+	wrap := DirNode{
+		symlinkName: SymlinkNode(rootName),
 		rootName:    symlinkedDir,
 	}
 	wrapPath := tempDir(t)
-	wrap.writeTestdata(t, wrapPath)
+	wrap.WriteTestdata(t, wrapPath)
 	rootSymlinkPath := filepath.Join(wrapPath, symlinkName)
 	rootPath := filepath.Join(wrapPath, rootName)
 	want := simulateScan(symlinkedDir, rootPath)
@@ -776,19 +776,19 @@ func Test__root_indirect_symlink_is_followed_and_logged(t *testing.T) {
 		t.Skip("Creating symlinks on Windows requires elevated privileges.")
 	}
 
-	symlinkedDir := dir{
-		"a": file{c: "z\n"},
-		"g": file{},
+	symlinkedDir := DirNode{
+		"a": FileNode{C: "z\n"},
+		"g": FileNode{},
 	}
 	symlinkName := "indirect-symlink"
 	rootName := "data"
-	wrap := dir{
-		symlinkName: symlink("symlink"),
-		"symlink":   symlink(rootName),
+	wrap := DirNode{
+		symlinkName: SymlinkNode("symlink"),
+		"symlink":   SymlinkNode(rootName),
 		rootName:    symlinkedDir,
 	}
 	wrapPath := tempDir(t)
-	wrap.writeTestdata(t, wrapPath)
+	wrap.WriteTestdata(t, wrapPath)
 	rootSymlinkPath := filepath.Join(wrapPath, symlinkName)
 	rootPath := filepath.Join(wrapPath, rootName)
 	want := simulateScan(symlinkedDir, rootPath)
@@ -814,26 +814,26 @@ func Test__internal_symlink_is_skipped_and_logged(t *testing.T) {
 
 	tests := []struct {
 		name string
-		root dir
+		root DirNode
 	}{
 		{
 			name: "existing target",
-			root: dir{
-				"a":         file{c: "z\n"},
-				symlinkName: symlink("a"),
+			root: DirNode{
+				"a":         FileNode{C: "z\n"},
+				symlinkName: SymlinkNode("a"),
 			},
 		},
 		{
 			name: "non-existing target",
-			root: dir{
-				symlinkName: symlink("x"),
+			root: DirNode{
+				symlinkName: SymlinkNode("x"),
 			},
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			rootPath := tempDir(t)
-			test.root.writeTestdata(t, rootPath)
+			test.root.WriteTestdata(t, rootPath)
 			want := simulateScan(test.root, rootPath)
 			logs := CaptureLogs(t)
 			res, err := Run(rootPath, NoSkip, nil)
@@ -857,23 +857,23 @@ func Test__root_symlink_to_ancestor_is_followed_but_skipped_and_logged_when_inte
 		t.Skip("Creating symlinks on Windows requires elevated privileges.")
 	}
 	symlinkName := "parent-symlink"
-	symlinkedDir := dir{
-		"a":         file{c: "z\n"},
-		"g":         file{},
-		symlinkName: symlink(".."), // points to root
+	symlinkedDir := DirNode{
+		"a":         FileNode{C: "z\n"},
+		"g":         FileNode{},
+		symlinkName: SymlinkNode(".."), // points to root
 	}
 	symlinkTargetName := "f"
-	root := dir{
+	root := DirNode{
 		symlinkTargetName: symlinkedDir,
 	}
 	rootPath := tempDir(t)
-	root.writeTestdata(t, rootPath)
+	root.WriteTestdata(t, rootPath)
 	want := &Result{
 		TypeVersion: CurrentResultTypeVersion,
 		Root: &Dir{
 			Name: rootPath,
 			Dirs: []*Dir{
-				symlinkedDir.simulateScan(symlinkTargetName),
+				symlinkedDir.SimulateScan(symlinkTargetName),
 			},
 		},
 	}
@@ -922,5 +922,12 @@ func makeSkip(names ...string) ShouldSkipPath {
 			}
 		}
 		return false
+	}
+}
+
+func simulateScan(d DirNode, rootPath string) *Result {
+	return &Result{
+		TypeVersion: CurrentResultTypeVersion,
+		Root:        d.SimulateScan(rootPath),
 	}
 }
