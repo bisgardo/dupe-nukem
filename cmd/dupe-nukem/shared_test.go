@@ -26,7 +26,7 @@ func Test__resolveReader_rejects_invalid_compressed_scan_file(t *testing.T) {
 	assert.EqualError(t, err, "gzip: invalid header")
 }
 
-func Test__loadScanDirFile_loads_scan_file(t *testing.T) {
+func Test__loadScanResultFile_loads_scan_file(t *testing.T) {
 	f := "testdata/cache1.json"
 	want := &scan.Result{
 		TypeVersion: scan.CurrentResultTypeVersion,
@@ -51,7 +51,7 @@ func Test__loadScanDirFile_loads_scan_file(t *testing.T) {
 	assert.Equal(t, want, res)
 }
 
-func Test__loadScanDirFile_loads_compressed_scan_file(t *testing.T) {
+func Test__loadScanResultFile_loads_compressed_scan_file(t *testing.T) {
 	f := "testdata/cache2.json.gz" // fun fact: uses CRLF when uncompressed (while cache1.json uses LF)
 	want := &scan.Result{
 		TypeVersion: scan.CurrentResultTypeVersion,
@@ -62,7 +62,7 @@ func Test__loadScanDirFile_loads_compressed_scan_file(t *testing.T) {
 	assert.Equal(t, want, res)
 }
 
-func Test__loadScanDirFile_wraps_scan_file_error(t *testing.T) {
+func Test__loadScanResultFile_wraps_scan_file_error(t *testing.T) {
 	path := TempFileByPattern(t,
 		"invalid-*.gz", // the '*' is swapped out for gibberish instead of it being appended after ".gz"
 		nil,
