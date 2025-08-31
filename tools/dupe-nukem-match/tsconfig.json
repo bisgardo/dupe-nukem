@@ -1,0 +1,15 @@
+// Using TypeScript to check JSDoc annotations only - no transpilation.
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": true,
+    "lib": ["es2015", "dom"],
+
+    // Allow importing JSON files - only relevant during early development...
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+  },
+  "include": ["src/**/*.js"]
+}

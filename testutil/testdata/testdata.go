@@ -18,7 +18,7 @@ import (
 	"github.com/bisgardo/dupe-nukem/testutil"
 )
 
-// Node is a content item of a DirNode, used for building test data for Run.
+// Node is a content item of a DirNode, used for building test data for scan.Run.
 type Node interface {
 	// SimulateScanFromParent adds the "scan" result of the Node to the Dir representing the parent Node.
 	SimulateScanFromParent(parent *scan.Dir, name string)
@@ -131,9 +131,9 @@ type FileNode struct {
 	// If the value is non-zero (or Inaccessible is true), then SimulateScan will expect the hash to resolve to this value
 	// (as if it was read from a cache file) instead of explicitly computing it.
 	HashFromCache uint64
-	// Whether SimulateScan should expect the file to be skipped by Run.
+	// Whether SimulateScan should expect the file to be skipped by scan.Run.
 	Skipped bool
-	// Whether WriteTestdata is to make the file inaccessible (and thus expecting Run to find it so).
+	// Whether WriteTestdata is to make the file inaccessible (and thus expecting scan.Run to find it so).
 	Inaccessible bool
 }
 
