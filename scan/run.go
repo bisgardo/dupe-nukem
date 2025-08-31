@@ -163,21 +163,21 @@ func run(rootPath string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, error) {
 		if shouldSkip(parentPath, name) {
 			log.Printf("skipping %v %q based on skip list\n", util.FileModeName(info.Mode()), path)
 			if info.IsDir() {
-				head.curDir.appendSkippedDir(name)
+				head.curDir.AppendSkippedDir(name)
 				return filepath.SkipDir
 			}
-			head.curDir.appendSkippedFile(name)
+			head.curDir.AppendSkippedFile(name)
 			return nil
 		}
 
 		if mode := info.Mode(); mode.IsDir() {
 			dir := NewDir(name)
-			head.curDir.appendDir(dir) // Walk visits in lexical order
+			head.curDir.AppendDir(dir) // Walk visits in lexical order
 			head = &walkContext{
 				prev:     head,
 				curDir:   dir,
 				pathLen:  len(path),
-				cacheDir: safeFindDir(head.cacheDir, name),
+				cacheDir: SafeFindDir(head.cacheDir, name),
 			}
 		} else if !mode.IsRegular() {
 			// File is a symlink, named pipe, socket, device, etc.
@@ -185,7 +185,7 @@ func run(rootPath string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, error) {
 			// IDEA: If symlink, print target (and whether it exists).
 			log.Printf("skipping %v %q during scan\n", util.FileModeName(mode), path)
 		} else if size := info.Size(); size == 0 {
-			head.curDir.appendEmptyFile(name) // Walk visits in lexical order
+			head.curDir.AppendEmptyFile(name) // Walk visits in lexical order
 		} else {
 			// IDEA: Parallelize hash computation (via work queue for example).
 			// IDEA: Consider adding option to hash a limited number of bytes only
@@ -210,7 +210,7 @@ func run(rootPath string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, error) {
 					log.Printf("info: hash of file %q evaluated to 0 - this might result in warnings (which can be safely ignored) if the output is used as cache in future scans\n", path)
 				}
 			}
-			head.curDir.appendFile(NewFile(name, size, info.ModTime().Unix(), h)) // Walk visits in lexical order
+			head.curDir.AppendFile(NewFile(name, size, info.ModTime().Unix(), h)) // Walk visits in lexical order
 		}
 		return nil
 	})
@@ -221,7 +221,7 @@ func run(rootPath string, shouldSkip ShouldSkipPath, cache *Dir) (*Dir, error) {
 // A cache miss will always return hash value 0.
 // The boolean return value indicates whether the hash was found in the cache or not.
 func hashFromCache(cacheDir *Dir, fileName string, fileSize int64, modTimeUnix int64) (uint64, bool) {
-	f := safeFindFile(cacheDir, fileName)
+	f := SafeFindFile(cacheDir, fileName)
 	if f != nil && f.Size == fileSize && f.ModTime == modTimeUnix {
 		return f.Hash, true
 	}

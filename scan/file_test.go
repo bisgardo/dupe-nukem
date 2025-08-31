@@ -8,11 +8,11 @@ import (
 )
 
 func Test__safeFindDir_nil_returns_nil(t *testing.T) {
-	assert.Nil(t, safeFindDir(nil, "x"))
+	assert.Nil(t, SafeFindDir(nil, "x"))
 }
 
 func Test__safeFindFile_nil_returns_nil(t *testing.T) {
-	assert.Nil(t, safeFindFile(nil, "x"))
+	assert.Nil(t, SafeFindFile(nil, "x"))
 }
 
 //goland:noinspection GoSnakeCaseUsage
@@ -78,7 +78,7 @@ func Test__safeFindDir_finds_subdir(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("%v/%v", test.dir.Name, test.name), func(t *testing.T) {
-			dir := safeFindDir(test.dir, test.name)
+			dir := SafeFindDir(test.dir, test.name)
 			assert.True(t, dir == test.want)
 		})
 	}
@@ -100,7 +100,7 @@ func Test__safeFindFile_finds_file(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("%v/%v", test.dir.Name, test.name), func(t *testing.T) {
-			dir := safeFindFile(test.dir, test.name)
+			dir := SafeFindFile(test.dir, test.name)
 			assert.True(t, dir == test.want)
 		})
 	}

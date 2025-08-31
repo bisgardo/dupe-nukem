@@ -1,4 +1,4 @@
-package scan
+package scan_test // must use test package as otherwise we cannot use 'testdata' (and 'scantest') which depends on the 'scan' types
 
 import (
 	"fmt"
@@ -11,7 +11,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	. "github.com/bisgardo/dupe-nukem/scan"
+	. "github.com/bisgardo/dupe-nukem/scan/scantest"
 	. "github.com/bisgardo/dupe-nukem/testutil"
+	. "github.com/bisgardo/dupe-nukem/testutil/testdata"
 )
 
 // TODO: Revise data setup of all tests using the new system (construct more targeted setups)
@@ -39,7 +42,7 @@ func Test__empty_dir(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			res, err := Run(rootDir, test.shouldSkip, nil)
 			require.NoError(t, err)
-			res.assertEqual(t, want)
+			AssertEqualResult(t, res, want)
 		})
 	}
 }
@@ -107,7 +110,7 @@ func Test__inaccessible_root_is_skipped_and_logged(t *testing.T) {
 	logs := CaptureLogs(t)
 	res, err := Run(rootPath, NoSkip, nil)
 	require.NoError(t, err)
-	res.assertEqual(t, want)
+	AssertEqualResult(t, res, want)
 	assert.Equal(t,
 		fmt.Sprintf(
 			Lines("skipping inaccessible directory %q"),
@@ -133,7 +136,7 @@ func Test__no_skip(t *testing.T) {
 
 	res, err := Run(rootPath, NoSkip, nil)
 	require.NoError(t, err)
-	res.assertEqual(t, want)
+	AssertEqualResult(t, res, want)
 }
 
 func Test__SkipNameSet_empty_always_returns_false(t *testing.T) {
@@ -193,7 +196,7 @@ func Test__root_cannot_be_skipped(t *testing.T) {
 	logs := CaptureLogs(t)
 	res, err := Run(rootPath, makeSkip(filepath.Base(rootPath)), nil)
 	require.NoError(t, err)
-	res.assertEqual(t, want)
+	AssertEqualResult(t, res, want)
 	assert.Equal(t,
 		fmt.Sprintf(Lines("not skipping root directory %q"), rootPath),
 		logs.String(),
@@ -244,7 +247,7 @@ func Test__symlink_root_cannot_be_skipped(t *testing.T) {
 			logs := CaptureLogs(t)
 			res, err := Run(symlinkPath, makeSkip(test.skipName), nil)
 			require.NoError(t, err)
-			res.assertEqual(t, want)
+			AssertEqualResult(t, res, want)
 			assert.Equal(t, test.wantLogs, logs.String())
 		})
 	}
@@ -267,7 +270,7 @@ func Test__skip_dir_without_subdirs_is_logged(t *testing.T) {
 	logs := CaptureLogs(t)
 	res, err := Run(rootPath, makeSkip("b"), nil)
 	require.NoError(t, err)
-	res.assertEqual(t, want)
+	AssertEqualResult(t, res, want)
 	assert.Equal(t,
 		fmt.Sprintf(
 			Lines("skipping directory %q based on skip list"),
@@ -299,7 +302,7 @@ func Test__skip_dir_with_subdirs_is_logged(t *testing.T) {
 	logs := CaptureLogs(t)
 	res, err := Run(rootPath, makeSkip("e"), nil)
 	require.NoError(t, err)
-	res.assertEqual(t, want)
+	AssertEqualResult(t, res, want)
 	assert.Equal(t,
 		fmt.Sprintf(
 			Lines("skipping directory %q based on skip list"),
@@ -326,7 +329,7 @@ func Test__skip_nonempty_files_is_logged(t *testing.T) {
 	logs := CaptureLogs(t)
 	res, err := Run(rootPath, makeSkip("a"), nil)
 	require.NoError(t, err)
-	res.assertEqual(t, want)
+	AssertEqualResult(t, res, want)
 	assert.Equal(t,
 		fmt.Sprintf(
 			Lines(
@@ -351,7 +354,7 @@ func Test__skip_empty_file_is_logged(t *testing.T) {
 	logs := CaptureLogs(t)
 	res, err := Run(rootPath, makeSkip("g"), nil)
 	require.NoError(t, err)
-	res.assertEqual(t, want)
+	AssertEqualResult(t, res, want)
 	assert.Equal(t,
 		fmt.Sprintf(
 			Lines("skipping file %q based on skip list"),
@@ -376,7 +379,7 @@ func Test__skip_symlink_is_logged(t *testing.T) {
 	logs := CaptureLogs(t)
 	res, err := Run(rootPath, makeSkip(symlinkName), nil)
 	require.NoError(t, err)
-	res.assertEqual(t, want)
+	AssertEqualResult(t, res, want)
 	assert.Equal(t,
 		fmt.Sprintf(Lines("skipping symlink %q based on skip list"), symlinkPath),
 		logs.String(),
@@ -396,7 +399,7 @@ func Test__skip_file_after_dir(t *testing.T) {
 	logs := CaptureLogs(t)
 	res, err := Run(rootPath, makeSkip("x"), nil)
 	require.NoError(t, err)
-	res.assertEqual(t, want)
+	AssertEqualResult(t, res, want)
 	assert.Equal(t,
 		fmt.Sprintf(
 			Lines("skipping file %q based on skip list"),
@@ -417,7 +420,7 @@ func Test__trailing_slash_of_run_path_gets_removed(t *testing.T) {
 
 	res, err := Run(rootPath+"/", NoSkip, nil) // note added '/'
 	require.NoError(t, err)
-	res.assertEqual(t, want)
+	AssertEqualResult(t, res, want)
 }
 
 // On Windows, this test only works if the repository is stored on an NTFS drive.
@@ -437,7 +440,7 @@ func Test__inaccessible_internal_file_is_not_hashed_and_is_logged(t *testing.T) 
 	logs := CaptureLogs(t)
 	res, err := Run(rootPath, NoSkip, nil)
 	require.NoError(t, err)
-	res.assertEqual(t, want)
+	AssertEqualResult(t, res, want)
 	assert.Equal(t,
 		fmt.Sprintf(
 			Lines("error: cannot hash file %q: cannot open file: access denied"),
@@ -464,7 +467,7 @@ func Test__inaccessible_internal_dir_is_logged(t *testing.T) {
 	logs := CaptureLogs(t)
 	res, err := Run(rootPath, NoSkip, nil)
 	require.NoError(t, err)
-	res.assertEqual(t, want)
+	AssertEqualResult(t, res, want)
 	assert.Equal(t,
 		fmt.Sprintf(
 			Lines("skipping inaccessible directory %q"),
@@ -485,7 +488,7 @@ func Test__inaccessible_internal_empty_file_is_not_logged(t *testing.T) {
 	logs := CaptureLogs(t)
 	res, err := Run(rootPath, NoSkip, nil)
 	require.NoError(t, err)
-	res.assertEqual(t, want)
+	AssertEqualResult(t, res, want)
 	assert.Empty(t, logs.String())
 }
 
@@ -594,7 +597,7 @@ func Test__hashes_from_cache_are_used(t *testing.T) {
 	}
 	res, err := Run(rootPath, NoSkip, cache)
 	require.NoError(t, err)
-	res.assertEqual(t, want)
+	AssertEqualResult(t, res, want)
 }
 
 func Test__cache_with_mismatching_file_size_is_not_used(t *testing.T) {
@@ -621,7 +624,7 @@ func Test__cache_with_mismatching_file_size_is_not_used(t *testing.T) {
 	}
 	res, err := Run(rootPath, NoSkip, cache)
 	require.NoError(t, err)
-	res.assertEqual(t, want)
+	AssertEqualResult(t, res, want)
 }
 
 func Test__cache_with_mismatching_file_mod_time_is_not_used(t *testing.T) {
@@ -648,7 +651,7 @@ func Test__cache_with_mismatching_file_mod_time_is_not_used(t *testing.T) {
 	}
 	res, err := Run(rootPath, NoSkip, cache)
 	require.NoError(t, err)
-	res.assertEqual(t, want)
+	AssertEqualResult(t, res, want)
 }
 
 func Test__hash_of_inaccessible_file_is_used(t *testing.T) {
@@ -676,7 +679,7 @@ func Test__hash_of_inaccessible_file_is_used(t *testing.T) {
 	}
 	res, err := Run(rootPath, NoSkip, cache)
 	require.NoError(t, err)
-	res.assertEqual(t, want)
+	AssertEqualResult(t, res, want)
 }
 
 func Test__cache_entry_with_hash_0_is_ignored_and_logged(t *testing.T) {
@@ -704,7 +707,7 @@ func Test__cache_entry_with_hash_0_is_ignored_and_logged(t *testing.T) {
 	logs := CaptureLogs(t)
 	res, err := Run(rootPath, NoSkip, cache)
 	require.NoError(t, err)
-	res.assertEqual(t, want)
+	AssertEqualResult(t, res, want)
 	assert.Equal(t,
 		fmt.Sprintf(
 			Lines("warning: cached hash value 0 of file %q ignored"),
@@ -726,7 +729,7 @@ func Test__hash_computed_as_0_is_logged(t *testing.T) {
 	logs := CaptureLogs(t)
 	res, err := Run(rootPath, NoSkip, nil)
 	require.NoError(t, err)
-	res.assertEqual(t, want)
+	AssertEqualResult(t, res, want)
 	assert.Equal(t,
 		fmt.Sprintf(
 			Lines("info: hash of file %q evaluated to 0 - this might result in warnings (which can be safely ignored) if the output is used as cache in future scans"),
@@ -762,7 +765,7 @@ func Test__root_symlink_is_followed_and_logged(t *testing.T) {
 	logs := CaptureLogs(t)
 	res, err := Run(rootSymlinkPath, NoSkip, nil)
 	require.NoError(t, err)
-	res.assertEqual(t, want)
+	AssertEqualResult(t, res, want)
 	assert.Equal(t,
 		fmt.Sprintf(Lines("following root symlink %q to %q"), rootSymlinkPath, rootPath),
 		logs.String(),
@@ -796,7 +799,7 @@ func Test__root_indirect_symlink_is_followed_and_logged(t *testing.T) {
 	logs := CaptureLogs(t)
 	res, err := Run(rootSymlinkPath, NoSkip, nil)
 	require.NoError(t, err)
-	res.assertEqual(t, want)
+	AssertEqualResult(t, res, want)
 	assert.Equal(t,
 		fmt.Sprintf(Lines("following root symlink %q to %q"), rootSymlinkPath, rootPath),
 		logs.String(),
@@ -838,7 +841,7 @@ func Test__internal_symlink_is_skipped_and_logged(t *testing.T) {
 			logs := CaptureLogs(t)
 			res, err := Run(rootPath, NoSkip, nil)
 			require.NoError(t, err)
-			res.assertEqual(t, want)
+			AssertEqualResult(t, res, want)
 			assert.Equal(t,
 				fmt.Sprintf(
 					Lines("skipping symlink %q during scan"),
@@ -882,7 +885,7 @@ func Test__root_symlink_to_ancestor_is_followed_but_skipped_and_logged_when_inte
 	rootSymlinkPath := filepath.Join(rootPath, symlinkTargetName, symlinkName)
 	res, err := Run(rootSymlinkPath, NoSkip, nil)
 	require.NoError(t, err)
-	res.assertEqual(t, want)
+	AssertEqualResult(t, res, want)
 	assert.Equal(t,
 		fmt.Sprintf(
 			Lines(

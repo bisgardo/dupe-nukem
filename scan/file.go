@@ -26,38 +26,38 @@ func NewDir(name string) *Dir {
 	return &Dir{Name: name}
 }
 
-// appendDir appends a Dir to the list of subdirectories.
+// AppendDir appends a Dir to the list of subdirectories.
 // The usage pattern must ensure that this doesn't break the ordering constraint
 // as the function doesn't ensure nor check this.
-func (d *Dir) appendDir(s *Dir) {
+func (d *Dir) AppendDir(s *Dir) {
 	d.Dirs = append(d.Dirs, s)
 }
 
-// appendFile appends a File to the list of files.
+// AppendFile appends a File to the list of files.
 // The usage pattern must ensure that this doesn't break the ordering constraint
 // as the function doesn't ensure nor check this.
-func (d *Dir) appendFile(f *File) {
+func (d *Dir) AppendFile(f *File) {
 	d.Files = append(d.Files, f)
 }
 
-// appendEmptyFile appends a file name to the list of empty files.
+// AppendEmptyFile appends a file name to the list of empty files.
 // The usage pattern must ensure that this doesn't break the ordering constraint
 // as the function doesn't ensure nor check this.
-func (d *Dir) appendEmptyFile(fileName string) {
+func (d *Dir) AppendEmptyFile(fileName string) {
 	d.EmptyFiles = append(d.EmptyFiles, fileName)
 }
 
-// appendSkippedFile appends the file name to the list of files that were skipped by scan.
+// AppendSkippedFile appends the file name to the list of files that were skipped by scan.
 // The usage pattern must ensure that this doesn't break the ordering constraint
 // as the function doesn't ensure nor check this.
-func (d *Dir) appendSkippedFile(name string) {
+func (d *Dir) AppendSkippedFile(name string) {
 	d.SkippedFiles = append(d.SkippedFiles, name)
 }
 
-// appendSkippedDir appends the dir name to the list of subdirectories that were skipped by scan.
+// AppendSkippedDir appends the dir name to the list of subdirectories that were skipped by scan.
 // The usage pattern must ensure that this doesn't break the ordering constraint
 // as the function doesn't ensure nor check this.
-func (d *Dir) appendSkippedDir(dirName string) {
+func (d *Dir) AppendSkippedDir(dirName string) {
 	d.SkippedDirs = append(d.SkippedDirs, dirName)
 }
 
@@ -84,9 +84,9 @@ func NewFile(name string, size int64, modTime int64, hash uint64) *File {
 	}
 }
 
-// safeFindDir looks for a Dir with the given name in the subdirectory list of the given Dir.
+// SafeFindDir looks for a Dir with the given name in the subdirectory list of the given Dir.
 // Returns nil if the Dir is nil or doesn't have a subdirectory with that name.
-func safeFindDir(d *Dir, name string) *Dir {
+func SafeFindDir(d *Dir, name string) *Dir {
 	if d == nil {
 		return nil
 	}
@@ -99,9 +99,9 @@ func safeFindDir(d *Dir, name string) *Dir {
 	return nil
 }
 
-// safeFindFile looks for a File with the given name in the file list of the given Dir.
+// SafeFindFile looks for a File with the given name in the file list of the given Dir.
 // Returns nil if the Dir is nil or doesn't have a file with that name.
-func safeFindFile(d *Dir, name string) *File {
+func SafeFindFile(d *Dir, name string) *File {
 	if d == nil {
 		return nil
 	}
