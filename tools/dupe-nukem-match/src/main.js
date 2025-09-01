@@ -26,7 +26,7 @@ const app = document.getElementById('app')
 if (app) {
     const doms = targets.map(({root}) => {
         const container = document.createElement('ul')
-        container.appendChild(root.dom)
+        container.appendChild(root.dom.self)
         return container
     })
     app.replaceChildren(domTargetWrapper(doms))

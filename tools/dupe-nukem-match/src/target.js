@@ -1,4 +1,13 @@
+/**
+ * The main domain model of the app:
+ * The app compares a list of {@link Target}s, each of which is loaded from a {@link ScanResult}.
+ * A target contains a navigable tree of the file structure and a {@link FileIndex} of files by hash.
+ * Each directory and file (represented by {@link Dir} and {@link File}, respectively) has a "DOM component manager"
+ * which is responsible for directly manipulating the DOM elements that render the target.
+ */
+
 import {assertScanDir, assertScanFile} from './scan'
+import {DirDom, FileDom} from './dom'
 
 // Import JSDoc types. This could be done once and for all in a globals.d.ts file.
 // But it feels like we're probably going to move the fields to the target types
@@ -32,14 +41,12 @@ class Dir {
     /**
      * @param {Dir|undefined} parent Parent directory.
      * @param {ScanDir} scanDir Source directory from the scan result.
-     * @param {HTMLLIElement} dom DOM element of the directory.
-     * @param {HTMLUListElement} contentsDom DOM element of the directory's contents.'
+     * @param {DirDom} dom DOM manager of the directory.
      */
-    constructor(parent, scanDir, dom, contentsDom) {
+    constructor(parent, scanDir, dom) {
         this.parent = parent
         this.scanDir = scanDir
         this.dom = dom
-        this.containerDom = contentsDom
     }
 }
 
@@ -50,7 +57,7 @@ class File {
     /**
      * @param {Dir} dir Directory in which the file is located.
      * @param {ScanFile} scanFile Source file from the scan result.
-     * @param {HTMLLIElement} dom DOM element of the file.
+     * @param {FileDom} dom DOM manager of the file.
      */
     constructor(dir, scanFile, dom) {
         this.dir = dir
@@ -66,12 +73,9 @@ class File {
  * @returns Dir
  */
 function makeTargetDir(parent, scanDir) {
-    const dom = document.createElement('li')
-    dom.textContent = scanDir.name
-    parent?.containerDom.appendChild(dom) // attach to parent's container DOM element
-    const containerDom = document.createElement('ul')
-    dom.appendChild(containerDom) // attach to "own" DOM element
-    return new Dir(parent, scanDir, dom, containerDom)
+    const dom = new DirDom(scanDir.name)
+    parent?.dom.append(dom) // attach to parent's container DOM element (if provided)
+    return new Dir(parent, scanDir, dom)
 }
 
 /**
@@ -81,14 +85,13 @@ function makeTargetDir(parent, scanDir) {
  * @returns File
  */
 function makeTargetFile(dir, scanFile) {
-    const dom = document.createElement('li')
-    dom.textContent = scanFile.name
-    dir.containerDom.appendChild(dom) // attach to parent's container DOM element
+    const dom = new FileDom(scanFile.name)
+    dir.dom.append(dom) // attach to parent's container DOM element
     return new File(dir, scanFile, dom)
 }
 
 /**
- * Build target from the root of a scan result.
+ * Build target from the root of a {@link ScanResult}.
  * @param {unknown} scanRoot
  * @returns {Target}
  */

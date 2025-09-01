@@ -1,4 +1,6 @@
-/* TYPE DEFINITIONS */
+/**
+ * Type definitions and type checking functions for the scan result input types.
+ */
 
 /**
  * The result of scanning the root directory.
