@@ -30,3 +30,18 @@ footer {
         min-width: 0; /* allow shrinking */
     }
 }
+
+custom-dir, custom-file {
+    display: contents;
+}
+
+custom-dir::part(name) {
+    font-weight: bold;
+}
+custom-file::part(name) {
+    font-style: italic;
+}
+
+custom-dir::part(container) {
+    background-color: red;
+}
