@@ -40,3 +40,7 @@ footer {
 .highlighted {
     background-color: yellow;
 }
+
+.matched {
+    background-color: lightgreen;
+}

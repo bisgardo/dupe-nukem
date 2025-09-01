@@ -9,11 +9,9 @@
  * In the former case, it'll just be added directly. In the latter one, the called node will attach the caller to the appropriate container element.
  */
 
-import {Target, Dir, File} from "./target"
+import {Target, Dir, File, walkDir} from "./target"
 
-/**
- * @type {WeakMap<HTMLElement, DirDom|FileDom>}
- */
+/** @type {WeakMap<HTMLElement, DirDom|FileDom>} */
 const elements = new WeakMap()
 
 export class DirDom {
@@ -95,11 +93,23 @@ export class FileDom {
     /**
      * @param {boolean} v
      */
-    setHighlighted(v) {
+    setHovered(v) {
         if (v) {
             this.root.classList.add('highlighted')
         } else {
             this.root.classList.remove('highlighted')
+        }
+        return this
+    }
+
+    /**
+     * @param {boolean} v
+     */
+    setMatched(v) {
+        if (v) {
+            this.root.classList.add('matched')
+        } else {
+            this.root.classList.remove('matched')
         }
         return this
     }
@@ -116,18 +126,13 @@ export class FileDom {
 export class TargetContainerDom {
     /**
      * @param {Target} target
+     * @param {Controller} controller
      */
-    constructor(target) {
+    constructor(target, controller) {
         this.target = target
         this.root = TargetContainerDom.#createRoot()
-        this.root.addEventListener('mouseover', this.handleMouseOver)
-        this.root.addEventListener('mouseout', this.handleMouseOut)
         this.container = this.root.appendChild(TargetContainerDom.#createContainer())
-
-        /**
-         * @type {DirDom|FileDom|null}
-         */
-        this.currentlyHighlighed = null
+        controller.registerEventListeners(this)
     }
 
     static #createRoot() {
@@ -141,39 +146,12 @@ export class TargetContainerDom {
     }
 
     /**
-     * @param {DirDom|FileDom|null} dom
+     * @template {keyof HTMLElementEventMap} K
+     * @param {K} event
+     * @param {(this: HTMLDivElement, ev: HTMLElementEventMap[K]) => any} listener
      */
-    setHighlighed(dom) {
-        if (this.currentlyHighlighed !== dom) {
-            this.currentlyHighlighed?.setHighlighted(false)
-        }
-        if (dom) {
-            dom.setHighlighted(true)
-        }
-        this.currentlyHighlighed = dom
-    }
-
-    // TODO: It feels like this logic should be moved to a controller of some sort.
-
-    /**
-     * @param {MouseEvent} e
-     */
-    handleMouseOver = (e) => {
-        console.log('over', e.target)
-        let nextHighlighted = null
-        if (e.target instanceof HTMLElement) {
-            const dom = elements.get(e.target);
-            if (dom) nextHighlighted = dom;
-        }
-        this.setHighlighed(nextHighlighted)
-    }
-
-    /**
-     * @param {MouseEvent} e
-     */
-    handleMouseOut = (e) => {
-        console.log('out', e.target)
-        this.setHighlighed(null)
+    addEventListener(event, listener) {
+        this.root.addEventListener(event, listener)
     }
 
     /**
@@ -192,3 +170,100 @@ export class TargetContainerDom {
         parent.appendChild(this.root)
     }
 }
+
+export class Controller {
+    /**
+     * @param {Target[]} targets
+     */
+    constructor(targets) {
+        this.targets = targets
+
+        /** @type {FileDom|null} */
+        this.currentlyHovered = null
+        /** @type {Set<FileDom>} */
+        this.currentMatched = new Set()
+    }
+
+    /**
+     * @param {TargetContainerDom} dom
+     */
+    registerEventListeners(dom) {
+        dom.addEventListener('mouseover', this.handleMouseOver)
+        dom.addEventListener('mouseout', this.handleMouseOut)
+    }
+
+    /**
+     * @param {FileDom|null} dom
+     */
+    setHovered(dom) {
+        if (this.currentlyHovered !== dom) {
+            this.currentlyHovered?.setHovered(false)
+        }
+        if (dom) {
+            dom.setHovered(true)
+        }
+        this.currentlyHovered = dom
+    }
+
+    /**
+     * @param {Set<FileDom>} files
+     * @returns {Set<FileDom>}
+     */
+    findMatchesOf(files) {
+        /** @type {Set<FileDom>} */
+        const matchedDoms = new Set()
+        /** @type {Set<number>} */
+        const hashes = new Set()
+        files.forEach(({file}) => hashes.add(file.scanFile.hash))
+        for (const hash of hashes) {
+            for (const t of this.targets) {
+                const matches = t.index.get(hash)
+                matches?.forEach(({dom}) => dom && !files.has(dom) && matchedDoms.add(dom))
+            }
+        }
+        return matchedDoms
+    }
+
+    /**
+     * @param {Set<FileDom>} newMatchedDoms
+     */
+    refreshCurrentlyMatched(newMatchedDoms) {
+        for (const dom of this.currentMatched) {
+            if (!newMatchedDoms.has(dom)) {
+                dom.setMatched(false)
+            }
+        }
+        for (const dom of newMatchedDoms) {
+            dom.setMatched(true)
+        }
+        this.currentMatched = newMatchedDoms
+    }
+
+    /**
+     * @param {MouseEvent} e
+     */
+    handleMouseOver = (e) => {
+        let hovered = null
+        const selected = new Set()
+        if (e.target instanceof HTMLElement) {
+            const dom = elements.get(e.target);
+            if (dom instanceof FileDom) {
+                hovered = dom;
+                selected.add(dom)
+            }
+            if (dom instanceof DirDom) {
+                // Collect all files in the directory tree.
+                walkDir(dom.dir, (file) => selected.add(file.dom), () => true)
+            }
+        }
+        this.setHovered(hovered)
+        /** @type {Set<FileDom>} */
+        const matched = this.findMatchesOf(selected)
+        this.refreshCurrentlyMatched(matched)
+    }
+
+    handleMouseOut = () => {
+        this.setHovered(null)
+    }
+}
+

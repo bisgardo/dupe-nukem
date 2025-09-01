@@ -45,7 +45,25 @@ export class Dir {
     constructor(parent, scanDir) {
         this.parent = parent
         this.scanDir = scanDir
+        /** @type {Dir[]} */
+        this.dirs = []
+        /** @type {File[]} */
+        this.files = []
         this.dom = null
+    }
+
+    /**
+     * @param {Dir} child
+     */
+    addDir(child) {
+        this.dirs.push(child)
+    }
+
+    /**
+     * @param {File} child
+     */
+    addFile(child) {
+        this.files.push(child)
     }
 
     /**
@@ -96,6 +114,7 @@ export class File {
  */
 function makeTargetDir(parent, scanDir) {
     const res = new Dir(parent, scanDir)
+    parent?.addDir(res)
     const dom = new DirDom(res)
     res.setDom(dom, true)
     return res
@@ -109,6 +128,7 @@ function makeTargetDir(parent, scanDir) {
  */
 function makeTargetFile(dir, scanFile) {
     const res = new File(dir, scanFile)
+    dir.addFile(res)
     const dom = new FileDom(res)
     res.setDom(dom, true)
     return res
@@ -152,4 +172,21 @@ export function buildTarget(scanRoot) {
 
     const root = buildRecursive(scanRoot, undefined)
     return new Target(root, index)
+}
+
+/**
+ * @param {Dir} dir
+ * @param {(file: File, level: number) => void} fileCallback
+ * @param {(dir: Dir, level: number) => boolean} dirCallback
+ * @param level
+ */
+export function walkDir(dir, fileCallback, dirCallback, level = 0) {
+    if (dirCallback(dir, level++)) {
+        for (const d of dir.dirs) {
+            walkDir(d, fileCallback, dirCallback, level)
+        }
+        for (const f of dir.files) {
+            fileCallback(f, level)
+        }
+    }
 }
