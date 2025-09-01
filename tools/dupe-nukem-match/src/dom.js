@@ -9,6 +9,9 @@
  * In the former case, it'll just be added directly. In the latter one, the called node will attach the caller to the appropriate container element.
  */
 
+// TODO:
+//  - Both DirDom and FileDom currently have identical implementations of method 'mark'. If it stays that way, consider extracting a common base class.
+
 import {Target, Dir, File, walkDir} from "./target"
 
 /** @type {WeakMap<HTMLElement, DirDom|FileDom>} */
@@ -56,19 +59,24 @@ export class DirDom {
     }
 
     /**
+     * @param {MarkKey} key
      * @param {boolean} v
      */
-    setHighlighted(v) {
+    mark(key, v) {
+        // For now all keys just map directly to a CSS class.
         if (v) {
-            this.root.classList.add('highlighted')
+            this.root.classList.add(key)
         } else {
-            this.root.classList.remove('highlighted')
+            this.root.classList.remove(key)
         }
-        return this
     }
 
     // TODO: Add method for expanding, collapsing etc.
 }
+
+/**
+ * @typedef {'highlighted'|'matched'} MarkKey
+ */
 
 export class FileDom {
     /**
@@ -91,27 +99,16 @@ export class FileDom {
     }
 
     /**
+     * @param {MarkKey} key
      * @param {boolean} v
      */
-    setHovered(v) {
+    mark(key, v) {
+        // For now all keys just map directly to a CSS class.
         if (v) {
-            this.root.classList.add('highlighted')
+            this.root.classList.add(key)
         } else {
-            this.root.classList.remove('highlighted')
+            this.root.classList.remove(key)
         }
-        return this
-    }
-
-    /**
-     * @param {boolean} v
-     */
-    setMatched(v) {
-        if (v) {
-            this.root.classList.add('matched')
-        } else {
-            this.root.classList.remove('matched')
-        }
-        return this
     }
 
     /**
@@ -178,10 +175,11 @@ export class Controller {
     constructor(targets) {
         this.targets = targets
 
-        /** @type {FileDom|null} */
-        this.currentlyHovered = null
-        /** @type {Set<FileDom>} */
-        this.currentMatched = new Set()
+        /** @type {Record<MarkKey, Set<DirDom|FileDom>|null>} */
+        this.marks = {
+            highlighted: null,
+            matched: null,
+        }
     }
 
     /**
@@ -190,19 +188,6 @@ export class Controller {
     registerEventListeners(dom) {
         dom.addEventListener('mouseover', this.handleMouseOver)
         dom.addEventListener('mouseout', this.handleMouseOut)
-    }
-
-    /**
-     * @param {FileDom|null} dom
-     */
-    setHovered(dom) {
-        if (this.currentlyHovered !== dom) {
-            this.currentlyHovered?.setHovered(false)
-        }
-        if (dom) {
-            dom.setHovered(true)
-        }
-        this.currentlyHovered = dom
     }
 
     /**
@@ -225,45 +210,45 @@ export class Controller {
     }
 
     /**
-     * @param {Set<FileDom>} newMatchedDoms
+     * @param {MarkKey} key
+     * @param {Set<DirDom|FileDom>|null} doms
      */
-    refreshCurrentlyMatched(newMatchedDoms) {
-        for (const dom of this.currentMatched) {
-            if (!newMatchedDoms.has(dom)) {
-                dom.setMatched(false)
+    refreshMarks(key, doms) {
+        const marked = this.marks[key];
+        if (marked !== null) for (const dom of marked) {
+            if (!doms?.has(dom)) {
+                dom.mark(key, false)
             }
         }
-        for (const dom of newMatchedDoms) {
-            dom.setMatched(true)
+        if (doms !== null) for (const dom of doms) {
+            dom.mark(key, true)
         }
-        this.currentMatched = newMatchedDoms
+        this.marks[key] = doms
     }
 
     /**
      * @param {MouseEvent} e
      */
     handleMouseOver = (e) => {
-        let hovered = null
-        const selected = new Set()
+        const highlighted = new Set()
         if (e.target instanceof HTMLElement) {
             const dom = elements.get(e.target);
             if (dom instanceof FileDom) {
-                hovered = dom;
-                selected.add(dom)
+                highlighted.add(dom)
             }
             if (dom instanceof DirDom) {
                 // Collect all files in the directory tree.
-                walkDir(dom.dir, (file) => selected.add(file.dom), () => true)
+                walkDir(dom.dir, (file) => highlighted.add(file.dom), () => true)
             }
         }
-        this.setHovered(hovered)
-        /** @type {Set<FileDom>} */
-        const matched = this.findMatchesOf(selected)
-        this.refreshCurrentlyMatched(matched)
+        this.refreshMarks('highlighted', highlighted)
+        const matched = this.findMatchesOf(highlighted)
+        this.refreshMarks('matched', matched)
     }
 
     handleMouseOut = () => {
-        this.setHovered(null)
+        this.refreshMarks('highlighted', null)
+        this.refreshMarks('matched', null)
     }
 }
 
