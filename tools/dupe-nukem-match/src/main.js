@@ -25,9 +25,12 @@ function domTargetWrapper(targetDoms) {
 const app = document.getElementById('app')
 if (app) {
     const doms = targets.map(({root}) => {
-        const container = document.createElement('ul')
-        container.appendChild(root.dom.self)
-        return container
+        const innerContainer = document.createElement('ul')
+        innerContainer.appendChild(root.dom.self)
+        const outerContainer = document.createElement('div')
+        outerContainer.appendChild(innerContainer)
+        outerContainer.className = 'target-container'
+        return outerContainer
     })
     app.replaceChildren(domTargetWrapper(doms))
 }

@@ -50,6 +50,10 @@ func main() {
 			"a": FileNode{C: contents3},
 			"c": FileNode{C: contents2},
 			"g": FileNode{},
+			"x": FileNode{C: contents3},
+			"y": FileNode{C: contents3},
+			"z": FileNode{C: contents3},
+			"k": FileNode{C: contents3},
 		},
 		"e": DirNode{
 			"a": FileNode{C: contents3},
