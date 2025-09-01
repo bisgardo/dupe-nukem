@@ -13,7 +13,7 @@ footer {
     padding: .25em;
 }
 
-#app-container {
+.app-container {
     flex: 1;       /* take up remaining space */
     min-height: 0; /* allow shrinking */
 }

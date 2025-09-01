@@ -4,6 +4,7 @@ import {buildTarget} from './target'
 // Load scan result files.
 import testResult1 from '../gendata/test1.json'
 import testResult2 from '../gendata/test2.json'
+import {TargetContainerDom} from "./dom.js";
 
 /** @type {unknown[]} */
 const scanRoots = [testResult1.root, testResult2.root]
@@ -16,21 +17,18 @@ const targets = scanRoots.map(buildTarget)
  * @return {HTMLElement}
  */
 function domTargetWrapper(targetDoms) {
-    const res = document.createElement('div')
-    res.className = 'targets-container'
-    res.append(...targetDoms)
-    return res
+    const targetsContainer = document.createElement('div')
+    targetsContainer.className = 'targets-container'
+    targetsContainer.replaceChildren(...targetDoms)
+    return targetsContainer
 }
 
 const app = document.getElementById('app')
 if (app) {
-    const doms = targets.map(({root}) => {
-        const innerContainer = document.createElement('ul')
-        innerContainer.appendChild(root.dom.self)
-        const outerContainer = document.createElement('div')
-        outerContainer.appendChild(innerContainer)
-        outerContainer.className = 'target-container'
-        return outerContainer
+    const doms = targets.map((target) => {
+        const res = new TargetContainerDom(target)
+        target.root.dom?.appendTo(res) // attach root to target
+        return res.root
     })
     app.replaceChildren(domTargetWrapper(doms))
 }

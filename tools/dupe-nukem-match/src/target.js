@@ -9,7 +9,7 @@
 import {assertScanDir, assertScanFile} from './scan'
 import {DirDom, FileDom} from './dom'
 
-// Import JSDoc types. This could be done once and for all in a globals.d.ts file.
+// Import JSDoc types. This could be done once and for all in 'globals.d.ts'.
 // But it feels like we're probably going to move the fields to the target types
 // (and make them fully navigable) rather than keeping these "raw" input values around.
 /** @typedef {import("./scan.js").ScanDir} ScanDir */
@@ -37,32 +37,54 @@ export class Target {
 /**
  * A directory in a hierarchical file structure, including its associated DOM elements.
  */
-class Dir {
+export class Dir {
     /**
      * @param {Dir|undefined} parent Parent directory.
      * @param {ScanDir} scanDir Source directory from the scan result.
-     * @param {DirDom} dom DOM manager of the directory.
      */
-    constructor(parent, scanDir, dom) {
+    constructor(parent, scanDir) {
         this.parent = parent
         this.scanDir = scanDir
+        this.dom = null
+    }
+
+    /**
+     * Register the DOM manager of this directory and optionally attach it to the parent dir's DOM (if there is one).
+     * @param {DirDom} dom DOM manager of the directory.
+     * @param {boolean} attach
+     */
+    setDom(dom, attach) {
         this.dom = dom
+        if (attach && this.parent?.dom) {
+            dom.appendTo(this.parent.dom)
+        }
     }
 }
 
 /**
  * A file within a directory structure, including its associated DOM element.
  */
-class File {
+export class File {
     /**
      * @param {Dir} dir Directory in which the file is located.
      * @param {ScanFile} scanFile Source file from the scan result.
-     * @param {FileDom} dom DOM manager of the file.
      */
-    constructor(dir, scanFile, dom) {
+    constructor(dir, scanFile) {
         this.dir = dir
         this.scanFile = scanFile
+        this.dom = null
+    }
+
+    /**
+     * Register the DOM manager of this directory and optionally attach it to the containing dir's DOM.
+     * @param {FileDom} dom DOM manager of the file.
+     * @param {boolean} attach
+     */
+    setDom(dom, attach) {
         this.dom = dom
+        if (attach && this.dir.dom) {
+            dom.appendTo(this.dir.dom)
+        }
     }
 }
 
@@ -73,9 +95,10 @@ class File {
  * @returns Dir
  */
 function makeTargetDir(parent, scanDir) {
-    const dom = new DirDom(scanDir.name)
-    parent?.dom.append(dom) // attach to parent's container DOM element (if provided)
-    return new Dir(parent, scanDir, dom)
+    const res = new Dir(parent, scanDir)
+    const dom = new DirDom(res)
+    res.setDom(dom, true)
+    return res
 }
 
 /**
@@ -85,9 +108,10 @@ function makeTargetDir(parent, scanDir) {
  * @returns File
  */
 function makeTargetFile(dir, scanFile) {
-    const dom = new FileDom(scanFile.name)
-    dir.dom.append(dom) // attach to parent's container DOM element
-    return new File(dir, scanFile, dom)
+    const res = new File(dir, scanFile)
+    const dom = new FileDom(res)
+    res.setDom(dom, true)
+    return res
 }
 
 /**
@@ -125,6 +149,7 @@ export function buildTarget(scanRoot) {
         }
         return targetDir
     }
+
     const root = buildRecursive(scanRoot, undefined)
-    return {root, index}
+    return new Target(root, index)
 }
