@@ -1,21 +1,29 @@
+// TODO:
+//  - Should probably create custom components for Dir and File. Seems better than relying on plain ul/li.
+//    We actually don't need to make it a webcomponent yet - that upgrade can always be done later!
+
 import './style.css'
 
 // Load scan result files.
 import testResult1 from '../gendata/test1.json'
 import testResult2 from '../gendata/test2.json'
 
+/* TYPE DEFINITIONS */
+
+/* = JSON input types = */
+
 /**
  * The result of scanning the root directory.
  * @typedef {Object} ScanResult
- * @property {number} schema_version
- * @property {ScanDir} root
+ * @property {number} schema_version Schema version.
+ * @property {unknown} root Root directory.
  */
 /**
  * The result of scanning a directory.
  * @typedef {Object} ScanDir
  * @property {string} name
- * @property {ScanDir[]=} dirs
- * @property {ScanFile[]=} files
+ * @property {unknown[]=} dirs
+ * @property {unknown[]=} files
  * @property {string[]=} empty_files
  * @property {string[]=} skipped_files
  * @property {string[]=} skipped_dirs
@@ -29,41 +37,67 @@ import testResult2 from '../gendata/test2.json'
  * @property {number} hash
  */
 
-/** @type {ScanDir[]} */
-const roots = [testResult1.root, testResult2.root]
-
-/**
- * Index of a target.
- * @typedef {Map<number, TargetFile[]>} Index
- */
+/** @type {unknown[]} */
+const scanRoots = [testResult1.root, testResult2.root]
 
 /**
  * All processed information of a root.
- * @typedef {Object} Target
- * @property {TargetDir} root
- * @property {Index} index
  */
+class Target {
+    /**
+     * @param {Dir} root
+     * @param {Index} index
+     */
+    constructor(root, index) {
+        this.root = root
+        this.index = index
+    }
+}
+
 /**
- * A directory in a target.
- * @typedef {Object} TargetDir
- * @property {TargetDir=} parent
- * @property {ScanDir} scanDir
- * @property {HTMLLIElement} ownDom DOM element of the directory.
- * @property {HTMLUListElement} containerDom DOM element of the container holding the children.
- */
-/**
- * A file in a target.
- * @typedef {Object} TargetFile
- * @property {TargetDir} dir
- * @property {ScanFile} scanFile
- * @property {HTMLLIElement} ownDom DOM element of the file.
+ * Index of a target.
+ * @typedef {Map<number, File[]>} Index
  */
 
 /**
- * Create new {@link TargetDir}, including the DOM element into which it will be rendered.
- * @param {TargetDir|undefined} parent
+ * A directory in a hierarchical file structure, including its associated DOM elements.
+ */
+class Dir {
+    /**
+     * @param {Dir|undefined} parent Parent directory.
+     * @param {ScanDir} scanDir Source directory from the scan result.
+     * @param {HTMLLIElement} dom DOM element of the directory.
+     * @param {HTMLUListElement} contentsDom DOM element of the directory's contents.'
+     */
+    constructor(parent, scanDir, dom, contentsDom) {
+        this.parent = parent
+        this.scanDir = scanDir
+        this.dom = dom
+        this.containerDom = contentsDom
+    }
+}
+
+/**
+ * A file within a directory structure, including its associated DOM element.
+ */
+class File {
+    /**
+     * @param {Dir} dir Directory in which the file is located.
+     * @param {ScanFile} scanFile Source file from the scan result.
+     * @param {HTMLLIElement} dom DOM element of the file.
+     */
+    constructor(dir, scanFile, dom) {
+        this.dir = dir
+        this.scanFile = scanFile
+        this.dom = dom
+    }
+}
+
+/**
+ * Create new {@link Dir}, including the DOM element into which it will be rendered.
+ * @param {Dir|undefined} parent
  * @param {ScanDir} scanDir
- * @returns TargetDir
+ * @returns Dir
  */
 function makeTargetDir(parent, scanDir) {
     const ownDom = document.createElement('li')
@@ -71,25 +105,75 @@ function makeTargetDir(parent, scanDir) {
     parent?.containerDom.appendChild(ownDom) // attach to parent's container DOM element
     const containerDom = document.createElement('ul')
     ownDom.appendChild(containerDom) // attach to "own" DOM element
-    return {parent, scanDir, ownDom, containerDom}
+    return new Dir(parent, scanDir, ownDom, containerDom)
 }
 
 /**
- * Create new {@link TargetFile}, including the DOM element into which it will be rendered.
- * @param {TargetDir} dir
+ * Create new {@link File}, including the DOM element into which it will be rendered.
+ * @param {Dir} dir
  * @param {ScanFile} scanFile
- * @returns TargetFile
+ * @returns File
  */
 function makeTargetFile(dir, scanFile) {
-    const ownDom = document.createElement('li');
+    const ownDom = document.createElement('li')
     ownDom.textContent = scanFile.name
     dir.containerDom.appendChild(ownDom) // attach to parent's container DOM element
-    return {dir, scanFile, ownDom}
+    return new File(dir, scanFile, ownDom)
+}
+
+/* = Runtime validation helpers = */
+
+/**
+ * Determine if value is a non-null object (record).
+ * @param {unknown} v
+ * @returns {v is Record<string, unknown>}
+ */
+function isRecord(v) {
+    return typeof v === 'object' && v !== null
+}
+
+/**
+ * Check if value is an array of strings.
+ * @param {unknown} a
+ * @returns {a is string[]}
+ */
+function isStringArray(a) {
+    return Array.isArray(a) && a.every(x => typeof x === 'string')
+}
+
+/**
+ * Assert that provided value is a valid {@link ScanFile}, otherwise throw.
+ * @param {unknown} scanFile
+ * @returns {asserts scanFile is ScanFile}
+ */
+function assertScanFile(scanFile) {
+    if (!isRecord(scanFile)) throw new TypeError('Invalid ScanFile: not an object')
+    const { name, size, ts, hash } = scanFile
+    if (typeof name !== 'string') throw new TypeError('Invalid ScanFile.name')
+    if (!Number.isFinite(size)) throw new TypeError('Invalid ScanFile.size')
+    if (!Number.isFinite(ts)) throw new TypeError('Invalid ScanFile.ts')
+    if (!Number.isFinite(hash)) throw new TypeError('Invalid ScanFile.hash')
+}
+
+/**
+ * Assert (non-recursively) that provided value is a valid {@link ScanDir}, otherwise throw.
+ * @param {unknown} scanDir
+ * @returns {asserts scanDir is ScanDir}
+ */
+function assertScanDir(scanDir) {
+    if (!isRecord(scanDir)) throw new TypeError('Invalid ScanDir: not an object')
+    const { name, dirs, files, empty_files, skipped_files, skipped_dirs } = scanDir
+    if (typeof name !== 'string') throw new TypeError('Invalid ScanDir.name')
+    if (dirs !== undefined && !Array.isArray(dirs)) throw new TypeError('Invalid ScanDir.dirs')
+    if (files !== undefined && !Array.isArray(files)) throw new TypeError('Invalid ScanDir.files')
+    if (empty_files !== undefined && !isStringArray(empty_files)) throw new TypeError('Invalid ScanDir.empty_files')
+    if (skipped_files !== undefined && !isStringArray(skipped_files)) throw new TypeError('Invalid ScanDir.skipped_files')
+    if (skipped_dirs !== undefined && !isStringArray(skipped_dirs)) throw new TypeError('Invalid ScanDir.skipped_dirs')
 }
 
 /**
  * Build target from a scan result.
- * @param {ScanDir} scanRoot
+ * @param {unknown} scanRoot
  * @returns {Target}
  */
 function buildTarget(scanRoot) {
@@ -97,10 +181,11 @@ function buildTarget(scanRoot) {
     const index = new Map()
 
     /**
-     * @param {ScanDir} scanDir
-     * @param {TargetDir|undefined} parent
+     * @param {unknown} scanDir
+     * @param {Dir|undefined} parent
      */
     function buildRecursive(scanDir, parent) {
+        assertScanDir(scanDir)
         const targetDir = makeTargetDir(parent, scanDir)
         if (scanDir.dirs !== undefined) {
             for (const d of scanDir.dirs) {
@@ -109,6 +194,7 @@ function buildTarget(scanRoot) {
         }
         if (scanDir.files !== undefined) {
             for (const f of scanDir.files) {
+                assertScanFile(f)
                 const matchFile = makeTargetFile(targetDir, f)
                 const matchFiles = index.get(f.hash)
                 if (matchFiles === undefined) {
@@ -124,10 +210,26 @@ function buildTarget(scanRoot) {
     return {root, index}
 }
 
-const targets = roots.map(buildTarget)
+const targets = scanRoots.map(buildTarget)
 
-const app = document.getElementById('app');
+/**
+ * Wrap DOM elements in a container.
+ * @param {HTMLElement[]} targetDoms
+ * @return {HTMLElement}
+ */
+function domTargetWrapper(targetDoms) {
+    const res = document.createElement('div')
+    res.className = 'targets-container'
+    res.append(...targetDoms)
+    return res
+}
+
+const app = document.getElementById('app')
 if (app) {
-    app.innerHTML = `<pre>${JSON.stringify(targets, null, 2)}</pre>`
-    app.append(...targets.map(({root}) => root.ownDom))
+    const doms = targets.map(({root}) => {
+        const container = document.createElement('ul')
+        container.appendChild(root.dom)
+        return container
+    })
+    app.replaceChildren(domTargetWrapper(doms))
 }
