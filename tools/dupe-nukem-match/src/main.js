@@ -100,12 +100,12 @@ class File {
  * @returns Dir
  */
 function makeTargetDir(parent, scanDir) {
-    const ownDom = document.createElement('li')
-    ownDom.textContent = scanDir.name
-    parent?.containerDom.appendChild(ownDom) // attach to parent's container DOM element
+    const dom = document.createElement('li')
+    dom.textContent = scanDir.name
+    parent?.containerDom.appendChild(dom) // attach to parent's container DOM element
     const containerDom = document.createElement('ul')
-    ownDom.appendChild(containerDom) // attach to "own" DOM element
-    return new Dir(parent, scanDir, ownDom, containerDom)
+    dom.appendChild(containerDom) // attach to "own" DOM element
+    return new Dir(parent, scanDir, dom, containerDom)
 }
 
 /**
@@ -115,10 +115,10 @@ function makeTargetDir(parent, scanDir) {
  * @returns File
  */
 function makeTargetFile(dir, scanFile) {
-    const ownDom = document.createElement('li')
-    ownDom.textContent = scanFile.name
-    dir.containerDom.appendChild(ownDom) // attach to parent's container DOM element
-    return new File(dir, scanFile, ownDom)
+    const dom = document.createElement('li')
+    dom.textContent = scanFile.name
+    dir.containerDom.appendChild(dom) // attach to parent's container DOM element
+    return new File(dir, scanFile, dom)
 }
 
 /* = Runtime validation helpers = */

@@ -14,7 +14,7 @@ footer {
 }
 
 #app-container {
-    flex: 1;
+    flex: 1;       /* take up remaining space */
     min-height: 0; /* allow shrinking */
 }
 
@@ -25,11 +25,8 @@ footer {
 
 .targets-container {
     display: flex;
-}
-
-.targets-container > * {
-    /* Give each direct child an equal share of the space */
-    flex: 1;
-    /* Allow content to shrink without overflowing */
-    min-width: 0;
+    & > * {
+        flex: 1;      /* distribute space evenly */
+        min-width: 0; /* allow shrinking */
+    }
 }
