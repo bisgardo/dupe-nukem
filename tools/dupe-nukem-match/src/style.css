@@ -25,6 +25,7 @@ footer {
 
 .targets-container {
     display: flex;
+
     & > * {
         flex: 1;      /* distribute space evenly */
         min-width: 0; /* allow shrinking */
