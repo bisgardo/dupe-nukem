@@ -36,3 +36,7 @@ footer {
 .target-container {
     overflow: auto; /* show scroll bars for each target separately */
 }
+
+.highlighted {
+    background-color: yellow;
+}

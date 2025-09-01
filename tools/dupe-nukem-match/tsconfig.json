@@ -6,10 +6,12 @@
     "noEmit": true,
     "strict": true,
     "lib": ["es2015", "dom"], // for 'for...of' on 'NodeList', etc., include 'dom.iterable'
+    "target": "ES2015",
 
     // Allow importing JSON files - only relevant during early development...
     "resolveJsonModule": true,
     "esModuleInterop": true,
+    "moduleResolution": "node"
   },
   "include": ["src/**/*.js"]
 }

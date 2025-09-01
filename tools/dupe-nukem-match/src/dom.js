@@ -11,15 +11,34 @@
 
 import {Target, Dir, File} from "./target"
 
+/**
+ * @type {WeakMap<HTMLElement, DirDom|FileDom>}
+ */
+const elements = new WeakMap()
+
 export class DirDom {
     /**
      * @param {Dir} dir
      */
     constructor(dir) {
         this.dir = dir
-        this.root = document.createElement('li')
-        this.root.textContent = dir.scanDir.name
-        this.container = this.root.appendChild(document.createElement('ul'))
+        this.root = DirDom.#createRoot(dir.scanDir.name)
+        this.container = this.root.appendChild(DirDom.#createContainer())
+        elements.set(this.root, this)
+    }
+
+    /**
+     * @param {string} name
+     * @returns {HTMLLIElement}
+     */
+    static #createRoot(name) {
+        const res = document.createElement('li')
+        res.textContent = name
+        return res
+    }
+
+    static #createContainer() {
+        return document.createElement('ul')
     }
 
     /**
@@ -38,6 +57,18 @@ export class DirDom {
         parent.appendChild(this.root)
     }
 
+    /**
+     * @param {boolean} v
+     */
+    setHighlighted(v) {
+        if (v) {
+            this.root.classList.add('highlighted')
+        } else {
+            this.root.classList.remove('highlighted')
+        }
+        return this
+    }
+
     // TODO: Add method for expanding, collapsing etc.
 }
 
@@ -47,11 +78,31 @@ export class FileDom {
      */
     constructor(file) {
         this.file = file
-        this.root = document.createElement('li')
-        this.root.textContent = file.scanFile.name
+        this.root = FileDom.#createRoot(file.scanFile.name)
+        elements.set(this.root, this)
     }
 
-    // TODO: Add methods for highlighting etc..
+    /**
+     * @param {string} name
+     * @returns {HTMLLIElement}
+     */
+    static #createRoot(name) {
+        const res = document.createElement('li')
+        res.textContent = name
+        return res
+    }
+
+    /**
+     * @param {boolean} v
+     */
+    setHighlighted(v) {
+        if (v) {
+            this.root.classList.add('highlighted')
+        } else {
+            this.root.classList.remove('highlighted')
+        }
+        return this
+    }
 
     /**
      * Append to the provided DOM element.
@@ -68,9 +119,61 @@ export class TargetContainerDom {
      */
     constructor(target) {
         this.target = target
-        this.root = document.createElement('div')
-        this.root.className = 'target-container'
-        this.container = this.root.appendChild(document.createElement('ul'))
+        this.root = TargetContainerDom.#createRoot()
+        this.root.addEventListener('mouseover', this.handleMouseOver)
+        this.root.addEventListener('mouseout', this.handleMouseOut)
+        this.container = this.root.appendChild(TargetContainerDom.#createContainer())
+
+        /**
+         * @type {DirDom|FileDom|null}
+         */
+        this.currentlyHighlighed = null
+    }
+
+    static #createRoot() {
+        const root = document.createElement('div')
+        root.className = 'target-container'
+        return root
+    }
+
+    static #createContainer() {
+        return document.createElement('ul')
+    }
+
+    /**
+     * @param {DirDom|FileDom|null} dom
+     */
+    setHighlighed(dom) {
+        if (this.currentlyHighlighed !== dom) {
+            this.currentlyHighlighed?.setHighlighted(false)
+        }
+        if (dom) {
+            dom.setHighlighted(true)
+        }
+        this.currentlyHighlighed = dom
+    }
+
+    // TODO: It feels like this logic should be moved to a controller of some sort.
+
+    /**
+     * @param {MouseEvent} e
+     */
+    handleMouseOver = (e) => {
+        console.log('over', e.target)
+        let nextHighlighted = null
+        if (e.target instanceof HTMLElement) {
+            const dom = elements.get(e.target);
+            if (dom) nextHighlighted = dom;
+        }
+        this.setHighlighed(nextHighlighted)
+    }
+
+    /**
+     * @param {MouseEvent} e
+     */
+    handleMouseOut = (e) => {
+        console.log('out', e.target)
+        this.setHighlighed(null)
     }
 
     /**
