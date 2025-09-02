@@ -1,5 +1,5 @@
-import {Dir, File, Target, walkDir} from "./domain.js";
-import {DirDom, domMap, FileDom, TargetContainerDom} from "./dom.js";
+import {Dir, File, Target, walkDir} from "./domain.js"
+import {DirDom, domMap, FileDom, TargetContainerDom} from "./dom.js"
 
 /**
  * @typedef {import("./dom.js").MarkKey} MarkKey
@@ -31,9 +31,26 @@ export class Controller {
      * @param {TargetContainerDom|Node} dom
      */
     registerEventListeners(dom) {
-        dom.addEventListener('mouseover', e => this.handleMouseOver(e))
-        dom.addEventListener('mouseout', e => this.handleMouseOut(e))
-        document.addEventListener('keydown', ({altKey}) => altKey && this.handleAltDown())
+        dom.addEventListener('mouseover', e => {
+            if (e instanceof MouseEvent && !e.altKey) {
+                this.deferredTarget = e.target
+                return
+            }
+            this.selectTarget(e.target)
+        })
+        dom.addEventListener('mouseout', e => {
+            if (e instanceof MouseEvent && !e.altKey) {
+                // Ignore event unless alt key is pressed.
+                this.deferredTarget = null
+                return
+            }
+            this.clearMarks()
+        })
+        document.addEventListener('keydown', ({altKey}) => {
+            if (altKey) {
+                this.selectTarget(this.deferredTarget)
+            }
+        })
     }
 
     /**
@@ -66,7 +83,7 @@ export class Controller {
      * @param {Set<Dir|File>|null} nodes
      */
     refreshMarks(key, nodes) {
-        const marked = this.marks[key];
+        const marked = this.marks[key]
         if (marked !== null) for (const node of marked) {
             if (!nodes?.has(node)) {
                 node.dom?.mark(key, false)
@@ -87,17 +104,12 @@ export class Controller {
         }
     }
 
-    // TODO: Extract functions from handlers to reflect what they do rather than what they react on.
+    /* EVENT HANDLING */
 
     /**
-     * @param {{target: EventTarget|null}} e
+     * @param {EventTarget|null} target
      */
-    handleMouseOver(e) {
-        let target = e.target ?? this.deferredTarget;
-        if (e instanceof MouseEvent && !e.altKey) {
-            this.deferredTarget = e.target
-            return
-        }
+    selectTarget(target) {
         /** @type {Set<Dir|File>} */
         const hovered = new Set();
         /** @type {Set<Dir|File>} */
@@ -146,21 +158,5 @@ export class Controller {
         const dirsContainingMatchedFiles = new Set()
         matchingFiles.forEach(f => f.forEachAncestor(a => dirsContainingMatchedFiles.add(a)))
         this.refreshMarks('containsMatches', dirsContainingMatchedFiles)
-    }
-
-    /**
-     * @param {Event} e
-     */
-    handleMouseOut(e) {
-        if (e instanceof MouseEvent && !e.altKey) {
-            // Ignore mouse-only event unless alt key is pressed.
-            this.deferredTarget = null
-            return
-        }
-        this.clearMarks()
-    }
-
-    handleAltDown() {
-        this.handleMouseOver({target: null}) // will use deferred target
     }
 }

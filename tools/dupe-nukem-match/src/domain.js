@@ -37,14 +37,14 @@ export class Target {
 
         /** @param {File} file */
         function updateFile(file) {
-            const {hash} = file;
+            const {hash} = file
             // For now we're including matches in our own target - but it's unclear if (and how) we should...
             file.setMatchState(
                 targets.map((target, idx) => {
-                    let numMatches = target.index.get(hash)?.length ?? 0;
+                    let numMatches = target.index.get(hash)?.length ?? 0
                     if (idx === ownTargetIdx) numMatches-- // subtract self
                     console.assert(numMatches >= 0)
-                    return numMatches;
+                    return numMatches
                 })
             )
         }
@@ -69,7 +69,7 @@ export class Dir {
     constructor(parent, name) {
         this.parent = parent
         this.name = name
-        this.dom = null; // init deferred to create circular reference
+        this.dom = null // init deferred to create circular reference
 
         /* TREE NAVIGATION */
 
@@ -124,12 +124,12 @@ export class File {
         this.name = name
         this.size = size
         this.hash = hash
-        this.dom = null; // init deferred to create circular reference
+        this.dom = null // init deferred to create circular reference
 
         /* MATCH STATE */
 
         /** @type {number[]|null} */
-        this.matchCountByTarget = null;
+        this.matchCountByTarget = null
     }
 
     /**
@@ -165,7 +165,7 @@ export class File {
         this.matchCountByTarget = matchCountByTarget
 
         // Sync DOM.
-        const totalMatchCount = matchCountByTarget.reduce((acc, c) => acc+c, 0);
+        const totalMatchCount = matchCountByTarget.reduce((acc, c) => acc+c, 0)
         if (totalMatchCount === 0) {
             this.dom?.mark('hasNoMatches', true)
         }
