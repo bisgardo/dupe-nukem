@@ -4,7 +4,129 @@
 	<meta charset="UTF-8"/>
 	<link rel="icon" type="image/svg+xml" href="/vite.svg"/>
 	<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-	<title>Vite App</title>
+	<title>Dupe Nukem Match</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+	<style>
+		:root {
+			--text: #111827;
+			--muted: #6b7280;
+			--line: #e6e7eb;
+
+			--hovered: #f59e0b;
+			--highlighted: #7c3aed;
+			--matched: #16a34a;
+			--contains: #2563eb;
+		}
+
+		*,
+		*::before,
+		*::after { box-sizing: border-box; }
+
+		html, body { height: 100%; }
+
+		body {
+			margin: 0;
+			color: var(--text);
+			font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
+			-webkit-font-smoothing: antialiased;
+			-moz-osx-font-smoothing: grayscale;
+			line-height: 1.5;
+		}
+
+		header { padding: 12px 16px; }
+		header h1 {
+			margin: 0;
+			font-size: 20px;
+			font-weight: 600;
+			letter-spacing: .2px;
+		}
+
+		.app-container {
+			width: min(1100px, 100% - 32px);
+			margin: 12px auto 20px;
+		}
+
+		/* Legend */
+		footer { padding: 8px 16px 16px; color: var(--muted); }
+		.legend {
+			display: flex;
+			flex-wrap: wrap;
+			align-items: center;
+			gap: 10px 18px;
+			font-size: 14px;
+		}
+		.legend .entry {
+			display: inline-flex;
+			align-items: center;
+			gap: 8px;
+			white-space: nowrap;
+		}
+		.marker {
+			display: inline-block;
+			width: 10px;
+			height: 10px;
+			border-radius: 999px;
+		}
+		.marker.hovered { background: var(--hovered); }
+		.marker.highlighted { background: var(--highlighted); }
+		.marker.matched { background: var(--matched); }
+		.marker.containsMatches {
+			background: transparent;
+			border: 1px solid var(--contains);
+			width: 12px;
+			height: 12px;
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			border-radius: 3px;
+		}
+		.marker.containsMatches .name {
+			display: block;
+			width: 6px;
+			height: 6px;
+			border-radius: 2px;
+			background: var(--contains);
+		}
+
+		/* Simple filesystem-like tree for nested ul/li inside #app */
+		#app ul {
+			list-style: none;
+			padding-left: 0;
+			margin: 0;
+		}
+		#app ul ul {
+			margin-left: 14px;
+			padding-left: 12px;
+			border-left: 1px solid var(--line);
+		}
+		#app li {
+			position: relative;
+			padding-left: 22px;
+			margin: 2px 0;
+			line-height: 1.6;
+			font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+			font-size: 13px;
+		}
+		/* Default file icon */
+		#app li::before {
+			content: "📄";
+			position: absolute;
+			left: 0;
+			top: 0.05rem;
+			font-size: 14px;
+			opacity: .9;
+		}
+		/* Directory icon if it contains a nested list, or has a common dir class */
+		#app li:has(> ul)::before,
+		#app li.dir::before,
+		#app li.folder::before {
+			content: "📁";
+		}
+		/* Optional emphasis for active/hovered items */
+		#app li:hover { background: rgba(0,0,0,0.03); border-radius: 4px; }
+	</style>
 </head>
 <body>
 <header>
