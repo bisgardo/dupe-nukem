@@ -116,6 +116,13 @@ export class File {
         }
         return res
     }
+
+    /**
+     * @param {Target} target
+     */
+    hasMatchesIn(target) {
+        return target.index.has(this.scanFile.hash)
+    }
 }
 
 /**

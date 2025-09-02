@@ -4,7 +4,8 @@ import {buildTarget} from './domain.js'
 // Load scan result files.
 import testResult1 from '../gendata/test1.json'
 import testResult2 from '../gendata/test2.json'
-import {Controller, TargetContainerDom} from "./dom.js";
+import {TargetContainerDom} from "./dom.js";
+import {Controller} from "./controller.js";
 
 /** @type {unknown[]} */
 const scanRoots = [testResult1.root, testResult2.root]
