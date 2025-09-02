@@ -19,14 +19,18 @@ export class Controller {
             matched: null,
             containsMatches: null,
         }
+
+        /** @type {EventTarget|null} */
+        this.deferredTarget = null
     }
 
     /**
-     * @param {TargetContainerDom} dom
+     * @param {TargetContainerDom|Node} dom
      */
     registerEventListeners(dom) {
-        dom.addEventListener('mouseover', this.handleMouseOver)
-        dom.addEventListener('mouseout', this.handleMouseOut)
+        dom.addEventListener('mouseover', e => this.handleMouseOver(e))
+        dom.addEventListener('mouseout', e => this.handleMouseOut(e))
+        document.addEventListener('keydown', ({altKey}) => altKey && this.handleAltDown())
     }
 
     /**
@@ -80,11 +84,15 @@ export class Controller {
         }
     }
 
+    // TODO: Extract functions from handlers to reflect what they do rather than what they react on.
+
     /**
-     * @param {MouseEvent} e
+     * @param {{target: EventTarget|null}} e
      */
-    handleMouseOver = ({target, altKey}) => {
-        if (!altKey) {
+    handleMouseOver(e) {
+        let target = e.target ?? this.deferredTarget;
+        if (e instanceof MouseEvent && !e.altKey) {
+            this.deferredTarget = e.target
             return
         }
         /** @type {Set<Dir|File>} */
@@ -138,13 +146,19 @@ export class Controller {
     }
 
     /**
-     * @param {MouseEvent} e
+     * @param {Event} e
      */
-    handleMouseOut = ({altKey}) => {
-        if (!altKey) {
+    handleMouseOut(e) {
+        if (e instanceof MouseEvent && !e.altKey) {
+            // Ignore mouse-only event unless alt key is pressed.
+            this.deferredTarget = null
             return
         }
         this.clearMarks()
+    }
+
+    handleAltDown() {
+        this.handleMouseOver({target: null}) // will use deferred target
     }
 
     /**

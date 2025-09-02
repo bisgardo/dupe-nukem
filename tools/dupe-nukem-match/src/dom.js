@@ -155,9 +155,8 @@ export class TargetContainerDom {
     }
 
     /**
-     * @template {keyof HTMLElementEventMap} K
-     * @param {K} event
-     * @param {(this: HTMLDivElement, ev: HTMLElementEventMap[K]) => any} listener
+     * @param {string} event
+     * @param {EventListenerOrEventListenerObject} listener
      */
     addEventListener(event, listener) {
         this.root.addEventListener(event, listener)
