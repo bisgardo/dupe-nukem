@@ -137,4 +137,20 @@ export class Controller {
     handleMouseOut = () => {
         this.clearMarks()
     }
+
+    /**
+     * Initialize the DOM nodes to display static information such as whether they have any matches in any other target.
+     */
+    init() {
+        for (const target of this.targets) {
+            const matchedHashes = target.hashesInOtherTargets(this.targets)
+            for (const [hash, files] of target.index) {
+                if (!matchedHashes.has(hash)) {
+                    for (const file of files) {
+                        file.dom?.markHasNoMatches()
+                    }
+                }
+            }
+        }
+    }
 }

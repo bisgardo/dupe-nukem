@@ -27,6 +27,24 @@ export class Target {
         this.root = root
         this.index = index
     }
+
+    /**
+     * Compute the hashes of all files in this target that are present in the provided targets.
+     * For the target itself (i.e. 'this'), a given hash will get included only if it's present more than once.
+     * @param {Target[]} targets
+     */
+    hashesInOtherTargets(targets) {
+        /** @type {Set<number>} */
+        const res = new Set()
+        for (const [hash, files] of this.index) {
+            for (const target of targets) {
+                if (target === this ? files.length > 1 : target.index.has(hash)) {
+                    res.add(hash)
+                }
+            }
+        }
+        return res
+    }
 }
 
 /**

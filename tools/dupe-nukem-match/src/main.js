@@ -27,6 +27,7 @@ function domTargetWrapper(targetDoms) {
 const app = document.getElementById('app')
 if (app) {
     const controller = new Controller(targets)
+    controller.init()
     const doms = targets.map((target) => {
         const res = new TargetContainerDom(target, controller)
         target.root.dom?.appendTo(res) // attach root to target

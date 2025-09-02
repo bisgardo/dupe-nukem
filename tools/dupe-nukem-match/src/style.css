@@ -71,3 +71,7 @@ footer {
         }
     }
 }
+
+.has-no-matches {
+    color: gray;
+}

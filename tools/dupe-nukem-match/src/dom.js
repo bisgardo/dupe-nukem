@@ -119,6 +119,10 @@ export class FileDom {
         }
     }
 
+    markHasNoMatches() {
+        this.root.classList.add('has-no-matches')
+    }
+
     /**
      * Append to the provided DOM element.
      * @param {DirDom|HTMLElement} parent
