@@ -1,5 +1,5 @@
 import './style.css'
-import {buildTarget} from './target'
+import {buildTarget} from './domain.js'
 
 // Load scan result files.
 import testResult1 from '../gendata/test1.json'

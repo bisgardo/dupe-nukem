@@ -12,7 +12,7 @@
 // TODO:
 //  - Both DirDom and FileDom currently have identical implementations of method 'mark'. If it stays that way, consider extracting a common base class.
 
-import {Dir, File, Target, walkDir} from "./target"
+import {Dir, File, Target, walkDir} from "./domain.js"
 
 /** @type {WeakMap<HTMLElement, DirDom|FileDom>} */
 const elements = new WeakMap()
