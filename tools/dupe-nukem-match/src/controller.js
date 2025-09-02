@@ -45,8 +45,8 @@ export class Controller {
         const res = new Set()
         /** @type {Set<number>} */
         const hashes = new Set()
-        for (const f of files) {
-            hashes.add(f.scanFile.hash)
+        for (const {hash} of files) {
+            hashes.add(hash)
         }
         for (const hash of hashes) {
             for (const t of this.targets) {

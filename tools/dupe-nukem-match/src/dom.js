@@ -24,7 +24,7 @@ export class DirDom {
      */
     constructor(dir) {
         this.dir = dir
-        this.root = DirDom.#createRoot(dir.scanDir.name)
+        this.root = DirDom.#createRoot(dir.name)
         this.container = this.root.appendChild(DirDom.#createContainer())
         domMap.set(this.root, this)
     }
@@ -77,8 +77,6 @@ export class DirDom {
             this.root.classList.remove(key)
         }
     }
-
-    // TODO: Add method for expanding, collapsing etc.
 }
 
 /**
@@ -91,7 +89,7 @@ export class FileDom {
      */
     constructor(file) {
         this.file = file
-        this.root = FileDom.#createRoot(file.scanFile.name)
+        this.root = FileDom.#createRoot(file.name)
         domMap.set(this.root, this)
     }
 

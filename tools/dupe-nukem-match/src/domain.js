@@ -9,12 +9,6 @@
 import {assertScanDir, assertScanFile} from './scan'
 import {DirDom, FileDom} from './dom'
 
-// Import JSDoc types. This could be done once and for all in 'globals.d.ts'.
-// But it feels like we're probably going to move the fields to the target types
-// (and make them fully navigable) rather than keeping these "raw" input values around.
-/** @typedef {import("./scan.js").ScanDir} ScanDir */
-/** @typedef {import("./scan.js").ScanFile} ScanFile */
-
 /**
  * All processed information of a root.
  */
@@ -43,7 +37,7 @@ export class Target {
 
         /** @param {File} file */
         function updateFile(file) {
-            const {hash} = file.scanFile;
+            const {hash} = file;
             // For now we're including matches in our own target - but it's unclear if (and how) we should...
             file.setMatchState(
                 targets.map((target, idx) => {
@@ -70,11 +64,11 @@ export class Target {
 export class Dir {
     /**
      * @param {Dir|undefined} parent Parent directory.
-     * @param {ScanDir} scanDir Source directory from the scan result.
+     * @param {string} name
      */
-    constructor(parent, scanDir) {
+    constructor(parent, name) {
         this.parent = parent
-        this.scanDir = scanDir
+        this.name = name
         this.dom = null; // init deferred to create circular reference
 
         /* TREE NAVIGATION */
@@ -121,11 +115,15 @@ export class Dir {
 export class File {
     /**
      * @param {Dir} dir Directory in which the file is located.
-     * @param {ScanFile} scanFile Source file from the scan result.
+     * @param {string} name
+     * @param {number} size
+     * @param {number} hash
      */
-    constructor(dir, scanFile) {
+    constructor(dir, name, size, hash) {
         this.dir = dir
-        this.scanFile = scanFile
+        this.name = name
+        this.size = size
+        this.hash = hash
         this.dom = null; // init deferred to create circular reference
 
         /* MATCH STATE */
@@ -177,11 +175,11 @@ export class File {
 /**
  * Create new {@link Dir}, including the DOM element into which it will be rendered.
  * @param {Dir|undefined} parent
- * @param {ScanDir} scanDir
+ * @param {string} name
  * @returns Dir
  */
-function makeTargetDir(parent, scanDir) {
-    const res = new Dir(parent, scanDir)
+function makeTargetDir(parent, name) {
+    const res = new Dir(parent, name)
     parent?.addDir(res)
     const dom = new DirDom(res)
     res.initDom(dom, true)
@@ -191,11 +189,13 @@ function makeTargetDir(parent, scanDir) {
 /**
  * Create new {@link File}, including the DOM element into which it will be rendered.
  * @param {Dir} dir
- * @param {ScanFile} scanFile
+ * @param {string} name
+ * @param {number} size
+ * @param {number} hash
  * @returns File
  */
-function makeTargetFile(dir, scanFile) {
-    const res = new File(dir, scanFile)
+function makeTargetFile(dir, name, size, hash) {
+    const res = new File(dir, name, size, hash)
     dir.addFile(res)
     const dom = new FileDom(res)
     res.initDom(dom, true)
@@ -217,22 +217,18 @@ export function buildTarget(scanRoot) {
      */
     function buildRecursive(scanDir, parent) {
         assertScanDir(scanDir)
-        const targetDir = makeTargetDir(parent, scanDir)
-        if (scanDir.dirs !== undefined) {
-            for (const d of scanDir.dirs) {
-                buildRecursive(d, targetDir)
-            }
+        const targetDir = makeTargetDir(parent, scanDir.name)
+        if (scanDir.dirs !== undefined) for (const d of scanDir.dirs) {
+            buildRecursive(d, targetDir)
         }
-        if (scanDir.files !== undefined) {
-            for (const f of scanDir.files) {
-                assertScanFile(f)
-                const matchFile = makeTargetFile(targetDir, f)
-                const matchFiles = index.get(f.hash)
-                if (matchFiles === undefined) {
-                    index.set(f.hash, [matchFile])
-                } else {
-                    matchFiles.push(matchFile)
-                }
+        if (scanDir.files !== undefined) for (const f of scanDir.files) {
+            assertScanFile(f)
+            const matchFile = makeTargetFile(targetDir, f.name, f.size, f.hash)
+            const matchFiles = index.get(f.hash)
+            if (matchFiles === undefined) {
+                index.set(f.hash, [matchFile])
+            } else {
+                matchFiles.push(matchFile)
             }
         }
         return targetDir
