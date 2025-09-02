@@ -83,7 +83,10 @@ export class Controller {
     /**
      * @param {MouseEvent} e
      */
-    handleMouseOver = ({target}) => {
+    handleMouseOver = ({target, altKey}) => {
+        if (!altKey) {
+            return
+        }
         /** @type {Set<Dir|File>} */
         const hovered = new Set();
         /** @type {Set<Dir|File>} */
@@ -134,7 +137,13 @@ export class Controller {
         this.refreshMarks('containsMatches', dirsContainingMatchedFiles)
     }
 
-    handleMouseOut = () => {
+    /**
+     * @param {MouseEvent} e
+     */
+    handleMouseOut = ({altKey}) => {
+        if (!altKey) {
+            return
+        }
         this.clearMarks()
     }
 
