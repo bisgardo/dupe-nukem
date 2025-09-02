@@ -82,7 +82,7 @@ export class DirDom {
 }
 
 /**
- * @typedef {'hovered'|'highlighted'|'matched'|'containsMatches'} MarkKey
+ * @typedef {'hovered'|'highlighted'|'matched'|'containsMatches'|'hasNoMatches'} MarkKey
  */
 
 export class FileDom {
@@ -117,10 +117,6 @@ export class FileDom {
         } else {
             this.root.classList.remove(key)
         }
-    }
-
-    markHasNoMatches() {
-        this.root.classList.add('has-no-matches')
     }
 
     /**

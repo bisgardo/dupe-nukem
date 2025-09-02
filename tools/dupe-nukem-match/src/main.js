@@ -11,6 +11,9 @@ import {Controller} from "./controller.js";
 const scanRoots = [testResult1.root, testResult2.root]
 
 const targets = scanRoots.map(buildTarget)
+for (const t of targets) {
+    t.updateMatchInfo(targets)
+}
 
 /**
  * Wrap DOM elements in a container.
@@ -27,7 +30,6 @@ function domTargetWrapper(targetDoms) {
 const app = document.getElementById('app')
 if (app) {
     const controller = new Controller(targets)
-    controller.init()
     const doms = targets.map((target) => {
         const res = new TargetContainerDom(target, controller)
         target.root.dom?.appendTo(res) // attach root to target

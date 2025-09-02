@@ -18,6 +18,9 @@ export class Controller {
             highlighted: null,
             matched: null,
             containsMatches: null,
+            // TODO: Only included to satisfy type - we don't actually track this here.
+            //       This is likely a signal that the types should change (probably just use a map as an enum of plain strings).
+            hasNoMatches: null,
         }
 
         /** @type {EventTarget|null} */
@@ -141,7 +144,7 @@ export class Controller {
         // Collect all parent directories of any files that are matched.
         /** @type {Set<Dir>} */
         const dirsContainingMatchedFiles = new Set()
-        matchingFiles.forEach(f => f.ancestors.forEach(a => dirsContainingMatchedFiles.add(a)))
+        matchingFiles.forEach(f => f.forEachAncestor(a => dirsContainingMatchedFiles.add(a)))
         this.refreshMarks('containsMatches', dirsContainingMatchedFiles)
     }
 
@@ -159,21 +162,5 @@ export class Controller {
 
     handleAltDown() {
         this.handleMouseOver({target: null}) // will use deferred target
-    }
-
-    /**
-     * Initialize the DOM nodes to display static information such as whether they have any matches in any other target.
-     */
-    init() {
-        for (const target of this.targets) {
-            const matchedHashes = target.hashesInOtherTargets(this.targets)
-            for (const [hash, files] of target.index) {
-                if (!matchedHashes.has(hash)) {
-                    for (const file of files) {
-                        file.dom?.markHasNoMatches()
-                    }
-                }
-            }
-        }
     }
 }

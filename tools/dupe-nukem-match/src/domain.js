@@ -29,21 +29,33 @@ export class Target {
     }
 
     /**
-     * Compute the hashes of all files in this target that are present in the provided targets.
-     * For the target itself (i.e. 'this'), a given hash will get included only if it's present more than once.
      * @param {Target[]} targets
      */
-    hashesInOtherTargets(targets) {
-        /** @type {Set<number>} */
-        const res = new Set()
-        for (const [hash, files] of this.index) {
-            for (const target of targets) {
-                if (target === this ? files.length > 1 : target.index.has(hash)) {
-                    res.add(hash)
-                }
-            }
+    updateMatchInfo(targets) {
+        const ownTargetIdx = targets.indexOf(this)
+
+        /** @param {Dir} dir */
+        function updateDir(dir) {
+            for (const d of dir.dirs) updateDir(d)
+            for (const f of dir.files) updateFile(f)
+            // TODO: update dir information
         }
-        return res
+
+        /** @param {File} file */
+        function updateFile(file) {
+            const {hash} = file.scanFile;
+            // For now we're including matches in our own target - but it's unclear if (and how) we should...
+            file.setMatchState(
+                targets.map((target, idx) => {
+                    let numMatches = target.index.get(hash)?.length ?? 0;
+                    if (idx === ownTargetIdx) numMatches-- // subtract self
+                    console.assert(numMatches >= 0)
+                    return numMatches;
+                })
+            )
+        }
+
+        updateDir(this.root)
     }
 }
 
@@ -63,11 +75,29 @@ export class Dir {
     constructor(parent, scanDir) {
         this.parent = parent
         this.scanDir = scanDir
+        this.dom = null; // init deferred to create circular reference
+
+        /* TREE NAVIGATION */
+
         /** @type {Dir[]} */
         this.dirs = []
         /** @type {File[]} */
         this.files = []
-        this.dom = null
+
+        /* MATCH STATE */
+        // TODO
+    }
+
+    /**
+     * Register the DOM manager of this directory and optionally attach it to the parent dir's DOM (if there is one).
+     * @param {DirDom} dom DOM manager of the directory.
+     * @param {boolean} attach
+     */
+    initDom(dom, attach) {
+        this.dom = dom
+        if (attach && this.parent?.dom) {
+            dom.appendTo(this.parent.dom)
+        }
     }
 
     /**
@@ -83,18 +113,6 @@ export class Dir {
     addFile(child) {
         this.files.push(child)
     }
-
-    /**
-     * Register the DOM manager of this directory and optionally attach it to the parent dir's DOM (if there is one).
-     * @param {DirDom} dom DOM manager of the directory.
-     * @param {boolean} attach
-     */
-    setDom(dom, attach) {
-        this.dom = dom
-        if (attach && this.parent?.dom) {
-            dom.appendTo(this.parent.dom)
-        }
-    }
 }
 
 /**
@@ -108,7 +126,12 @@ export class File {
     constructor(dir, scanFile) {
         this.dir = dir
         this.scanFile = scanFile
-        this.dom = null
+        this.dom = null; // init deferred to create circular reference
+
+        /* MATCH STATE */
+
+        /** @type {number[]|null} */
+        this.matchCountByTarget = null;
     }
 
     /**
@@ -116,30 +139,38 @@ export class File {
      * @param {FileDom} dom DOM manager of the file.
      * @param {boolean} attach
      */
-    setDom(dom, attach) {
+    initDom(dom, attach) {
         this.dom = dom
         if (attach && this.dir.dom) {
             dom.appendTo(this.dir.dom)
         }
     }
 
-    get ancestors() {
-        /** @type {Dir[]} */
-        const res = []
+    /**
+     * @param {(value: Dir, index: number) => void} callback
+     */
+    forEachAncestor(callback) {
         /** @type {Dir|undefined} */
         let d = this.dir
-        while (d) {
-            res.push(d)
+        let c = 0
+        do {
+            callback(d, c++)
             d = d.parent
-        }
-        return res
+        } while (d)
     }
 
     /**
-     * @param {Target} target
+     * Set the match state of this file and sync it to the DOM.
+     * @param {number[]} matchCountByTarget Number of matches in other targets.
      */
-    hasMatchesIn(target) {
-        return target.index.has(this.scanFile.hash)
+    setMatchState(matchCountByTarget) {
+        this.matchCountByTarget = matchCountByTarget
+
+        // Sync DOM.
+        const totalMatchCount = matchCountByTarget.reduce((acc, c) => acc+c, 0);
+        if (totalMatchCount === 0) {
+            this.dom?.mark('hasNoMatches', true)
+        }
     }
 }
 
@@ -153,7 +184,7 @@ function makeTargetDir(parent, scanDir) {
     const res = new Dir(parent, scanDir)
     parent?.addDir(res)
     const dom = new DirDom(res)
-    res.setDom(dom, true)
+    res.initDom(dom, true)
     return res
 }
 
@@ -167,7 +198,7 @@ function makeTargetFile(dir, scanFile) {
     const res = new File(dir, scanFile)
     dir.addFile(res)
     const dom = new FileDom(res)
-    res.setDom(dom, true)
+    res.initDom(dom, true)
     return res
 }
 
