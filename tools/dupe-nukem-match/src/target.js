@@ -104,6 +104,18 @@ export class File {
             dom.appendTo(this.dir.dom)
         }
     }
+
+    get ancestors() {
+        /** @type {Dir[]} */
+        const res = []
+        /** @type {Dir|undefined} */
+        let d = this.dir
+        while (d) {
+            res.push(d)
+            d = d.parent
+        }
+        return res
+    }
 }
 
 /**

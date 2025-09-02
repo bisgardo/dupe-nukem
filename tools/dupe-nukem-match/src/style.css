@@ -41,6 +41,7 @@ footer {
     --hover-color: darkcyan;
     --highlight-color: cadetblue;
     --match-color: darkseagreen;
+    --contains-matches: mistyrose;
 }
 
 .hovered {
@@ -53,6 +54,10 @@ footer {
 
 .matched {
     background-color: var(--match-color);
+}
+
+.containsMatches > .name {
+    background-color: var(--contains-matches);
 }
 
 .legend {

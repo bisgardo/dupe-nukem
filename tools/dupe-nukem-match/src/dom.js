@@ -30,14 +30,20 @@ export class DirDom {
 
     /**
      * @param {string} name
-     * @returns {HTMLLIElement}
+     * @returns {HTMLElement}
      */
     static #createRoot(name) {
         const res = document.createElement('li')
-        res.textContent = name
+        res.className = 'dir'
+        const nameContainer = res.appendChild(document.createElement('div'))
+        nameContainer.className = 'name'
+        nameContainer.textContent = name
         return res
     }
 
+    /**
+     * @returns {HTMLElement}
+     */
     static #createContainer() {
         return document.createElement('ul')
     }
@@ -75,7 +81,7 @@ export class DirDom {
 }
 
 /**
- * @typedef {'hovered'|'highlighted'|'matched'} MarkKey
+ * @typedef {'hovered'|'highlighted'|'matched'|'containsMatches'} MarkKey
  */
 
 export class FileDom {
@@ -90,10 +96,11 @@ export class FileDom {
 
     /**
      * @param {string} name
-     * @returns {HTMLLIElement}
+     * @returns {HTMLElement}
      */
     static #createRoot(name) {
         const res = document.createElement('li')
+        res.className = 'file'
         res.textContent = name
         return res
     }
@@ -180,6 +187,7 @@ export class Controller {
             hovered: null,
             highlighted: null,
             matched: null,
+            containsMatches: null,
         }
     }
 
@@ -224,12 +232,12 @@ export class Controller {
         const marked = this.marks[key];
         if (marked !== null) for (const dom of marked) {
             if (!doms?.has(dom)) {
-                dom.mark(key, false) // currently marked, but shouldn't be
+                dom.mark(key, false)
             }
         }
         if (doms !== null) for (const dom of doms) {
             if (!marked?.has(dom)) {
-                dom.mark(key, true) // not currently marked, but should be
+                dom.mark(key, true)
             }
         }
         this.marks[key] = doms
@@ -250,37 +258,53 @@ export class Controller {
         const hovered = new Set();
         /** @type {Set<DirDom|FileDom>} */
         const highlighted = new Set()
-        if (target instanceof HTMLElement) {
-            const dom = elements.get(target);
-            if (dom instanceof FileDom) {
-                hovered.add(dom)
-                // highlighted.add(dom)
-            }
-            if (dom instanceof DirDom) {
-                hovered.add(dom)
-                // Collect all files and directories in the subtree for highlighting.
-                walkDir(
-                    dom.dir,
-                    ({dom}) => dom && highlighted.add(dom),
-                    ({dom}, level) => {
-                        // level > 0 && dom && highlighted.add(dom);
-                        return true;
-                    },
-                )
+        while (target !== null) {
+            // As we only have a single event listener, we cannot rely on the event bubbling to the parent element
+            // when we hit a DOM node sitting above the dir/file elements (like the 'name' div of a Dir).
+            // Instead, we walk up the DOM tree manually until we find a hit (at which point we 'break' out of the loop).
+            if (target instanceof HTMLElement) {
+                const dom = elements.get(target);
+                if (dom instanceof FileDom) {
+                    hovered.add(dom)
+                    // highlighted.add(dom)
+                    break;
+                }
+                if (dom instanceof DirDom) {
+                    hovered.add(dom)
+                    // Collect all files and directories in the subtree for highlighting.
+                    walkDir(
+                        dom.dir,
+                        ({dom}) => dom && highlighted.add(dom),
+                        ({dom}, level) => {
+                            // level > 0 && dom && highlighted.add(dom);
+                            return true;
+                        },
+                    )
+                    break;
+                }
+                target = target.parentElement;
             }
         }
         // Array.of(hovered).map(d => d.mark('hovered', true))
         this.refreshMarks('hovered', hovered)
         this.refreshMarks('highlighted', highlighted)
+
         // Match against hovered and highlighted files.
+        /** @type {Set<FileDom>} */
         const filesToMatch = new Set()
         hovered.forEach(d => d instanceof FileDom && filesToMatch.add(d))
         highlighted.forEach(d => d instanceof FileDom && filesToMatch.add(d))
-        this.refreshMarks('matched', this.findMatchesOf(filesToMatch))
+        const matchingFiles = this.findMatchesOf(filesToMatch);
+        this.refreshMarks('matched', matchingFiles)
+
+        // Collect all parent directories of any files that are matched.
+        /** @type {Set<DirDom>} */
+        const dirsContainingMatchedFiles = new Set()
+        matchingFiles.forEach(({file}) => file.ancestors.forEach(({dom}) => dom && dirsContainingMatchedFiles.add(dom)))
+        this.refreshMarks('containsMatches', dirsContainingMatchedFiles)
     }
 
     handleMouseOut = () => {
         this.clearMarks()
     }
 }
-
