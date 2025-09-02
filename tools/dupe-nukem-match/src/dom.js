@@ -12,7 +12,7 @@
 // TODO:
 //  - Both DirDom and FileDom currently have identical implementations of method 'mark'. If it stays that way, consider extracting a common base class.
 
-import {Target, Dir, File, walkDir} from "./target"
+import {Dir, File, Target, walkDir} from "./target"
 
 /** @type {WeakMap<HTMLElement, DirDom|FileDom>} */
 const elements = new WeakMap()
@@ -75,7 +75,7 @@ export class DirDom {
 }
 
 /**
- * @typedef {'highlighted'|'matched'} MarkKey
+ * @typedef {'hovered'|'highlighted'|'matched'} MarkKey
  */
 
 export class FileDom {
@@ -177,6 +177,7 @@ export class Controller {
 
         /** @type {Record<MarkKey, Set<DirDom|FileDom>|null>} */
         this.marks = {
+            hovered: null,
             highlighted: null,
             matched: null,
         }
@@ -191,22 +192,28 @@ export class Controller {
     }
 
     /**
-     * @param {Set<FileDom>} files
+     * @param {Set<FileDom>} doms
      * @returns {Set<FileDom>}
      */
-    findMatchesOf(files) {
+    findMatchesOf(doms) {
         /** @type {Set<FileDom>} */
-        const matchedDoms = new Set()
+        const res = new Set()
         /** @type {Set<number>} */
         const hashes = new Set()
-        files.forEach(({file}) => hashes.add(file.scanFile.hash))
+        for (const {file} of doms) {
+            hashes.add(file.scanFile.hash)
+        }
         for (const hash of hashes) {
             for (const t of this.targets) {
                 const matches = t.index.get(hash)
-                matches?.forEach(({dom}) => dom && !files.has(dom) && matchedDoms.add(dom))
+                if (matches !== undefined) for (const {dom} of matches) {
+                    if (dom && !doms.has(dom)) {
+                        res.add(dom)
+                    }
+                }
             }
         }
-        return matchedDoms
+        return res
     }
 
     /**
@@ -217,38 +224,63 @@ export class Controller {
         const marked = this.marks[key];
         if (marked !== null) for (const dom of marked) {
             if (!doms?.has(dom)) {
-                dom.mark(key, false)
+                dom.mark(key, false) // currently marked, but shouldn't be
             }
         }
         if (doms !== null) for (const dom of doms) {
-            dom.mark(key, true)
+            if (!marked?.has(dom)) {
+                dom.mark(key, true) // not currently marked, but should be
+            }
         }
         this.marks[key] = doms
+    }
+
+    clearMarks() {
+        for (const key of Object.keys(this.marks)) {
+            // Type annotation is necessary because 'Object.keys' returns 'string[]'.
+            this.refreshMarks(/** @type {MarkKey} */ (key), null)
+        }
     }
 
     /**
      * @param {MouseEvent} e
      */
-    handleMouseOver = (e) => {
+    handleMouseOver = ({target}) => {
+        /** @type {Set<DirDom|FileDom>} */
+        const hovered = new Set();
+        /** @type {Set<DirDom|FileDom>} */
         const highlighted = new Set()
-        if (e.target instanceof HTMLElement) {
-            const dom = elements.get(e.target);
+        if (target instanceof HTMLElement) {
+            const dom = elements.get(target);
             if (dom instanceof FileDom) {
-                highlighted.add(dom)
+                hovered.add(dom)
+                // highlighted.add(dom)
             }
             if (dom instanceof DirDom) {
-                // Collect all files in the directory tree.
-                walkDir(dom.dir, (file) => highlighted.add(file.dom), () => true)
+                hovered.add(dom)
+                // Collect all files and directories in the subtree for highlighting.
+                walkDir(
+                    dom.dir,
+                    ({dom}) => dom && highlighted.add(dom),
+                    ({dom}, level) => {
+                        // level > 0 && dom && highlighted.add(dom);
+                        return true;
+                    },
+                )
             }
         }
+        // Array.of(hovered).map(d => d.mark('hovered', true))
+        this.refreshMarks('hovered', hovered)
         this.refreshMarks('highlighted', highlighted)
-        const matched = this.findMatchesOf(highlighted)
-        this.refreshMarks('matched', matched)
+        // Match against hovered and highlighted files.
+        const filesToMatch = new Set()
+        hovered.forEach(d => d instanceof FileDom && filesToMatch.add(d))
+        highlighted.forEach(d => d instanceof FileDom && filesToMatch.add(d))
+        this.refreshMarks('matched', this.findMatchesOf(filesToMatch))
     }
 
     handleMouseOut = () => {
-        this.refreshMarks('highlighted', null)
-        this.refreshMarks('matched', null)
+        this.clearMarks()
     }
 }
 

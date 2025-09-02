@@ -37,10 +37,32 @@ footer {
     overflow: auto; /* show scroll bars for each target separately */
 }
 
+:root {
+    --hover-color: darkcyan;
+    --highlight-color: cadetblue;
+    --match-color: darkseagreen;
+}
+
+.hovered {
+    background-color: var(--hover-color);
+}
+
 .highlighted {
-    background-color: yellow;
+    background-color: var(--highlight-color);
 }
 
 .matched {
-    background-color: lightgreen;
+    background-color: var(--match-color);
+}
+
+.legend {
+    display: flex;
+    gap: 1em;
+    .entry {
+        display: inline-block;
+        .marker {
+            display: inline-block;
+            width: 1em;
+        }
+    }
 }
