@@ -52,11 +52,11 @@ function isStringArray(v) {
  * @returns {asserts scanFile is ScanFile}
  */
 export function assertScanFile(scanFile) {
-    if (!isRecord(scanFile)) throw new TypeError('invalid ScanFile: not an object')
+    if (!isRecord(scanFile)) throw new TypeError(`invalid ScanFile: '${scanFile}' is not an object`)
     const {name, size, hash} = scanFile
-    if (typeof name !== 'string') throw new TypeError('invalid ScanFile.name')
-    if (!Number.isFinite(size)) throw new TypeError('invalid ScanFile.size')
-    if (!Number.isFinite(hash)) throw new TypeError('invalid ScanFile.hash')
+    if (typeof name !== 'string') throw new TypeError(`invalid ScanFile.name '${name}'`)
+    if (!Number.isFinite(size)) throw new TypeError(`invalid ScanFile.size '${size}'`)
+    if (!Number.isFinite(hash)) throw new TypeError(`invalid ScanFile.hash '${hash}'`)
 }
 
 /**
@@ -65,12 +65,12 @@ export function assertScanFile(scanFile) {
  * @returns {asserts scanDir is ScanDir}
  */
 export function assertScanDir(scanDir) {
-    if (!isRecord(scanDir)) throw new TypeError('invalid ScanDir: not an object')
+    if (!isRecord(scanDir)) throw new TypeError(`invalid ScanDir: '${scanDir}' is not an object`)
     const {name, dirs, files, empty_files, skipped_files, skipped_dirs} = scanDir
     if (typeof name !== 'string') throw new TypeError('invalid ScanDir.name')
-    if (dirs !== undefined && !Array.isArray(dirs)) throw new TypeError('invalid ScanDir.dirs')
-    if (files !== undefined && !Array.isArray(files)) throw new TypeError('invalid ScanDir.files')
-    if (empty_files !== undefined && !isStringArray(empty_files)) throw new TypeError('invalid ScanDir.empty_files')
-    if (skipped_files !== undefined && !isStringArray(skipped_files)) throw new TypeError('invalid ScanDir.skipped_files')
-    if (skipped_dirs !== undefined && !isStringArray(skipped_dirs)) throw new TypeError('invalid ScanDir.skipped_dirs')
+    if (dirs !== undefined && !Array.isArray(dirs)) throw new TypeError(`invalid ScanDir.dirs '${dirs}'`)
+    if (files !== undefined && !Array.isArray(files)) throw new TypeError(`invalid ScanDir.files '${files}'`)
+    if (empty_files !== undefined && !isStringArray(empty_files)) throw new TypeError(`invalid ScanDir.empty_files '${empty_files}'`)
+    if (skipped_files !== undefined && !isStringArray(skipped_files)) throw new TypeError(`invalid ScanDir.skipped_files '${skipped_files}'`)
+    if (skipped_dirs !== undefined && !isStringArray(skipped_dirs)) throw new TypeError(`invalid ScanDir.skipped_dirs '${skipped_dirs}'`)
 }
