@@ -23,30 +23,36 @@ export class Target {
     }
 
     /**
-     * @param {Target[]} targets
+     * @param {Target[]} otherTargets
      */
-    updateMatchInfo(targets) {
-        const ownTargetIdx = targets.indexOf(this)
-
-        /** @param {Dir} dir */
+    updateMatchInfo(otherTargets) {
+        const ownTarget = this;
+        /**
+         * @param {Dir} dir
+         * @return {Set<number>}
+         */
         function updateDir(dir) {
-            for (const d of dir.dirs) updateDir(d)
-            for (const f of dir.files) updateFile(f)
-            // TODO: update dir information
+            /** @type {Set<number>} */
+            const hashes = new Set()
+            for (const d of dir.dirs) {
+                const dirHashes = updateDir(d)
+                dirHashes.forEach(h => hashes.add(h))
+            }
+            for (const f of dir.files) {
+                updateFile(f)
+                hashes.add(f.hash)
+            }
+            dir.refreshMatchState(hashes)
+            dir.syncDom()
+
+            return hashes
         }
 
         /** @param {File} file */
         function updateFile(file) {
-            const {hash} = file
             // For now we're including matches in our own target - but it's unclear if (and how) we should...
-            file.setMatchState(
-                targets.map((target, idx) => {
-                    let numMatches = target.index.get(hash)?.length ?? 0
-                    if (idx === ownTargetIdx) numMatches-- // subtract self
-                    console.assert(numMatches >= 0)
-                    return numMatches
-                })
-            )
+            file.refreshMatchState(ownTarget, otherTargets)
+            file.syncDom()
         }
 
         updateDir(this.root)
@@ -78,8 +84,14 @@ export class Dir {
         /** @type {File[]} */
         this.files = []
 
-        /* MATCH STATE */
-        // TODO
+        /* MATCH STATE (operating on files rather than hashes for now) */
+
+        /** @type {number} */
+        this.totalFileCount = 0;
+        /** @type {number} */
+        this.matchedByOtherTargetCount = 0;
+        /** @type {number} */
+        this.matchedByOwnOrOtherTargetCount = 0;
     }
 
     /**
@@ -107,6 +119,39 @@ export class Dir {
     addFile(child) {
         this.files.push(child)
     }
+
+    /**
+     * @param {Set<number>} hashes
+     */
+    refreshMatchState(hashes) {
+        // Collect dirs (
+        // let totalFileCount = 0;
+        // let matchedByOtherTargetCount = 0
+        // let matchedByOwnOrOtherTargetCount = 0;
+        // for (const d of this.dirs) {
+        //     totalFileCount += d.totalFileCount
+        //     matchedByOtherTargetCount += d.matchedByOtherTargetCount
+        //     matchedByOwnOrOtherTargetCount += d.matchedByOwnOrOtherTargetCount
+        // }
+        // for (const f of this.files) {
+        //     totalFileCount++
+        //     if (f.matchedByOwnTarget || f.matchedByOtherTarget) {
+        //         matchedByOwnOrOtherTargetCount++
+        //     }
+        //     if (f.matchedByOtherTarget) {
+        //         matchedByOtherTargetCount++
+        //     }
+        // }
+        // this.totalFileCount = totalFileCount
+        // this.matchedByOtherTargetCount = matchedByOtherTargetCount
+        // this.matchedByOwnOrOtherTargetCount = matchedByOwnOrOtherTargetCount
+    }
+
+    syncDom() {
+        if (this.totalFileCount < this.matchedByOtherTargetCount) {
+            this.dom?.mark('hasNoMatches', true)
+        }
+    }
 }
 
 /**
@@ -128,8 +173,10 @@ export class File {
 
         /* MATCH STATE */
 
-        /** @type {number[]|null} */
-        this.matchCountByTarget = null
+        /** @type {boolean|null} */
+        this.matchedByOwnTarget = null
+        /** @type {boolean|null} */
+        this.matchedByOtherTarget = null
     }
 
     /**
@@ -159,14 +206,22 @@ export class File {
 
     /**
      * Set the match state of this file and sync it to the DOM.
-     * @param {number[]} matchCountByTarget Number of matches in other targets.
+     * @param {Target} ownTarget
+     * @param {Target[]} otherTargets
      */
-    setMatchState(matchCountByTarget) {
-        this.matchCountByTarget = matchCountByTarget
+    refreshMatchState(ownTarget, otherTargets) {
+        const numMatchesOwnTarget = ownTarget.index.get(this.hash)?.length ?? 0;
+        this.matchedByOwnTarget = numMatchesOwnTarget > 1
+        this.matchedByOtherTarget = otherTargets.some((target) => {
+            const numMatches = target.index.get(this.hash)?.length ?? 0
+            return numMatches > 0
+        })
+    }
 
-        // Sync DOM.
-        const totalMatchCount = matchCountByTarget.reduce((acc, c) => acc+c, 0)
-        if (totalMatchCount === 0) {
+    // Is separate method because we might want to pass some settings,
+    // allowing us to update DOM without recomputing state.
+    syncDom() {
+        if (!this.matchedByOwnTarget && !this.matchedByOtherTarget) {
             this.dom?.mark('hasNoMatches', true)
         }
     }
