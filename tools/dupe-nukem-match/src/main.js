@@ -27,7 +27,7 @@ function domTargetWrapper(targetDoms) {
 async function loadLocalScanFile(path) {
     const res = await fetch(path)
     if (!res.ok) {
-        throw new Error(`cannot load local scan file: file not found: ${path}`)
+        throw new TypeError(`cannot load local scan file: file not found: ${path}`)
     }
     return res.json()
 }
@@ -49,13 +49,17 @@ async function start() {
     const scanRoots = scanResults.map(({root}) => root)
     const targets = scanRoots.map(buildTarget)
     for (const t of targets) {
-        t.updateMatchInfo(targets)
+        t.refreshMatchState(targets.filter(target => target !== t))
+    }
+    for (const t of targets) {
+        t.syncDom()
     }
 
     const app = document.getElementById('app')
     if (app) {
         const controller = new Controller(targets)
         const doms = targets.map((target) => {
+            console.log(target)
             const res = new TargetContainerDom(target, controller)
             target.root.dom?.appendTo(res) // attach root to target
             return res.root

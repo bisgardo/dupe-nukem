@@ -58,6 +58,7 @@ func main() {
 		"e": DirNode{
 			"a": FileNode{C: contents3},
 		},
+		"new": FileNode{C: "X"},
 	}
 
 	if err := run(root1, name1); err != nil {

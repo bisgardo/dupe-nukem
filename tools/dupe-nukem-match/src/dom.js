@@ -80,7 +80,7 @@ export class DirDom {
 }
 
 /**
- * @typedef {'hovered'|'highlighted'|'matched'|'containsMatches'|'hasNoMatches'} MarkKey
+ * @typedef {'hovered'|'highlighted'|'matched'|'unmatched'|'containsMatches'|'containsUnmatched'} MarkKey
  */
 
 export class FileDom {

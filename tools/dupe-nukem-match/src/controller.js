@@ -20,7 +20,8 @@ export class Controller {
             containsMatches: null,
             // TODO: Only included to satisfy type - we don't actually track this here.
             //       This is likely a signal that the types should change (probably just use a map as an enum of plain strings).
-            hasNoMatches: null,
+            unmatched: null,
+            containsUnmatched: null,
         }
 
         /** @type {EventTarget|null} */

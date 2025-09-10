@@ -1,71 +1,545 @@
 {
   "schema_version": 1,
   "root": {
-    "name": "test2",
+    "name": "/Users/mol/code/dupe-nukem",
     "dirs": [
       {
-        "name": "b",
-        "files": [
+        "name": ".github",
+        "dirs": [
           {
-            "name": "a",
-            "size": 3,
-            "ts": 0,
-            "hash": 14908869807925460855
-          },
-          {
-            "name": "c",
-            "size": 3,
-            "ts": 0,
-            "hash": 13021196359272502786
-          },
-          {
-            "name": "k",
-            "size": 3,
-            "ts": 0,
-            "hash": 14908869807925460855
-          },
-          {
-            "name": "x",
-            "size": 3,
-            "ts": 0,
-            "hash": 14908869807925460855
-          },
-          {
-            "name": "y",
-            "size": 3,
-            "ts": 0,
-            "hash": 14908869807925460855
-          },
-          {
-            "name": "z",
-            "size": 3,
-            "ts": 0,
-            "hash": 14908869807925460855
+            "name": "workflows",
+            "files": [
+              {
+                "name": "lint+test.yaml",
+                "size": 1612,
+                "ts": 1747307087,
+                "hash": 11463968052961191541
+              }
+            ]
           }
         ],
-        "empty_files": [
-          "g"
+        "files": [
+          {
+            "name": "dependabot.yml",
+            "size": 197,
+            "ts": 1741966560,
+            "hash": 162544229026983152
+          }
         ]
       },
       {
-        "name": "e",
+        "name": ".idea",
         "files": [
           {
-            "name": "a",
-            "size": 3,
-            "ts": 0,
-            "hash": 14908869807925460855
+            "name": ".gitignore",
+            "size": 176,
+            "ts": 1741966573,
+            "hash": 2292944775836437098
+          },
+          {
+            "name": "dupe-nukem.iml",
+            "size": 377,
+            "ts": 1742122013,
+            "hash": 13417703689149011305
+          },
+          {
+            "name": "misc.xml",
+            "size": 275,
+            "ts": 1742122013,
+            "hash": 4547906881588501165
+          },
+          {
+            "name": "modules.xml",
+            "size": 272,
+            "ts": 1742122013,
+            "hash": 16832470374170367973
+          },
+          {
+            "name": "pyright-overrides.xml",
+            "size": 489,
+            "ts": 1742122013,
+            "hash": 1190880884932301522
+          },
+          {
+            "name": "vcs.xml",
+            "size": 167,
+            "ts": 1742122013,
+            "hash": 333905764020322823
+          },
+          {
+            "name": "workspace.xml",
+            "size": 50539,
+            "ts": 1756927353,
+            "hash": 12232926248797972156
+          }
+        ]
+      },
+      {
+        "name": "cmd",
+        "dirs": [
+          {
+            "name": "dupe-nukem",
+            "dirs": [
+              {
+                "name": "testdata",
+                "files": [
+                  {
+                    "name": ".gitattributes",
+                    "size": 8,
+                    "ts": 1746392689,
+                    "hash": 14181289122033052373
+                  },
+                  {
+                    "name": "cache1.json",
+                    "size": 297,
+                    "ts": 1748931785,
+                    "hash": 4470884388509523918
+                  },
+                  {
+                    "name": "cache2.json.gz",
+                    "size": 80,
+                    "ts": 1748931785,
+                    "hash": 921101782703557466
+                  },
+                  {
+                    "name": "skipnames",
+                    "size": 7,
+                    "ts": 1742285605,
+                    "hash": 10951817445047336725
+                  },
+                  {
+                    "name": "skipnames_crlf",
+                    "size": 11,
+                    "ts": 1746392689,
+                    "hash": 15953509558814875971
+                  }
+                ]
+              }
+            ],
+            "files": [
+              {
+                "name": "hash.go",
+                "size": 733,
+                "ts": 1756926962,
+                "hash": 9497490076343727735
+              },
+              {
+                "name": "hash_test.go",
+                "size": 1354,
+                "ts": 1746686651,
+                "hash": 5843056689381942559
+              },
+              {
+                "name": "main.go",
+                "size": 2493,
+                "ts": 1741966560,
+                "hash": 8708746925572598433
+              },
+              {
+                "name": "scan.go",
+                "size": 6400,
+                "ts": 1756926962,
+                "hash": 13494032072482327684
+              },
+              {
+                "name": "scan_test.go",
+                "size": 18007,
+                "ts": 1756926962,
+                "hash": 2084337107396555412
+              },
+              {
+                "name": "shared.go",
+                "size": 1571,
+                "ts": 1756926962,
+                "hash": 14636742161484085130
+              },
+              {
+                "name": "shared_test.go",
+                "size": 1908,
+                "ts": 1756926962,
+                "hash": 3567397144376753087
+              },
+              {
+                "name": "time.go",
+                "size": 210,
+                "ts": 1751971876,
+                "hash": 9090459146095001120
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "hash",
+        "files": [
+          {
+            "name": "hash.go",
+            "size": 1246,
+            "ts": 1756926962,
+            "hash": 2451652765865828864
+          },
+          {
+            "name": "hash_test.go",
+            "size": 1595,
+            "ts": 1746686634,
+            "hash": 14856310495471964123
+          }
+        ]
+      },
+      {
+        "name": "scan",
+        "dirs": [
+          {
+            "name": "scantest",
+            "files": [
+              {
+                "name": "assert.go",
+                "size": 2281,
+                "ts": 1756926962,
+                "hash": 11671680399592729836
+              }
+            ]
+          },
+          {
+            "name": "testdata",
+            "dirs": [
+              {
+                "name": "rapid",
+                "dirs": [
+                  {
+                    "name": "Test__scan_property",
+                    "files": [
+                      {
+                        "name": "Test__scan_property-20250713221154-79272.fail",
+                        "size": 397,
+                        "ts": 1752437514,
+                        "hash": 6443936814400718355
+                      },
+                      {
+                        "name": "Test__scan_property-20250713221349-79552.fail",
+                        "size": 6965,
+                        "ts": 1752437629,
+                        "hash": 11080885790878068842
+                      },
+                      {
+                        "name": "Test__scan_property-20250713222829-23628.fail",
+                        "size": 20306,
+                        "ts": 1752438509,
+                        "hash": 1570997966514343548
+                      },
+                      {
+                        "name": "Test__scan_property-20250713234011-90125.fail",
+                        "size": 352,
+                        "ts": 1752442811,
+                        "hash": 6236204831233612360
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "files": [
+          {
+            "name": "file.go",
+            "size": 3763,
+            "ts": 1756926962,
+            "hash": 11205657485849398899
+          },
+          {
+            "name": "file_test.go",
+            "size": 3200,
+            "ts": 1756926962,
+            "hash": 8125906202915014821
+          },
+          {
+            "name": "run.go",
+            "size": 9126,
+            "ts": 1756926962,
+            "hash": 5204653493614031433
+          },
+          {
+            "name": "run_test.go",
+            "size": 26471,
+            "ts": 1756926962,
+            "hash": 329356794164225225
+          }
+        ]
+      },
+      {
+        "name": "testdata",
+        "dirs": [
+          {
+            "name": "rapid",
+            "dirs": [
+              {
+                "name": "Test__scan_property"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "testutil",
+        "dirs": [
+          {
+            "name": "testdata",
+            "files": [
+              {
+                "name": "testdata.go",
+                "size": 7691,
+                "ts": 1756926972,
+                "hash": 14882860234121204523
+              },
+              {
+                "name": "testdata_test.go",
+                "size": 6923,
+                "ts": 1756926962,
+                "hash": 14958233264765815326
+              }
+            ]
+          }
+        ],
+        "files": [
+          {
+            "name": "ci.go",
+            "size": 1208,
+            "ts": 1741966560,
+            "hash": 12103590799109153488
+          },
+          {
+            "name": "file.go",
+            "size": 4016,
+            "ts": 1752604938,
+            "hash": 285045477066754518
+          },
+          {
+            "name": "file_test.go",
+            "size": 1229,
+            "ts": 1741966560,
+            "hash": 1400454398298988831
+          },
+          {
+            "name": "log.go",
+            "size": 1130,
+            "ts": 1747302119,
+            "hash": 13374255771084403203
+          },
+          {
+            "name": "string.go",
+            "size": 267,
+            "ts": 1747307087,
+            "hash": 13066384677406569251
+          }
+        ]
+      },
+      {
+        "name": "tools",
+        "dirs": [
+          {
+            "name": "dupe-nukem-match",
+            "dirs": [
+              {
+                "name": "gendata",
+                "files": [
+                  {
+                    "name": "go.mod",
+                    "size": 337,
+                    "ts": 1756926972,
+                    "hash": 6722168453572244737
+                  },
+                  {
+                    "name": "go.sum",
+                    "size": 1279,
+                    "ts": 1756926972,
+                    "hash": 1156993748283150416
+                  },
+                  {
+                    "name": "main.go",
+                    "size": 1342,
+                    "ts": 1756926972,
+                    "hash": 7900775901961989774
+                  },
+                  {
+                    "name": "test1.json",
+                    "size": 5686742,
+                    "ts": 1756927517,
+                    "hash": 4598386900514979055
+                  }
+                ],
+                "empty_files": [
+                  "test2.json"
+                ]
+              },
+              {
+                "name": "public",
+                "empty_files": [
+                  ".gitkeep"
+                ]
+              },
+              {
+                "name": "src",
+                "files": [
+                  {
+                    "name": "controller.js",
+                    "size": 5505,
+                    "ts": 1756926972,
+                    "hash": 12184804560082841969
+                  },
+                  {
+                    "name": "dom.js",
+                    "size": 4921,
+                    "ts": 1756926972,
+                    "hash": 11486385241202055627
+                  },
+                  {
+                    "name": "domain.js",
+                    "size": 6953,
+                    "ts": 1756926972,
+                    "hash": 13986905730049133502
+                  },
+                  {
+                    "name": "main.js",
+                    "size": 1152,
+                    "ts": 1756926972,
+                    "hash": 17559707205765787842
+                  },
+                  {
+                    "name": "scan.js",
+                    "size": 2703,
+                    "ts": 1756926972,
+                    "hash": 12983268408117102085
+                  },
+                  {
+                    "name": "style.css",
+                    "size": 1337,
+                    "ts": 1756926972,
+                    "hash": 16479295272643112492
+                  }
+                ]
+              }
+            ],
+            "files": [
+              {
+                "name": ".gitignore",
+                "size": 253,
+                "ts": 1756926972,
+                "hash": 9095071133276726901
+              },
+              {
+                "name": "index.html",
+                "size": 856,
+                "ts": 1756926972,
+                "hash": 4729653048463660493
+              },
+              {
+                "name": "package-lock.json",
+                "size": 32159,
+                "ts": 1756926993,
+                "hash": 10180741291098963841
+              },
+              {
+                "name": "package.json",
+                "size": 239,
+                "ts": 1756926972,
+                "hash": 7373430529200113027
+              },
+              {
+                "name": "tsconfig.json",
+                "size": 501,
+                "ts": 1756926972,
+                "hash": 11594644826484522087
+              }
+            ],
+            "skipped_dirs": [
+              "node_modules"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "util",
+        "files": [
+          {
+            "name": "error.go",
+            "size": 1078,
+            "ts": 1756926962,
+            "hash": 3114229301645064851
+          },
+          {
+            "name": "file.go",
+            "size": 763,
+            "ts": 1741966560,
+            "hash": 425025952971813735
           }
         ]
       }
     ],
     "files": [
       {
-        "name": "a",
-        "size": 3,
-        "ts": 0,
-        "hash": 13798360864711097533
+        "name": ".dockerignore",
+        "size": 37,
+        "ts": 1741966560,
+        "hash": 8956753497482698546
+      },
+      {
+        "name": ".gitignore",
+        "size": 39,
+        "ts": 1756926972,
+        "hash": 6461824033451878976
+      },
+      {
+        "name": "Dockerfile",
+        "size": 367,
+        "ts": 1741966560,
+        "hash": 3093005161537483796
+      },
+      {
+        "name": "LICENSE",
+        "size": 1080,
+        "ts": 1741966560,
+        "hash": 6347461592658089296
+      },
+      {
+        "name": "Makefile",
+        "size": 215,
+        "ts": 1741966560,
+        "hash": 13784572386316075235
+      },
+      {
+        "name": "README.md",
+        "size": 6002,
+        "ts": 1748931785,
+        "hash": 14388993702302716224
+      },
+      {
+        "name": "go.mod",
+        "size": 405,
+        "ts": 1752604938,
+        "hash": 6035229865491147013
+      },
+      {
+        "name": "go.sum",
+        "size": 2567,
+        "ts": 1752604938,
+        "hash": 15593034953089599592
+      },
+      {
+        "name": "go.work",
+        "size": 54,
+        "ts": 1756926972,
+        "hash": 8156052266443462895
+      },
+      {
+        "name": "go.work.sum",
+        "size": 258,
+        "ts": 1756926972,
+        "hash": 2811796368837063284
       }
+    ],
+    "skipped_dirs": [
+      ".git"
     ]
   }
 }

@@ -23,33 +23,48 @@ export class Target {
     }
 
     /**
-     * @param {Target[]} targets
+     * @param {Target[]} otherTargets
      */
-    updateMatchInfo(targets) {
-        const ownTargetIdx = targets.indexOf(this)
-
-        /** @param {Dir} dir */
-        function updateDir(dir) {
-            for (const d of dir.dirs) updateDir(d)
-            for (const f of dir.files) updateFile(f)
-            // TODO: update dir information
+    refreshMatchState(otherTargets) {
+        /**
+         * @param {Dir} dir
+         */
+        const visitDir = (dir) => {
+            /** @type {Set<number>} */
+            for (const d of dir.dirs) {
+                visitDir(d)
+            }
+            for (const f of dir.files) {
+                visitFile(f)
+            }
+            dir.refreshMatchState(this, otherTargets)
         }
-
         /** @param {File} file */
-        function updateFile(file) {
-            const {hash} = file
-            // For now we're including matches in our own target - but it's unclear if (and how) we should...
-            file.setMatchState(
-                targets.map((target, idx) => {
-                    let numMatches = target.index.get(hash)?.length ?? 0
-                    if (idx === ownTargetIdx) numMatches-- // subtract self
-                    console.assert(numMatches >= 0)
-                    return numMatches
-                })
-            )
+        const visitFile = (file) => {
+            file.refreshMatchState(this, otherTargets)
         }
+        visitDir(this.root)
+    }
 
-        updateDir(this.root)
+    syncDom() {
+        /**
+         * @param {Dir} dir
+         */
+        const visitDir = (dir) => {
+            /** @type {Set<number>} */
+            for (const d of dir.dirs) {
+                visitDir(d)
+            }
+            for (const f of dir.files) {
+                visitFile(f)
+            }
+            dir.syncDom()
+        }
+        /** @param {File} file */
+        const visitFile = (file) => {
+            file.syncDom()
+        }
+        visitDir(this.root)
     }
 }
 
@@ -63,7 +78,7 @@ export class Target {
  */
 export class Dir {
     /**
-     * @param {Dir|undefined} parent Parent directory.
+     * @param {Dir|null} parent Parent directory.
      * @param {string} name
      */
     constructor(parent, name) {
@@ -71,15 +86,22 @@ export class Dir {
         this.name = name
         this.dom = null // init deferred to create circular reference
 
-        /* TREE NAVIGATION */
+        /* TREE NAVIGATION - populated while subtree is being constructed */
 
         /** @type {Dir[]} */
         this.dirs = []
         /** @type {File[]} */
         this.files = []
 
-        /* MATCH STATE */
-        // TODO
+        /* MATCH STATE - populated in 'refreshMatchState' */
+        /** @type {number} */
+        this.totalFileCount = 0
+        /** @type {Set<number>|null} */
+        this.hashes = null
+        /** @type {Set<Dir>|null} */
+        this.dirsInOwnTargetContainingMatches = null
+        /** @type {Set<Dir>[]|null} */
+        this.dirsInOtherTargetsContainingMatches = null
     }
 
     /**
@@ -107,6 +129,122 @@ export class Dir {
     addFile(child) {
         this.files.push(child)
     }
+
+    /**
+     * @param {Target} ownTarget
+     * @param {Target[]} otherTargets
+     */
+    refreshMatchState(ownTarget, otherTargets) {
+        // Collect hashes of subtree (and total file count).
+        let totalFileCount = 0
+        const hashes = new Set()
+        for (const d of this.dirs) {
+            if (d.hashes === null) {
+                throw new TypeError(`field 'hashes' of Dir '${d}' has not been initialized`)
+            }
+            totalFileCount += d.totalFileCount
+            d.hashes.forEach(h => hashes.add(h))
+        }
+        for (const f of this.files) {
+            totalFileCount++
+            hashes.add(f.hash)
+        }
+        this.totalFileCount = totalFileCount
+        this.hashes = hashes
+
+        /**
+         * @param {Target} target
+         * @param {Set<number>} hashes
+         * @return {Set<Dir>}
+         */
+        const collectMatchDirs = (target, hashes) => {
+            /** @type {Set<Dir>} */
+            const res = new Set();
+            for (const h of hashes) {
+                target.index.get(h)?.forEach(f => res.add(f.dir))
+            }
+            // Remove descendants of matches as well as the dir's own subtree.
+            res.delete(this)
+            for (const d of res) {
+                let p = d.parent
+                while (p !== null) {
+                    if (p === this || res.has(p)) {
+                        res.delete(d)
+                        break
+                    }
+                    p = p.parent
+                }
+            }
+            return res
+        }
+
+        this.dirsInOwnTargetContainingMatches = collectMatchDirs(ownTarget, hashes)
+        this.dirsInOtherTargetsContainingMatches = otherTargets.map(t => collectMatchDirs(t, hashes))
+        // Interesting question is now which of these dirs contain *all* hashes!
+        // Note that any common shared ancestor could contain all matches without any of the dirs doing so individually.
+    }
+
+    /**
+     * @param {boolean} checkOwnTarget
+     * @param {boolean} checkOtherTargets
+     * @return {Set<number>}
+     */
+    unmatchedHashes(checkOwnTarget, checkOtherTargets) {
+        /** @type {Set<number>} */
+        const res = new Set(this.hashes)
+        if (checkOwnTarget) {
+            if (this.dirsInOwnTargetContainingMatches === null) {
+                throw new TypeError(`field 'dirsInOwnTargetContainingMatches' of Dir '${this}' has not been initialized`)
+            }
+            for (const d of this.dirsInOwnTargetContainingMatches) {
+                if (d.hashes === null) {
+                    throw new TypeError(`field 'hashes' of Dir '${d}' has not been initialized`)
+                }
+                for (const h of d.hashes) {
+                    res.delete(h)
+                }
+            }
+        }
+        if (checkOtherTargets) {
+            if (this.dirsInOtherTargetsContainingMatches === null) {
+                throw new TypeError(`field 'dirsInOtherTargetsContainingMatches' of Dir '${this}' has not been initialized`)
+            }
+            for (const dirsContainingMatches of this.dirsInOtherTargetsContainingMatches) {
+                for (const d of dirsContainingMatches) {
+                    if (d.hashes === null) {
+                        throw new TypeError(`field 'hashes' of Dir '${d}' has not been initialized`)
+                    }
+                    for (const h of d.hashes) {
+                        res.delete(h)
+                    }
+                }
+            }
+        }
+        return res
+    }
+
+    syncDom() {
+        if (this.hashes === null) {
+            throw new TypeError(`field 'hashes' of Dir '${this}' has not been initialized`)
+        }
+        if (this.dom === null) {
+            throw new TypeError(`field 'dom' of Dir '${this}' has not been initialized`)
+        }
+        // Why all this crap instead of just ask all files recursively for their state, you ask?
+        // Well, file could be matched internally in the target.
+        // This means that the file is matched up to some ancestor directory, but not outside of it.
+
+        // TODO: Instead of storing hashes as a set, make it a map from hash to match count.
+        //       Then you can check with the number of matches in the target index to see if there are more matches that what's inside the tree!
+        //       Use this to determine right away
+        //       * whether any file (hash) within the tree has matches outside the tree
+        //       * whether any file (hash) within the tree is not matched outside the tree
+        //       there are any matches within the target but outside the dir's own tree.
+        //       Only in a later pass do we check against other targets (which is trivial).
+        if (this.unmatchedHashes(true, true).size > 0) {
+            this.dom.mark('containsUnmatched', true)
+        }
+    }
 }
 
 /**
@@ -126,10 +264,12 @@ export class File {
         this.hash = hash
         this.dom = null // init deferred to create circular reference
 
-        /* MATCH STATE */
+        /* MATCH STATE - populated in 'refreshMatchState' */
 
-        /** @type {number[]|null} */
-        this.matchCountByTarget = null
+        /** @type {boolean|null} */
+        this.matchedByOwnTarget = null
+        /** @type {boolean|null} */
+        this.matchedByOtherTarget = null
     }
 
     /**
@@ -148,33 +288,44 @@ export class File {
      * @param {(value: Dir, index: number) => void} callback
      */
     forEachAncestor(callback) {
-        /** @type {Dir|undefined} */
+        /** @type {Dir|null} */
         let d = this.dir
         let c = 0
         do {
             callback(d, c++)
             d = d.parent
-        } while (d)
+        } while (d !== null)
     }
 
     /**
      * Set the match state of this file and sync it to the DOM.
-     * @param {number[]} matchCountByTarget Number of matches in other targets.
+     * @param {Target} ownTarget
+     * @param {Target[]} otherTargets
      */
-    setMatchState(matchCountByTarget) {
-        this.matchCountByTarget = matchCountByTarget
+    refreshMatchState(ownTarget, otherTargets) {
+        const numMatchesOwnTarget = ownTarget.index.get(this.hash)?.length ?? 0;
+        this.matchedByOwnTarget = numMatchesOwnTarget > 1
+        this.matchedByOtherTarget = otherTargets.some((target) => {
+            const numMatches = target.index.get(this.hash)?.length ?? 0
+            return numMatches > 0
+        })
+    }
 
-        // Sync DOM.
-        const totalMatchCount = matchCountByTarget.reduce((acc, c) => acc+c, 0)
-        if (totalMatchCount === 0) {
-            this.dom?.mark('hasNoMatches', true)
+    syncDom() {
+        if (this.dom === null) {
+            throw new TypeError(`field 'dom' of File '${this}' has not been initialized`)
+        }
+        // Is separate method because we might want to pass some settings,
+        // allowing us to update DOM without recomputing state.
+        if (!this.matchedByOwnTarget && !this.matchedByOtherTarget) {
+            this.dom.mark('unmatched', true)
         }
     }
 }
 
 /**
  * Create new {@link Dir}, including the DOM element into which it will be rendered.
- * @param {Dir|undefined} parent
+ * @param {Dir|null} parent
  * @param {string} name
  * @returns Dir
  */
@@ -213,7 +364,7 @@ export function buildTarget(scanRoot) {
 
     /**
      * @param {unknown} scanDir
-     * @param {Dir|undefined} parent
+     * @param {Dir|null} parent
      */
     function buildRecursive(scanDir, parent) {
         assertScanDir(scanDir)
@@ -234,7 +385,7 @@ export function buildTarget(scanRoot) {
         return targetDir
     }
 
-    const root = buildRecursive(scanRoot, undefined)
+    const root = buildRecursive(scanRoot, null)
     return new Target(root, index)
 }
 

@@ -41,7 +41,9 @@ footer {
     --hover-color: darkcyan;
     --highlight-color: cadetblue;
     --match-color: darkseagreen;
-    --contains-matches: mistyrose;
+    --unmatched-color: silver;
+    --contains-matches-color: mistyrose;
+    --contains-unmatched-color: slategray;
 }
 
 .hovered {
@@ -56,8 +58,16 @@ footer {
     background-color: var(--match-color);
 }
 
+.unmatched {
+    color: var(--unmatched-color);
+}
+
 .containsMatches > .name {
-    background-color: var(--contains-matches);
+    background-color: var(--contains-matches-color);
+}
+
+.containsUnmatched > .name {
+    color: var(--contains-matches-color);
 }
 
 .legend {
@@ -70,8 +80,4 @@ footer {
             width: 1em;
         }
     }
-}
-
-.hasNoMatches {
-    color: gray;
 }
