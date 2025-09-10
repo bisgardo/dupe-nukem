@@ -43,6 +43,10 @@ async function loadLocalScanResults(paths) {
 }
 
 async function start() {
+    // TODO: Instead of loading the scan files, we should have it run through a processor first to produce a match file.
+    //       This enables reducing hashes to a small number (using a simple counter) to ensure
+    //       (1) that we don't get into trouble with JS not implementing 64 bit integers
+    //       (2) that we have a place to actually check that matching files are indeed identical.
     // IDEA: Could split up the work such that each target is displayed right after it's loaded
     //       and then call 'updateMatchInfo' and annotate matches only after they've all loaded?
     const scanResults = await loadLocalScanResults(scanResultPaths)

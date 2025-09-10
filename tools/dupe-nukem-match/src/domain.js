@@ -68,10 +68,24 @@ export class Target {
     }
 }
 
+/** @typedef {number} Hash */
+
 /**
  * Index of all files in a target.
  * @typedef {Map<number, File[]>} FileIndex
  */
+
+export class TargetMatchSummary {
+
+    /**
+     * @param {number} matchedHashesCount Number of file hashes within the directory that have matches (outside its own tree) in one or more targets.
+     * @param {number} unmatchedHashesCount Number of file hashes within the directory that do not have matches (outside its own tree) in one or more targets.
+     */
+    constructor(matchedHashesCount, unmatchedHashesCount) {
+        this.matchedHashesCount = matchedHashesCount
+        this.unmatchedHashesCount = unmatchedHashesCount
+    }
+}
 
 /**
  * A directory in a hierarchical file structure, including its associated DOM elements.
@@ -96,12 +110,12 @@ export class Dir {
         /* MATCH STATE - populated in 'refreshMatchState' */
         /** @type {number} */
         this.totalFileCount = 0
-        /** @type {Set<number>|null} */
+        /** @type {Map<Hash, number>|null} */
         this.hashes = null
-        /** @type {Set<Dir>|null} */
-        this.dirsInOwnTargetContainingMatches = null
-        /** @type {Set<Dir>[]|null} */
-        this.dirsInOtherTargetsContainingMatches = null
+        /** @type {TargetMatchSummary|null} */
+        this.ownTargetMatchSummary = null
+        /** @type {TargetMatchSummary|null} */
+        this.otherTargetsMatchSummary = null
     }
 
     /**
@@ -135,93 +149,48 @@ export class Dir {
      * @param {Target[]} otherTargets
      */
     refreshMatchState(ownTarget, otherTargets) {
-        // Collect hashes of subtree (and total file count).
+        // Collect hashes of subtree mapped to their total match count (and total file count).
         let totalFileCount = 0
-        const hashes = new Set()
+        /** @type {Map<Hash, number>} */
+        const hashes = new Map()
         for (const d of this.dirs) {
             if (d.hashes === null) {
                 throw new TypeError(`field 'hashes' of Dir '${d}' has not been initialized`)
             }
             totalFileCount += d.totalFileCount
-            d.hashes.forEach(h => hashes.add(h))
+            for (const [h, c] of d.hashes) {
+                hashes.set(h, (hashes.get(h)??0) + c)
+            }
         }
         for (const f of this.files) {
             totalFileCount++
-            hashes.add(f.hash)
+            hashes.set(f.hash, (hashes.get(f.hash)??0) + 1)
         }
         this.totalFileCount = totalFileCount
         this.hashes = hashes
 
-        /**
-         * @param {Target} target
-         * @param {Set<number>} hashes
-         * @return {Set<Dir>}
-         */
-        const collectMatchDirs = (target, hashes) => {
-            /** @type {Set<Dir>} */
-            const res = new Set();
-            for (const h of hashes) {
-                target.index.get(h)?.forEach(f => res.add(f.dir))
+        // TODO: Move to another method.
+
+        let matchedCount = 0
+        let unmatchedCount = 0
+        for (const [h, c] of this.hashes) {
+            let matches = ownTarget.index.get(h);
+            if (matches === undefined) {
+                throw new Error(`hash '${h}' not matched within its own target '${ownTarget}'`)
             }
-            // Remove descendants of matches as well as the dir's own subtree.
-            res.delete(this)
-            for (const d of res) {
-                let p = d.parent
-                while (p !== null) {
-                    if (p === this || res.has(p)) {
-                        res.delete(d)
-                        break
-                    }
-                    p = p.parent
-                }
+            // NOTE: If we only cared about the presence of matched/unmatched, we could stop once both were true...
+            if (c < matches.length) {
+                matchedCount++
+            } else {
+                unmatchedCount++
             }
-            return res
         }
 
-        this.dirsInOwnTargetContainingMatches = collectMatchDirs(ownTarget, hashes)
-        this.dirsInOtherTargetsContainingMatches = otherTargets.map(t => collectMatchDirs(t, hashes))
-        // Interesting question is now which of these dirs contain *all* hashes!
-        // Note that any common shared ancestor could contain all matches without any of the dirs doing so individually.
+        this.ownTargetMatchSummary = new TargetMatchSummary(matchedCount, unmatchedCount)
+
+        // TODO: Compute match summary for other targets (in another method?).
     }
 
-    /**
-     * @param {boolean} checkOwnTarget
-     * @param {boolean} checkOtherTargets
-     * @return {Set<number>}
-     */
-    unmatchedHashes(checkOwnTarget, checkOtherTargets) {
-        /** @type {Set<number>} */
-        const res = new Set(this.hashes)
-        if (checkOwnTarget) {
-            if (this.dirsInOwnTargetContainingMatches === null) {
-                throw new TypeError(`field 'dirsInOwnTargetContainingMatches' of Dir '${this}' has not been initialized`)
-            }
-            for (const d of this.dirsInOwnTargetContainingMatches) {
-                if (d.hashes === null) {
-                    throw new TypeError(`field 'hashes' of Dir '${d}' has not been initialized`)
-                }
-                for (const h of d.hashes) {
-                    res.delete(h)
-                }
-            }
-        }
-        if (checkOtherTargets) {
-            if (this.dirsInOtherTargetsContainingMatches === null) {
-                throw new TypeError(`field 'dirsInOtherTargetsContainingMatches' of Dir '${this}' has not been initialized`)
-            }
-            for (const dirsContainingMatches of this.dirsInOtherTargetsContainingMatches) {
-                for (const d of dirsContainingMatches) {
-                    if (d.hashes === null) {
-                        throw new TypeError(`field 'hashes' of Dir '${d}' has not been initialized`)
-                    }
-                    for (const h of d.hashes) {
-                        res.delete(h)
-                    }
-                }
-            }
-        }
-        return res
-    }
 
     syncDom() {
         if (this.hashes === null) {
@@ -241,7 +210,7 @@ export class Dir {
         //       * whether any file (hash) within the tree is not matched outside the tree
         //       there are any matches within the target but outside the dir's own tree.
         //       Only in a later pass do we check against other targets (which is trivial).
-        if (this.unmatchedHashes(true, true).size > 0) {
+        if (this.ownTargetMatchSummary && this.ownTargetMatchSummary.unmatchedHashesCount > 0) {
             this.dom.mark('containsUnmatched', true)
         }
     }
