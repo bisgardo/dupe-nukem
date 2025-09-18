@@ -75,18 +75,6 @@ export class Target {
  * @typedef {Map<number, File[]>} FileIndex
  */
 
-export class TargetMatchSummary {
-
-    /**
-     * @param {number} matchedHashesCount Number of file hashes within the directory that have matches (outside its own tree) in one or more targets.
-     * @param {number} unmatchedHashesCount Number of file hashes within the directory that do not have matches (outside its own tree) in one or more targets.
-     */
-    constructor(matchedHashesCount, unmatchedHashesCount) {
-        this.matchedHashesCount = matchedHashesCount
-        this.unmatchedHashesCount = unmatchedHashesCount
-    }
-}
-
 /**
  * A directory in a hierarchical file structure, including its associated DOM elements.
  */
@@ -112,10 +100,10 @@ export class Dir {
         this.totalFileCount = 0
         /** @type {Map<Hash, number>|null} */
         this.hashes = null
-        /** @type {TargetMatchSummary|null} */
-        this.ownTargetMatchSummary = null
-        /** @type {TargetMatchSummary|null} */
-        this.otherTargetsMatchSummary = null
+        /** @type {number|null} */
+        this.ownTargetMatchCount = null
+        /** @type {number|null} */
+        this.otherTargetsMatchCount = null
     }
 
     /**
@@ -159,36 +147,53 @@ export class Dir {
             }
             totalFileCount += d.totalFileCount
             for (const [h, c] of d.hashes) {
-                hashes.set(h, (hashes.get(h)??0) + c)
+                hashes.set(h, (hashes.get(h) ?? 0) + c)
             }
         }
         for (const f of this.files) {
             totalFileCount++
-            hashes.set(f.hash, (hashes.get(f.hash)??0) + 1)
+            hashes.set(f.hash, (hashes.get(f.hash) ?? 0) + 1)
         }
         this.totalFileCount = totalFileCount
         this.hashes = hashes
 
-        // TODO: Move to another method.
+        this.ownTargetMatchCount = Dir.ownTargetMatches(ownTarget, hashes)
+        this.otherTargetsMatchCount = Dir.otherTargetsMatches(otherTargets, hashes)
+    }
 
+    /**
+     * @param {Target} ownTarget
+     * @param {Map<Hash, number>} hashes
+     */
+    static ownTargetMatches(ownTarget, hashes) {
         let matchedCount = 0
-        let unmatchedCount = 0
-        for (const [h, c] of this.hashes) {
+        // NOTE: If we only cared about the presence of matched/unmatched,
+        // we could stop once both match and unmatch has occurred.
+        for (const [h, c] of hashes) {
             let matches = ownTarget.index.get(h);
             if (matches === undefined) {
                 throw new Error(`hash '${h}' not matched within its own target '${ownTarget}'`)
             }
-            // NOTE: If we only cared about the presence of matched/unmatched, we could stop once both were true...
             if (c < matches.length) {
                 matchedCount++
-            } else {
-                unmatchedCount++
             }
         }
+        return matchedCount
+    }
 
-        this.ownTargetMatchSummary = new TargetMatchSummary(matchedCount, unmatchedCount)
-
-        // TODO: Compute match summary for other targets (in another method?).
+    /**
+     * @param {Target[]} otherTargets
+     * @param {Map<Hash, number>} hashes
+     */
+    static otherTargetsMatches(otherTargets, hashes) {
+        let matchedCount = 0
+        for (const h of hashes.keys()) {
+            const isMatched = otherTargets.some(({index}) => index.has(h));
+            if (isMatched) {
+                matchedCount++
+            }
+        }
+        return matchedCount
     }
 
 
@@ -196,21 +201,16 @@ export class Dir {
         if (this.hashes === null) {
             throw new TypeError(`field 'hashes' of Dir '${this}' has not been initialized`)
         }
+        if (this.ownTargetMatchCount === null) {
+            throw new TypeError(`field 'ownTargetMatchCount' of Dir '${this}' has not been initialized`)
+        }
+        if (this.otherTargetsMatchCount === null) {
+            throw new TypeError(`field 'otherTargetsMatchCount' of Dir '${this}' has not been initialized`)
+        }
         if (this.dom === null) {
             throw new TypeError(`field 'dom' of Dir '${this}' has not been initialized`)
         }
-        // Why all this crap instead of just ask all files recursively for their state, you ask?
-        // Well, file could be matched internally in the target.
-        // This means that the file is matched up to some ancestor directory, but not outside of it.
-
-        // TODO: Instead of storing hashes as a set, make it a map from hash to match count.
-        //       Then you can check with the number of matches in the target index to see if there are more matches that what's inside the tree!
-        //       Use this to determine right away
-        //       * whether any file (hash) within the tree has matches outside the tree
-        //       * whether any file (hash) within the tree is not matched outside the tree
-        //       there are any matches within the target but outside the dir's own tree.
-        //       Only in a later pass do we check against other targets (which is trivial).
-        if (this.ownTargetMatchSummary && this.ownTargetMatchSummary.unmatchedHashesCount > 0) {
+        if (this.otherTargetsMatchCount < this.hashes.size) {
             this.dom.mark('containsUnmatched', true)
         }
     }
@@ -286,7 +286,7 @@ export class File {
         }
         // Is separate method because we might want to pass some settings,
         // allowing us to update DOM without recomputing state.
-        if (!this.matchedByOwnTarget && !this.matchedByOtherTarget) {
+        if (this.matchedByOtherTarget === false) {
             this.dom.mark('unmatched', true)
         }
     }
