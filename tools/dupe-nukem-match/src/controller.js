@@ -1,8 +1,10 @@
 import {Dir, File, Target, walkDir} from "./domain.js"
 import {DirDom, domMap, FileDom, TargetContainerDom} from "./dom.js"
 
+/** @typedef {import("./dom.js").DynamicMarkKey} DynamicMarkKey */
 /**
- * @typedef {import("./dom.js").MarkKey} MarkKey
+ * @template Key
+ * @typedef {import("./dom.js").Markable<Key>} Markable
  */
 
 export class Controller {
@@ -12,16 +14,12 @@ export class Controller {
     constructor(targets) {
         this.targets = targets
 
-        /** @type {Record<MarkKey, Set<Dir|File>|null>} */
+        /** @type {{[K in DynamicMarkKey]: Set<{dom: Markable<K>|null}>|null}} */
         this.marks = {
-            hovered: null,
-            highlighted: null,
-            matched: null,
-            containsMatches: null,
-            // TODO: Only included to satisfy type - we don't actually track this here.
-            //       This is likely a signal that the types should change (probably just use a map as an enum of plain strings).
-            unmatched: null,
-            containsUnmatched: null,
+            'contains-matching': null,    // dir
+            'contains-nonmatching': null, // dir
+            'selected': null,             // dir or file
+            'matching': null,             // file
         }
 
         /** @type {EventTarget|null} */
@@ -80,8 +78,9 @@ export class Controller {
     }
 
     /**
-     * @param {MarkKey} key
-     * @param {Set<Dir|File>|null} nodes
+     * @template {keyof typeof this.marks} K
+     * @param {K} key
+     * @param {typeof this.marks[K]} nodes
      */
     refreshMarks(key, nodes) {
         const marked = this.marks[key]
@@ -101,7 +100,7 @@ export class Controller {
     clearMarks() {
         for (const key of Object.keys(this.marks)) {
             // Type annotation is necessary because 'Object.keys' returns 'string[]'.
-            this.refreshMarks(/** @type {MarkKey} */ (key), null)
+            this.refreshMarks(/** @type {DynamicMarkKey} */ (key), null)
         }
     }
 
@@ -112,9 +111,7 @@ export class Controller {
      */
     selectTarget(target) {
         /** @type {Set<Dir|File>} */
-        const hovered = new Set();
-        /** @type {Set<Dir|File>} */
-        const highlighted = new Set()
+        const selected = new Set()
         while (target !== null) {
             // As we only have a single event listener, we cannot rely on the event bubbling to the parent element
             // when we hit a DOM node sitting above the dir/file elements (like the 'name' div of a Dir).
@@ -122,42 +119,39 @@ export class Controller {
             if (target instanceof HTMLElement) {
                 const dom = domMap.get(target);
                 if (dom instanceof FileDom) {
-                    hovered.add(dom.file)
-                    // highlighted.add(dom)
+                    selected.add(dom.file)
                     break;
                 }
                 if (dom instanceof DirDom) {
-                    hovered.add(dom.dir)
+                    selected.add(dom.dir)
                     // Collect all files and directories in the subtree for highlighting.
                     walkDir(
                         dom.dir,
-                        (f) => highlighted.add(f),
+                        (f) => selected.add(f),
                         (d, level) => {
-                            // level > 0 && highlighted.add(d);
+                            // level > 0 && selected.add(d);
                             return true;
                         },
                     )
                     break;
                 }
-                // Target is not a "root" DOM node - let handler "bubble" up the tree.
+                // Target is not a "root" DOM node: bubble on...
                 target = target.parentElement;
             }
         }
-        this.refreshMarks('hovered', hovered)
-        this.refreshMarks('highlighted', highlighted)
+        this.refreshMarks('selected', selected)
 
-        // Match against hovered and highlighted files.
+        // Match against hovered and selected files.
         /** @type {Set<File>} */
         const filesToMatch = new Set()
-        hovered.forEach(d => d instanceof File && filesToMatch.add(d))
-        highlighted.forEach(d => d instanceof File && filesToMatch.add(d))
+        selected.forEach(d => d instanceof File && filesToMatch.add(d))
         const matchingFiles = this.findMatchesOf(filesToMatch);
-        this.refreshMarks('matched', matchingFiles)
+        this.refreshMarks('matching', matchingFiles)
 
         // Collect all parent directories of any files that are matched.
         /** @type {Set<Dir>} */
         const dirsContainingMatchedFiles = new Set()
         matchingFiles.forEach(f => f.forEachAncestor(a => dirsContainingMatchedFiles.add(a)))
-        this.refreshMarks('containsMatches', dirsContainingMatchedFiles)
+        this.refreshMarks('contains-matching', dirsContainingMatchedFiles)
     }
 }

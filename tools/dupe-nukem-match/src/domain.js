@@ -86,6 +86,7 @@ export class Dir {
     constructor(parent, name) {
         this.parent = parent
         this.name = name
+        /** @type {DirDom|null} */
         this.dom = null // init deferred to create circular reference
 
         /* TREE NAVIGATION - populated while subtree is being constructed */
@@ -157,6 +158,10 @@ export class Dir {
         this.totalFileCount = totalFileCount
         this.hashes = hashes
 
+        // CONSIDER: Might want to only match internally for first target and/or on demand.
+        //           If so we can compute hashes only for the these targets.
+        //           Then the cross-target matches will traverse files instead of using the hashes map...
+
         this.ownTargetMatchCount = Dir.ownTargetMatches(ownTarget, hashes)
         this.otherTargetsMatchCount = Dir.otherTargetsMatches(otherTargets, hashes)
     }
@@ -211,7 +216,7 @@ export class Dir {
             throw new TypeError(`field 'dom' of Dir '${this}' has not been initialized`)
         }
         if (this.otherTargetsMatchCount < this.hashes.size) {
-            this.dom.mark('containsUnmatched', true)
+            this.dom.mark('contains-nonmatching', true)
         }
     }
 }
@@ -231,6 +236,7 @@ export class File {
         this.name = name
         this.size = size
         this.hash = hash
+        /** @type {FileDom|null} */
         this.dom = null // init deferred to create circular reference
 
         /* MATCH STATE - populated in 'refreshMatchState' */
@@ -287,7 +293,7 @@ export class File {
         // Is separate method because we might want to pass some settings,
         // allowing us to update DOM without recomputing state.
         if (this.matchedByOtherTarget === false) {
-            this.dom.mark('unmatched', true)
+            this.dom.mark('matched', false)
         }
     }
 }

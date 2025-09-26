@@ -46,15 +46,15 @@ footer {
     --contains-unmatched-color: slategray;
 }
 
-.hovered {
+/*.hovered {
     background-color: var(--hover-color);
-}
+}*/
 
-.highlighted {
+.selected {
     background-color: var(--highlight-color);
 }
 
-.matched {
+.matching {
     background-color: var(--match-color);
 }
 
@@ -62,11 +62,11 @@ footer {
     color: var(--unmatched-color);
 }
 
-.containsMatches > .name {
+.contains-matching > .name {
     background-color: var(--contains-matches-color);
 }
 
-.containsUnmatched > .name {
+.contains-nonmatching > .name {
     color: var(--contains-matches-color);
 }
 

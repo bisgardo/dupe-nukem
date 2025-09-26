@@ -9,15 +9,58 @@
  * In the former case, it'll just be added directly. In the latter one, the called node will attach the caller to the appropriate container element.
  */
 
-// TODO:
-//  - Both DirDom and FileDom currently have identical implementations of method 'mark'. If it stays that way, consider extracting a common base class.
+// Terminology:
+//   Static (don't depend on selected):
+//   - file is matched in own target : matched
+//   - file is matched in other target : matched
+//   - directory contains some files that are not matched in own target : contains-unmatched
+//   - directory contains some files that are not matched in other target : contains-unmatched
+//   - directory doesn't contain any files that are matched in own target : contains-no-matched
+//   - directory doesn't contain any files that are matched in other target : contains-no-matched
+//   Dynamic (depend on selected):
+//   - file is selected : selected (currently: "hovered"/"highlighted")
+//   - dir is selected : selected
+//   - file matches selected file : matching
+//   - directory contains files matching selected files : contains-matching
+//   - directory contains files *not* matching selected files : contains-nonmatching
+//   Idea: Render "static" property with text styling, "dynamic" ones with background/border?
 
-import { Controller } from "./controller.js"
+
+import {Controller} from "./controller.js"
 import {Dir, File, Target} from "./domain.js"
+
+/** @typedef {'contains-unmatched'|'contains-no-matched'} DirStaticMarkKey */
+/** @typedef {'matched'} FileStaticMarkKey */
+/** @typedef {'selected'|'contains-matching'|'contains-nonmatching'} DirDynamicMarkKey */
+/** @typedef {'selected'|'matching'} FileDynamicMarkKey */
+
+/** @typedef {DirDynamicMarkKey|FileDynamicMarkKey} DynamicMarkKey */
+/** @typedef {DirStaticMarkKey|FileStaticMarkKey} StaticMarkKey */
+
+
+/** @type {Record<DynamicMarkKey|StaticMarkKey, string>} */
+const markCssClass = {
+    'contains-unmatched': 'contains-unmatched',     // dir:      static
+    'contains-no-matched': 'contains-no-matched',   // dir:      static
+    'selected': 'selected',                         // dir/file: dynamic
+    'contains-matching': 'contains-matching',       // dir:      dynamic
+    'contains-nonmatching': 'contains-nonmatching', // dir:      dynamic
+    'matched': 'matched',                           // file:     static
+    'matching': 'matching',                         // file:     dynamic
+}
 
 /** @type {WeakMap<HTMLElement, DirDom|FileDom>} */
 export const domMap = new WeakMap()
 
+/**
+ * @template Key
+ * @typedef {object} Markable
+ * @property {(k: Key, v: boolean) => void} mark
+ */
+
+/**
+ * @implements {Markable<DirStaticMarkKey|DirDynamicMarkKey>}
+ */
 export class DirDom {
     /**
      * @param {Dir} dir
@@ -66,23 +109,23 @@ export class DirDom {
     }
 
     /**
-     * @param {MarkKey} key
+     * @param {DirStaticMarkKey|DirDynamicMarkKey} key
      * @param {boolean} v
      */
     mark(key, v) {
         // For now all keys just map directly to a CSS class.
+        const cssClass = markCssClass[key]
         if (v) {
-            this.root.classList.add(key)
+            this.root.classList.add(cssClass)
         } else {
-            this.root.classList.remove(key)
+            this.root.classList.remove(cssClass)
         }
     }
 }
 
 /**
- * @typedef {'hovered'|'highlighted'|'matched'|'unmatched'|'containsMatches'|'containsUnmatched'} MarkKey
+ * @implements {Markable<FileStaticMarkKey|FileDynamicMarkKey>}
  */
-
 export class FileDom {
     /**
      * @param {File} file
@@ -105,15 +148,16 @@ export class FileDom {
     }
 
     /**
-     * @param {MarkKey} key
+     * @param {FileStaticMarkKey|FileDynamicMarkKey} key
      * @param {boolean} v
      */
     mark(key, v) {
         // For now all keys just map directly to a CSS class.
+        const cssClass = markCssClass[key];
         if (v) {
-            this.root.classList.add(key)
+            this.root.classList.add(cssClass)
         } else {
-            this.root.classList.remove(key)
+            this.root.classList.remove(cssClass)
         }
     }
 
