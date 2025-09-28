@@ -29,18 +29,18 @@ export class Target {
         /**
          * @param {Dir} dir
          */
-        const visitDir = (dir) => {
+        let visitDir = (dir) => {
             /** @type {Set<number>} */
-            for (const d of dir.dirs) {
+            for (let d of dir.dirs) {
                 visitDir(d)
             }
-            for (const f of dir.files) {
+            for (let f of dir.files) {
                 visitFile(f)
             }
             dir.refreshMatchState(this, otherTargets)
         }
         /** @param {File} file */
-        const visitFile = (file) => {
+        let visitFile = (file) => {
             file.refreshMatchState(this, otherTargets)
         }
         visitDir(this.root)
@@ -50,18 +50,18 @@ export class Target {
         /**
          * @param {Dir} dir
          */
-        const visitDir = (dir) => {
+        let visitDir = (dir) => {
             /** @type {Set<number>} */
-            for (const d of dir.dirs) {
+            for (let d of dir.dirs) {
                 visitDir(d)
             }
-            for (const f of dir.files) {
+            for (let f of dir.files) {
                 visitFile(f)
             }
             dir.syncDom()
         }
         /** @param {File} file */
-        const visitFile = (file) => {
+        let visitFile = (file) => {
             file.syncDom()
         }
         visitDir(this.root)
@@ -110,7 +110,7 @@ export class Dir {
     /**
      * Register the DOM manager of this directory and optionally attach it to the parent dir's DOM (if there is one).
      * @param {DirDom} dom DOM manager of the directory.
-     * @param {boolean} attach
+     * @param {boolean} attach Attach to parent's DOM element (if any).
      */
     initDom(dom, attach) {
         this.dom = dom
@@ -141,17 +141,17 @@ export class Dir {
         // Collect hashes of subtree mapped to their total match count (and total file count).
         let totalFileCount = 0
         /** @type {Map<Hash, number>} */
-        const hashes = new Map()
-        for (const d of this.dirs) {
+        let hashes = new Map()
+        for (let d of this.dirs) {
             if (d.hashes === null) {
                 throw new TypeError(`field 'hashes' of Dir '${d}' has not been initialized`)
             }
             totalFileCount += d.totalFileCount
-            for (const [h, c] of d.hashes) {
+            for (let [h, c] of d.hashes) {
                 hashes.set(h, (hashes.get(h) ?? 0) + c)
             }
         }
-        for (const f of this.files) {
+        for (let f of this.files) {
             totalFileCount++
             hashes.set(f.hash, (hashes.get(f.hash) ?? 0) + 1)
         }
@@ -174,7 +174,7 @@ export class Dir {
         let matchedCount = 0
         // NOTE: If we only cared about the presence of matched/unmatched,
         // we could stop once both match and unmatch has occurred.
-        for (const [h, c] of hashes) {
+        for (let [h, c] of hashes) {
             let matches = ownTarget.index.get(h);
             if (matches === undefined) {
                 throw new Error(`hash '${h}' not matched within its own target '${ownTarget}'`)
@@ -192,8 +192,8 @@ export class Dir {
      */
     static otherTargetsMatches(otherTargets, hashes) {
         let matchedCount = 0
-        for (const h of hashes.keys()) {
-            const isMatched = otherTargets.some(({index}) => index.has(h));
+        for (let h of hashes.keys()) {
+            let isMatched = otherTargets.some(({index}) => index.has(h));
             if (isMatched) {
                 matchedCount++
             }
@@ -278,10 +278,10 @@ export class File {
      * @param {Target[]} otherTargets
      */
     refreshMatchState(ownTarget, otherTargets) {
-        const numMatchesOwnTarget = ownTarget.index.get(this.hash)?.length ?? 0;
+        let numMatchesOwnTarget = ownTarget.index.get(this.hash)?.length ?? 0;
         this.matchedByOwnTarget = numMatchesOwnTarget > 1
         this.matchedByOtherTarget = otherTargets.some((target) => {
-            const numMatches = target.index.get(this.hash)?.length ?? 0
+            let numMatches = target.index.get(this.hash)?.length ?? 0
             return numMatches > 0
         })
     }
@@ -305,9 +305,9 @@ export class File {
  * @returns Dir
  */
 function makeTargetDir(parent, name) {
-    const res = new Dir(parent, name)
+    let res = new Dir(parent, name)
     parent?.addDir(res)
-    const dom = new DirDom(res)
+    let dom = new DirDom(res)
     res.initDom(dom, true)
     return res
 }
@@ -321,9 +321,9 @@ function makeTargetDir(parent, name) {
  * @returns File
  */
 function makeTargetFile(dir, name, size, hash) {
-    const res = new File(dir, name, size, hash)
+    let res = new File(dir, name, size, hash)
     dir.addFile(res)
-    const dom = new FileDom(res)
+    let dom = new FileDom(res)
     res.initDom(dom, true)
     return res
 }
@@ -335,7 +335,7 @@ function makeTargetFile(dir, name, size, hash) {
  */
 export function buildTarget(scanRoot) {
     /** @type {FileIndex} */
-    const index = new Map()
+    let index = new Map()
 
     /**
      * @param {unknown} scanDir
@@ -343,14 +343,14 @@ export function buildTarget(scanRoot) {
      */
     function buildRecursive(scanDir, parent) {
         assertScanDir(scanDir)
-        const targetDir = makeTargetDir(parent, scanDir.name)
-        if (scanDir.dirs !== undefined) for (const d of scanDir.dirs) {
+        let targetDir = makeTargetDir(parent, scanDir.name)
+        if (scanDir.dirs !== undefined) for (let d of scanDir.dirs) {
             buildRecursive(d, targetDir)
         }
-        if (scanDir.files !== undefined) for (const f of scanDir.files) {
+        if (scanDir.files !== undefined) for (let f of scanDir.files) {
             assertScanFile(f)
-            const matchFile = makeTargetFile(targetDir, f.name, f.size, f.hash)
-            const matchFiles = index.get(f.hash)
+            let matchFile = makeTargetFile(targetDir, f.name, f.size, f.hash)
+            let matchFiles = index.get(f.hash)
             if (matchFiles === undefined) {
                 index.set(f.hash, [matchFile])
             } else {
@@ -360,7 +360,7 @@ export function buildTarget(scanRoot) {
         return targetDir
     }
 
-    const root = buildRecursive(scanRoot, null)
+    let root = buildRecursive(scanRoot, null)
     return new Target(root, index)
 }
 
@@ -372,10 +372,10 @@ export function buildTarget(scanRoot) {
  */
 export function walkDir(dir, fileCallback, dirCallback, level = 0) {
     if (dirCallback(dir, level++)) {
-        for (const d of dir.dirs) {
+        for (let d of dir.dirs) {
             walkDir(d, fileCallback, dirCallback, level)
         }
-        for (const f of dir.files) {
+        for (let f of dir.files) {
             fileCallback(f, level)
         }
     }

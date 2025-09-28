@@ -39,7 +39,7 @@ import {Dir, File, Target} from "./domain.js"
 
 
 /** @type {Record<DynamicMarkKey|StaticMarkKey, string>} */
-const markCssClass = {
+let markCssClass = {
     'contains-unmatched': 'contains-unmatched',     // dir:      static
     'contains-no-matched': 'contains-no-matched',   // dir:      static
     'selected': 'selected',                         // dir/file: dynamic
@@ -50,7 +50,7 @@ const markCssClass = {
 }
 
 /** @type {WeakMap<HTMLElement, DirDom|FileDom>} */
-export const domMap = new WeakMap()
+export let domMap = new WeakMap()
 
 /**
  * @template Key
@@ -77,9 +77,9 @@ export class DirDom {
      * @returns {HTMLElement}
      */
     static #createRoot(name) {
-        const res = document.createElement('li')
+        let res = document.createElement('li')
         res.className = 'dir'
-        const nameContainer = res.appendChild(document.createElement('div'))
+        let nameContainer = res.appendChild(document.createElement('div'))
         nameContainer.className = 'name'
         nameContainer.textContent = name
         return res
@@ -114,7 +114,7 @@ export class DirDom {
      */
     mark(key, v) {
         // For now all keys just map directly to a CSS class.
-        const cssClass = markCssClass[key]
+        let cssClass = markCssClass[key]
         if (v) {
             this.root.classList.add(cssClass)
         } else {
@@ -141,7 +141,7 @@ export class FileDom {
      * @returns {HTMLElement}
      */
     static #createRoot(name) {
-        const res = document.createElement('li')
+        let res = document.createElement('li')
         res.className = 'file'
         res.textContent = name
         return res
@@ -153,7 +153,7 @@ export class FileDom {
      */
     mark(key, v) {
         // For now all keys just map directly to a CSS class.
-        const cssClass = markCssClass[key];
+        let cssClass = markCssClass[key];
         if (v) {
             this.root.classList.add(cssClass)
         } else {
@@ -183,7 +183,7 @@ export class TargetContainerDom {
     }
 
     static #createRoot() {
-        const root = document.createElement('div')
+        let root = document.createElement('div')
         root.className = 'target-container'
         return root
     }

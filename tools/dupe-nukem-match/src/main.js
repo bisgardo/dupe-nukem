@@ -3,7 +3,7 @@ import {buildTarget} from './domain.js'
 import {TargetContainerDom} from "./dom.js"
 import {Controller} from "./controller.js"
 
-const scanResultPaths = [
+let scanResultPaths = [
     '../gendata/test1.json',
     '../gendata/test2.json',
 ]
@@ -14,7 +14,7 @@ const scanResultPaths = [
  * @return {HTMLElement}
  */
 function domTargetWrapper(targetDoms) {
-    const targetsContainer = document.createElement('div')
+    let targetsContainer = document.createElement('div')
     targetsContainer.className = 'targets-container'
     targetsContainer.replaceChildren(...targetDoms)
     return targetsContainer
@@ -25,7 +25,7 @@ function domTargetWrapper(targetDoms) {
  * @return {Promise<unknown>}
  */
 async function loadLocalScanFile(path) {
-    const res = await fetch(path)
+    let res = await fetch(path)
     if (!res.ok) {
         throw new TypeError(`cannot load local scan file: file not found: ${path}`)
     }
@@ -49,37 +49,37 @@ async function start() {
     //       (2) that we have a place to actually check that matching files are indeed identical.
     // IDEA: Could split up the work such that each target is displayed right after it's loaded
     //       and then call 'updateMatchInfo' and annotate matches only after they've all loaded?
-    const time0 = new Date()
-    const scanResults = await loadLocalScanResults(scanResultPaths)
-    const scanRoots = scanResults.map(({root}) => root)
-    const time1 = new Date()
+    let time0 = new Date()
+    let scanResults = await loadLocalScanResults(scanResultPaths)
+    let scanRoots = scanResults.map(({root}) => root)
+    let time1 = new Date()
     console.info(`scan result files loaded in ${time1.getTime() - time0.getTime()}ms`)
-    const targets = scanRoots.map(buildTarget)
-    const time2 = new Date()
+    let targets = scanRoots.map(buildTarget)
+    let time2 = new Date()
     console.info(`targets built in ${time2.getTime() - time1.getTime()}ms`)
-    for (const t of targets) {
+    for (let t of targets) {
         t.refreshMatchState(targets.filter(target => target !== t))
     }
-    const time3 = new Date()
+    let time3 = new Date()
     console.info(`match state populated in ${time3.getTime() - time2.getTime()}ms`)
-    for (const t of targets) {
+    for (let t of targets) {
         t.syncDom()
     }
-    const time4 = new Date()
+    let time4 = new Date()
     console.info(`DOM synced in ${time4.getTime() - time3.getTime()}ms`)
 
-    const app = document.getElementById('app')
+    let app = document.getElementById('app')
     if (app) {
-        const controller = new Controller(targets)
-        const doms = targets.map((target) => {
+        let controller = new Controller(targets)
+        let doms = targets.map((target) => {
             console.log(target)
-            const res = new TargetContainerDom(target, controller)
+            let res = new TargetContainerDom(target, controller)
             target.root.dom?.appendTo(res) // attach root to target
             return res.root
         })
         app.replaceChildren(domTargetWrapper(doms))
     }
-    const time5 = new Date()
+    let time5 = new Date()
     console.info(`all done in a total of ${time5.getTime() - time0.getTime()}ms`)
 }
 

@@ -58,16 +58,16 @@ export class Controller {
      */
     findMatchesOf(files) {
         /** @type {Set<File>} */
-        const res = new Set()
+        let res = new Set()
         /** @type {Set<number>} */
-        const hashes = new Set()
-        for (const {hash} of files) {
+        let hashes = new Set()
+        for (let {hash} of files) {
             hashes.add(hash)
         }
-        for (const hash of hashes) {
-            for (const t of this.targets) {
-                const matches = t.index.get(hash)
-                if (matches !== undefined) for (const f of matches) {
+        for (let hash of hashes) {
+            for (let t of this.targets) {
+                let matches = t.index.get(hash)
+                if (matches !== undefined) for (let f of matches) {
                     if (!files.has(f)) {
                         res.add(f)
                     }
@@ -83,13 +83,13 @@ export class Controller {
      * @param {typeof this.marks[K]} nodes
      */
     refreshMarks(key, nodes) {
-        const marked = this.marks[key]
-        if (marked !== null) for (const node of marked) {
+        let marked = this.marks[key]
+        if (marked !== null) for (let node of marked) {
             if (!nodes?.has(node)) {
                 node.dom?.mark(key, false)
             }
         }
-        if (nodes !== null) for (const node of nodes) {
+        if (nodes !== null) for (let node of nodes) {
             if (!marked?.has(node)) {
                 node.dom?.mark(key, true)
             }
@@ -98,7 +98,7 @@ export class Controller {
     }
 
     clearMarks() {
-        for (const key of Object.keys(this.marks)) {
+        for (let key of Object.keys(this.marks)) {
             // Type annotation is necessary because 'Object.keys' returns 'string[]'.
             this.refreshMarks(/** @type {DynamicMarkKey} */ (key), null)
         }
@@ -111,13 +111,13 @@ export class Controller {
      */
     selectTarget(target) {
         /** @type {Set<Dir|File>} */
-        const selected = new Set()
+        let selected = new Set()
         while (target !== null) {
             // As we only have a single event listener, we cannot rely on the event bubbling to the parent element
             // when we hit a DOM node sitting above the dir/file elements (like the 'name' div of a Dir).
-            // Instead, we walk up the DOM tree manually until we find a hit (at which point we 'break' out of the loop).
+            // Instead, we walk up the DOM tree manually until we find a hit.
             if (target instanceof HTMLElement) {
-                const dom = domMap.get(target);
+                let dom = domMap.get(target);
                 if (dom instanceof FileDom) {
                     selected.add(dom.file)
                     break;
@@ -135,7 +135,7 @@ export class Controller {
                     )
                     break;
                 }
-                // Target is not a "root" DOM node: bubble on...
+                // Target is not a domain node: bubble on...
                 target = target.parentElement;
             }
         }
@@ -143,14 +143,14 @@ export class Controller {
 
         // Match against hovered and selected files.
         /** @type {Set<File>} */
-        const filesToMatch = new Set()
-        selected.forEach(d => d instanceof File && filesToMatch.add(d))
-        const matchingFiles = this.findMatchesOf(filesToMatch);
+        let filesToMatch = new Set()
+        selected.forEach(s => s instanceof File && filesToMatch.add(s))
+        let matchingFiles = this.findMatchesOf(filesToMatch);
         this.refreshMarks('matching', matchingFiles)
 
         // Collect all parent directories of any files that are matched.
         /** @type {Set<Dir>} */
-        const dirsContainingMatchedFiles = new Set()
+        let dirsContainingMatchedFiles = new Set()
         matchingFiles.forEach(f => f.forEachAncestor(a => dirsContainingMatchedFiles.add(a)))
         this.refreshMarks('contains-matching', dirsContainingMatchedFiles)
     }
