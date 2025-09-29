@@ -1,7 +1,10 @@
-import {Dir, File, Target, walkDir} from "./domain.js"
-import {DirDom, domMap, FileDom, TargetContainerDom} from "./dom.js"
+import {File, walkDir} from "./domain.js"
+import {DirDom, domMap, FileDom} from "./dom.js"
 
-/** @typedef {import("./dom.js").DynamicMarkKey} DynamicMarkKey */
+/** @typedef {import('./domain.js').Dir} Dir */
+/** @typedef {import('./domain.js').Target} Target
+/** @typedef {import('./dom.js').DynamicMarkKey} DynamicMarkKey */
+/** @typedef {import('./dom.js').TargetContainerDom} TargetContainerDom */
 /**
  * @template Key
  * @typedef {import("./dom.js").Markable<Key>} Markable
@@ -14,7 +17,7 @@ export class Controller {
     constructor(targets) {
         this.targets = targets
 
-        /** @type {{[K in DynamicMarkKey]: Set<{dom: Markable<K>|null}>|null}} */
+        /** @type {{[K in DynamicMarkKey]: Set<{dom: Markable<K>|null}>|null}} */ // eslint-disable-line jsdoc/no-undefined-type
         this.marks = {
             'contains-matching': null,    // dir
             'contains-nonmatching': null, // dir
@@ -128,7 +131,7 @@ export class Controller {
                     walkDir(
                         dom.dir,
                         (f) => selected.add(f),
-                        (d, level) => {
+                        (_d, _level) => {
                             // level > 0 && selected.add(d);
                             return true;
                         },

@@ -11,7 +11,7 @@ let scanResultPaths = [
 /**
  * Wrap DOM elements in a container.
  * @param {HTMLElement[]} targetDoms
- * @return {HTMLElement}
+ * @returns {HTMLElement}
  */
 function domTargetWrapper(targetDoms) {
     let targetsContainer = document.createElement('div')
@@ -22,7 +22,7 @@ function domTargetWrapper(targetDoms) {
 
 /**
  * @param {string} path
- * @return {Promise<unknown>}
+ * @returns {Promise<unknown>}
  */
 async function loadLocalScanFile(path) {
     let res = await fetch(path)
@@ -42,6 +42,9 @@ async function loadLocalScanResults(paths) {
     return Promise.all(paths.map(loadLocalScanFile))
 }
 
+/**
+ * Start the app.
+ */
 async function start() {
     // TODO: Instead of loading the scan files, we should have it run through a processor first to produce a match file.
     //       This enables reducing hashes to a small number (using a simple counter) to ensure

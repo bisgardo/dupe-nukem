@@ -1,4 +1,4 @@
-/**
+ /**
  * The main domain model of the app:
  * The app compares a list of {@link Target}s, each of which is loaded from a {@link ScanResult}.
  * A target contains a navigable tree of the file structure and a {@link FileIndex} of files by hash.
@@ -9,7 +9,9 @@
 import {assertScanDir, assertScanFile} from './scan'
 import {DirDom, FileDom} from './dom'
 
-/**
+ /** @typedef {import('./scan.js').ScanResult} ScanResult
+
+  /**
  * All processed information of a root.
  */
 export class Target {
@@ -368,7 +370,7 @@ export function buildTarget(scanRoot) {
  * @param {Dir} dir
  * @param {(file: File, level: number) => void} fileCallback
  * @param {(dir: Dir, level: number) => boolean} dirCallback
- * @param level
+ * @param {number} level
  */
 export function walkDir(dir, fileCallback, dirCallback, level = 0) {
     if (dirCallback(dir, level++)) {

@@ -4,14 +4,14 @@
 
 /**
  * The result of scanning the root directory.
- * @typedef {Object} ScanResult
+ * @typedef {object} ScanResult
  * @property {number} schema_version Schema version.
  * @property {unknown} root Root directory.
  */
 
 /**
  * The result of scanning a directory.
- * @typedef {Object} ScanDir
+ * @typedef {object} ScanDir
  * @property {string} name
  * @property {unknown[]=} dirs
  * @property {unknown[]=} files
@@ -22,7 +22,7 @@
 
 /**
  * The result of scanning a file.
- * @typedef {Object} ScanFile
+ * @typedef {object} ScanFile
  * @property {string} name
  * @property {number} size
  * @property {number} hash
@@ -62,7 +62,7 @@ export function assertScanFile(scanFile) {
 /**
  * Assert (non-recursively) that provided value is a valid {@link ScanDir}, otherwise throw.
  * @param {unknown} scanDir
- * @returns {asserts scanDir is ScanDir}
+ * @returns {asserts scanDir is ScanDir }
  */
 export function assertScanDir(scanDir) {
     if (!isRecord(scanDir)) throw new TypeError(`invalid ScanDir: '${scanDir}' is not an object`)

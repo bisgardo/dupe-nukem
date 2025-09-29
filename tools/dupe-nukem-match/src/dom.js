@@ -27,7 +27,12 @@
 
 
 import {Controller} from "./controller.js"
-import {Dir, File, Target} from "./domain.js"
+import {Target} from "./domain.js"
+
+/* global EventListenerOrEventListenerObject */
+
+/** @typedef {import('./domain.js').Dir} Dir */
+/** @typedef {import('./domain.js').File} File */
 
 /** @typedef {'contains-unmatched'|'contains-no-matched'} DirStaticMarkKey */
 /** @typedef {'matched'} FileStaticMarkKey */
