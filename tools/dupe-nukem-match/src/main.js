@@ -36,7 +36,7 @@ async function loadLocalScanFile(path) {
  * @param {string[]} paths
  * @returns {Promise<import('./scan.js').ScanResult[]>}
  */
-async function loadLocalScanResults(paths) {
+function loadLocalScanResults(paths) {
     // IDEA: Load concurrently in different web workers?
     // @ts-ignore
     return Promise.all(paths.map(loadLocalScanFile))

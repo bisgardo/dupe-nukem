@@ -1,5 +1,5 @@
 import {Dir, File, Target, walkDir} from "./domain.js"
-import {DirDom, domMap, FileDom, TargetContainerDom} from "./dom.js"
+import {DirDom, FileDom, TargetContainerDom, domMap} from "./dom.js"
 
 /** @typedef {import("./dom.js").DynamicMarkKey} DynamicMarkKey */
 /**

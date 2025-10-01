@@ -1,3 +1,5 @@
+/* eslint-disable camelcase */
+
 /**
  * Type definitions and type checking functions for the scan result input types.
  */
