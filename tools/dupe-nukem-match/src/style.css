@@ -38,36 +38,48 @@ footer {
 }
 
 :root {
-    --hover-color: darkcyan;
     --highlight-color: cadetblue;
-    --match-color: darkseagreen;
-    --unmatched-color: silver;
-    --contains-matches-color: mistyrose;
+    --unmatched-color: crimson;
+    --match-color: mediumseagreen;
+    --matched-by-own-target-color: sandybrown;
+    --matched-by-other-target-color: seagreen;
+    --contains-matches-color: darkseagreen;
     --contains-unmatched-color: slategray;
 }
 
-/*.hovered {
-    background-color: var(--hover-color);
-}*/
-
 .selected {
     background-color: var(--highlight-color);
+}
+
+.file {
+    color: var(--unmatched-color);
+
+    &.matched-by-own-target {
+        color: var(--matched-by-own-target-color);
+    }
+    &.matched-by-other-target {
+        /*color: var(--matched-by-other-target-color);*/
+        color: inherit;
+    }
+}
+
+.name, .file {
+    font-family: "ui-monospace", monospace;
+    border: 2px solid transparent;
+    border-radius: 3px;
+    margin: 1px;
 }
 
 .matching {
     background-color: var(--match-color);
 }
 
-.unmatched {
-    color: var(--unmatched-color);
-}
-
 .contains-matching > .name {
-    background-color: var(--contains-matches-color);
+    border-color: var(--contains-matches-color);
 }
 
-.contains-nonmatching > .name {
-    color: var(--contains-matches-color);
+.contains-all-matching > .name {
+    background-color: var(--contains-matches-color);
 }
 
 .legend {

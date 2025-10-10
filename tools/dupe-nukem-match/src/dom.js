@@ -30,8 +30,8 @@ import {Controller} from "./controller.js"
 import {Dir, File, Target} from "./domain.js"
 
 /** @typedef {'contains-unmatched'|'contains-no-matched'} DirStaticMarkKey */
-/** @typedef {'matched'} FileStaticMarkKey */
-/** @typedef {'selected'|'contains-matching'|'contains-nonmatching'} DirDynamicMarkKey */
+/** @typedef {'matched-by-own-target'|'matched-by-other-target'} FileStaticMarkKey */
+/** @typedef {'selected'|'contains-matching'|'contains-all-matching'} DirDynamicMarkKey */
 /** @typedef {'selected'|'matching'} FileDynamicMarkKey */
 
 /** @typedef {DirDynamicMarkKey|FileDynamicMarkKey} DynamicMarkKey */
@@ -40,13 +40,14 @@ import {Dir, File, Target} from "./domain.js"
 
 /** @type {Record<DynamicMarkKey|StaticMarkKey, string>} */
 let markCssClass = {
-    'contains-unmatched': 'contains-unmatched',     // dir:      static
-    'contains-no-matched': 'contains-no-matched',   // dir:      static
-    'selected': 'selected',                         // dir/file: dynamic
-    'contains-matching': 'contains-matching',       // dir:      dynamic
-    'contains-nonmatching': 'contains-nonmatching', // dir:      dynamic
-    'matched': 'matched',                           // file:     static
-    'matching': 'matching',                         // file:     dynamic
+    'selected': 'selected',                               // dir/file: dynamic
+    'contains-unmatched': 'contains-unmatched',           // dir:      static
+    'contains-no-matched': 'contains-no-matched',         // dir:      static
+    'contains-matching': 'contains-matching',             // dir:      dynamic
+    'contains-all-matching': 'contains-all-matching',     // dir:      dynamic
+    'matched-by-own-target': 'matched-by-own-target',     // file:     static
+    'matched-by-other-target': 'matched-by-other-target', // file:     static
+    'matching': 'matching',                               // file:     dynamic
 }
 
 /** @type {WeakMap<HTMLElement, DirDom|FileDom>} */
@@ -67,21 +68,30 @@ export class DirDom {
      */
     constructor(dir) {
         this.dir = dir
-        this.root = DirDom.#createRoot(dir.name)
+        this.root = DirDom.#createRoot()
+        let nameContainer = this.root.appendChild(DirDom.#createNameContainer(dir.name))
         this.container = this.root.appendChild(DirDom.#createContainer())
-        domMap.set(this.root, this)
+        // Make "select" affect labels only, and, in particular, not the spaces between files.
+        domMap.set(nameContainer, this)
+    }
+
+    /**
+     * @returns {HTMLElement}
+     */
+    static #createRoot() {
+        let res = document.createElement('li')
+        res.className = 'dir'
+        return res
     }
 
     /**
      * @param {string} name
      * @returns {HTMLElement}
      */
-    static #createRoot(name) {
-        let res = document.createElement('li')
-        res.className = 'dir'
-        let nameContainer = res.appendChild(document.createElement('div'))
-        nameContainer.className = 'name'
-        nameContainer.textContent = name
+    static #createNameContainer(name) {
+        let res = document.createElement('div');
+        res.className = 'name'
+        res.textContent = name
         return res
     }
 
@@ -153,7 +163,7 @@ export class FileDom {
      */
     mark(key, v) {
         // For now all keys just map directly to a CSS class.
-        let cssClass = markCssClass[key];
+        let cssClass = markCssClass[key]
         if (v) {
             this.root.classList.add(cssClass)
         } else {

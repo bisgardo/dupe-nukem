@@ -69,6 +69,7 @@ export class Target {
 }
 
 /** @typedef {number} Hash */
+/** @typedef {Map<Hash, number>} HashCounts */
 
 /**
  * Index of all files in a target.
@@ -99,7 +100,7 @@ export class Dir {
         /* MATCH STATE - populated in 'refreshMatchState' */
         /** @type {number} */
         this.totalFileCount = 0
-        /** @type {Map<Hash, number>|null} */
+        /** @type {HashCounts|null} */
         this.hashes = null
         /** @type {number|null} */
         this.ownTargetMatchCount = null
@@ -175,7 +176,7 @@ export class Dir {
         // NOTE: If we only cared about the presence of matched/unmatched,
         // we could stop once both match and unmatch has occurred.
         for (let [h, c] of hashes) {
-            let matches = ownTarget.index.get(h);
+            let matches = ownTarget.index.get(h)
             if (matches === undefined) {
                 throw new Error(`hash '${h}' not matched within its own target '${ownTarget}'`)
             }
@@ -193,7 +194,7 @@ export class Dir {
     static otherTargetsMatches(otherTargets, hashes) {
         let matchedCount = 0
         for (let h of hashes.keys()) {
-            let isMatched = otherTargets.some(({index}) => index.has(h));
+            let isMatched = otherTargets.some(({index}) => index.has(h))
             if (isMatched) {
                 matchedCount++
             }
@@ -215,8 +216,11 @@ export class Dir {
         if (this.dom === null) {
             throw new TypeError(`field 'dom' of Dir '${this}' has not been initialized`)
         }
+        if (this.ownTargetMatchCount < this.hashes.size) {
+            this.dom.mark('contains-unmatched-own-target', true)
+        }
         if (this.otherTargetsMatchCount < this.hashes.size) {
-            this.dom.mark('contains-nonmatching', true)
+            this.dom.mark('contains-unmatched-other-target', true)
         }
     }
 }
@@ -278,7 +282,7 @@ export class File {
      * @param {Target[]} otherTargets
      */
     refreshMatchState(ownTarget, otherTargets) {
-        let numMatchesOwnTarget = ownTarget.index.get(this.hash)?.length ?? 0;
+        let numMatchesOwnTarget = ownTarget.index.get(this.hash)?.length ?? 0
         this.matchedByOwnTarget = numMatchesOwnTarget > 1
         this.matchedByOtherTarget = otherTargets.some((target) => {
             let numMatches = target.index.get(this.hash)?.length ?? 0
@@ -287,13 +291,16 @@ export class File {
     }
 
     syncDom() {
+        // Is separate method because we might want to pass some settings,
+        // allowing us to update DOM without recomputing state.
         if (this.dom === null) {
             throw new TypeError(`field 'dom' of File '${this}' has not been initialized`)
         }
-        // Is separate method because we might want to pass some settings,
-        // allowing us to update DOM without recomputing state.
-        if (this.matchedByOtherTarget === false) {
-            this.dom.mark('matched', false)
+        if (this.matchedByOwnTarget) {
+            this.dom.mark('matched-by-own-target', true)
+        }
+        if (this.matchedByOtherTarget) {
+            this.dom.mark('matched-by-other-target', true)
         }
     }
 }

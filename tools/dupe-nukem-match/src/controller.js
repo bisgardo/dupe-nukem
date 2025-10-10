@@ -1,6 +1,9 @@
 import {Dir, File, Target, walkDir} from "./domain.js"
 import {DirDom, FileDom, TargetContainerDom, domMap} from "./dom.js"
 
+/** @typedef {import("./domain.js").Hash} Hash */
+/** @typedef {import("./domain.js").HashCounts} HashCounts */
+
 /** @typedef {import("./dom.js").DynamicMarkKey} DynamicMarkKey */
 /**
  * @template Key
@@ -16,10 +19,10 @@ export class Controller {
 
         /** @type {{[K in DynamicMarkKey]: Set<{dom: Markable<K>|null}>|null}} */
         this.marks = {
-            'contains-matching': null,    // dir
-            'contains-nonmatching': null, // dir
-            'selected': null,             // dir or file
-            'matching': null,             // file
+            'contains-matching': null,      // dir
+            'contains-all-matching': null,  // dir
+            'selected': null,               // dir or file
+            'matching': null,               // file
         }
 
         /** @type {EventTarget|null} */
@@ -53,22 +56,18 @@ export class Controller {
     }
 
     /**
-     * @param {Set<File>} files
+     * @param {Set<Hash>} hashes
+     * @param {Set<Dir|File>} selected
      * @returns {Set<File>}
      */
-    findMatchesOf(files) {
+    findMatchesOf(hashes, selected) {
         /** @type {Set<File>} */
         let res = new Set()
-        /** @type {Set<number>} */
-        let hashes = new Set()
-        for (let {hash} of files) {
-            hashes.add(hash)
-        }
         for (let hash of hashes) {
             for (let t of this.targets) {
                 let matches = t.index.get(hash)
                 if (matches !== undefined) for (let f of matches) {
-                    if (!files.has(f)) {
+                    if (!selected.has(f)) {
                         res.add(f)
                     }
                 }
@@ -112,40 +111,56 @@ export class Controller {
     selectTarget(target) {
         /** @type {Set<Dir|File>} */
         let selected = new Set()
-        while (target !== null) {
+
+        /**
+         * @param {HTMLElement} el
+         * @return {EventTarget|null} Next target to attempt.
+         */
+        function handle(el) {
+            let dom = domMap.get(el)
+            if (dom instanceof FileDom) {
+                selected.add(dom.file)
+                return null
+            }
+            if (dom instanceof DirDom) {
+                selected.add(dom.dir)
+                if (dom.dir.hashes === null) {
+                    throw new Error(`hashes of dir '${dom.dir.name}' has not yet been initialized`)
+                }
+                // Collect all files and directories in the subtree for highlighting.
+                walkDir(
+                    dom.dir,
+                    (f) => selected.add(f),
+                    (d, level) => {
+                        // level > 0 && selected.add(d)
+                        return true
+                    },
+                )
+                return null
+            }
+            return el.parentElement
+        }
+
+        while (target instanceof HTMLElement) {
             // As we only have a single event listener, we cannot rely on the event bubbling to the parent element
             // when we hit a DOM node sitting above the dir/file elements (like the 'name' div of a Dir).
             // Instead, we walk up the DOM tree manually until we find a hit.
-            if (target instanceof HTMLElement) {
-                let dom = domMap.get(target);
-                if (dom instanceof FileDom) {
-                    selected.add(dom.file)
-                    break;
-                }
-                if (dom instanceof DirDom) {
-                    selected.add(dom.dir)
-                    // Collect all files and directories in the subtree for highlighting.
-                    walkDir(
-                        dom.dir,
-                        (f) => selected.add(f),
-                        (d, level) => {
-                            // level > 0 && selected.add(d);
-                            return true;
-                        },
-                    )
-                    break;
-                }
-                // Target is not a domain node: bubble on...
-                target = target.parentElement;
-            }
+            target = handle(target)
         }
         this.refreshMarks('selected', selected)
+        this.refreshMatches(selected)
+    }
 
-        // Match against hovered and selected files.
-        /** @type {Set<File>} */
-        let filesToMatch = new Set()
-        selected.forEach(s => s instanceof File && filesToMatch.add(s))
-        let matchingFiles = this.findMatchesOf(filesToMatch);
+    /**
+     * @param {Set<Dir|File>} selected
+     */
+    refreshMatches(selected) {
+        /** @type {Set<Hash>} */
+        let hashes = new Set()
+        for (let s of selected) {
+            if (s instanceof File) hashes.add(s.hash)
+        }
+        let matchingFiles = this.findMatchesOf(hashes, selected)
         this.refreshMarks('matching', matchingFiles)
 
         // Collect all parent directories of any files that are matched.
@@ -153,5 +168,42 @@ export class Controller {
         let dirsContainingMatchedFiles = new Set()
         matchingFiles.forEach(f => f.forEachAncestor(a => dirsContainingMatchedFiles.add(a)))
         this.refreshMarks('contains-matching', dirsContainingMatchedFiles)
+
+        // /**
+        //  * @param {Dir} d
+        //  */
+        // function containsOnlyMatchedFiles(d) {
+        //     if (d.hashes === null) {
+        //         throw new Error(`hashes of dir '${d.name}' have not yet been initialized`)
+        //     }
+        //     for (let h of d.hashes.keys()) {
+        //         if (!hashes.has(h)) {
+        //             return false
+        //         }
+        //     }
+        //     return true
+        // }
+
+        /**
+         * @param {Dir} d
+         */
+        function containsAllMatchedFiles(d) {
+            if (d.hashes === null) {
+                throw new Error(`hashes of dir '${d.name}' have not yet been initialized`)
+            }
+            // IDEA: Could count number of matched hashes for more stats...
+            for (let h of hashes) {
+               if (!d.hashes.has(h)) {
+                   return false
+               }
+            }
+            return true
+        }
+
+        let dirsContainingAllMatchedFiles = new Set()
+        for (let d of dirsContainingMatchedFiles) {
+            if (containsAllMatchedFiles(d)) dirsContainingAllMatchedFiles.add(d)
+        }
+        this.refreshMarks('contains-all-matching', dirsContainingAllMatchedFiles)
     }
 }
